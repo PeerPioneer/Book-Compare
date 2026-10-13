@@ -44,6 +44,7 @@ class Action {
         }
 
         this.draw = this._draw.bind(this);
+        document.addEventListener('redraw_view', () => this._draw());
         this.updating = false;
 
         const { add: hover_add, remove: hover_remove } = this.hoverSwitch(this.result_container);
@@ -233,6 +234,9 @@ class Action {
         // Reset radio and slider ui
         document.getElementById('radio-horizontal').checked = this._HORIZONTAL;
         document.getElementById('radio-vertical').checked = !this._HORIZONTAL;
+        document.querySelectorAll('#slide_seg .seg').forEach((b) => {
+            b.classList.toggle('active', (b.dataset.value === 'horizontal') === this._HORIZONTAL);
+        });
         this.image_slider.classList.add('horizontal');
         this.image_slider.style.left = '50%';
         this.image_slider.style.top = '50%';
@@ -603,7 +607,7 @@ class Action {
         if(filename_list.length !== 2) {
             filename_list = ['im1.png', 'im2-aligned.png'];
         }
-        const im1 = this.result.getImageData(this.result.input_image);
+        const im1 = this.result.getImageData(this.result.ocanvas);
         this.result.bctx.putImageData( im1, 0, 0 );
         this.download_el.href = this.result.bcanvas.toDataURL("image/png");
         this.download_el.download = filename_list[0];
@@ -625,7 +629,7 @@ class Action {
             gif_filename = filename_list[0] + '-' + filename_list[1] + '.gif';
         }
 
-        const im1_data = this.result.getImageData(this.result.input_image);
+        const im1_data = this.result.getImageData(this.result.ocanvas);
         this.result.bctx.putImageData( im1_data, 0, 0 );
         var im1 = document.createElement('img');
         im1.src = this.result.bcanvas.toDataURL("image/png");

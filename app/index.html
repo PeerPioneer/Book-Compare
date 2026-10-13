@@ -426,10 +426,23 @@
         margin-bottom: 0.25em;
         background-color: #f7f7f7;
       }
+      #bw_row {
+        grid-area: 3 / 1 / 4 / 2;
+        justify-self: center;
+        padding: 0.4em 0 0.2em;
+        cursor: default;
+      }
+      #bw_row label {
+        display: flex;
+        align-items: center;
+        gap: 0.4em;
+        white-space: nowrap;
+      }
       .image_adjust {
         flex: 0 0 auto;
         display: flex;
         align-items: center;
+        justify-content: center;
         flex-wrap: wrap;
         gap: 0.6em;
         padding: 0.5em 0.75em;
@@ -503,6 +516,50 @@
       #toggle .mdc-tab.active .mdc-tab__text-label.mdc-theme--on-primary {
         color: var(--mdc-theme-primary, #6200ee) !important;
       }
+      /* Slide mode's Horizontal/Vertical switch: same look as the toggle */
+      .segmented {
+        display: flex;
+        box-shadow: 0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14);
+      }
+      .segmented .seg {
+        height: 48px;
+        padding: 0 24px;
+        border: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.4);
+        background: var(--mdc-theme-primary, #6200ee);
+        color: #fff;
+        font: 500 14px Roboto, sans-serif;
+        letter-spacing: 0.0892857143em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      .segmented .seg:last-child {
+        border-right: 0;
+      }
+      .segmented .seg.active {
+        background: #fff;
+        color: var(--mdc-theme-primary, #6200ee);
+      }
+      .pane__btn.na {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .pane__btn.na:hover {
+        background: #fafafa;
+      }
+      .pane__btn.on {
+        background: #d3e8e8;
+      }
+      .pane__btn.on svg {
+        stroke: #008080;
+      }
+      .pane__btn svg .f {
+        fill: #777;
+        stroke: none;
+      }
+      .pane__btn.on svg .f {
+        fill: #008080;
+      }
       .diff_note {
         line-height: 1.3;
         white-space: nowrap;
@@ -532,33 +589,97 @@
         font-weight: 500;
       }
 
-      /* row 3 is 0-height now (see #compare_container above) - the button
-         is centred in the "Compare" screen's column (column 1) by taking it
-         out of the grid's height calculation with position:absolute, which
-         also fixes a bug where that empty row was leaking a blank band
-         into column 2 (the result view), since row tracks are shared
-         across both 100vw-wide columns. */
-      /* Reverted from an earlier position:absolute attempt to fix a white
-         bar in the result view - that approach made the button disappear
-         entirely instead, so back to plain grid placement + margin
-         centering (the way this worked in every round before that one).
-         The white-bar issue is still open; worth a safer fix later. */
-      #compare {
-        grid-area: 3 / 1 / 4 / 2;
-        margin: auto auto 1.5em auto;
+      /* ---- Bottom (teal) bar ----
+         Three cells: Back | menu | everything else. Step 2 and step 3 use
+         the same bar; the class "step2"/"step3" on it (switched in
+         compare.js) decides the arrangement. */
+      .bar {
+        position: relative;
+        display: grid;
+        grid-template-columns: auto auto 1fr;
+        align-items: center;
+        min-height: 86px;
+      }
+      .bar.step3 {
+        grid-template-columns: 1fr auto 1fr;
+      }
+      .bar > * {
+        margin: 0.5em;
+      }
+      .bar > #back {
+        justify-self: start;
+      }
+      .bar_right {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        margin: 0;
+      }
+      .bar_right > #link_toggle {
+        margin-left: auto;
+      }
+      .bar_right > #link_toggle,
+      .bar_right > #more {
+        flex: 0 0 auto;
+      }
+      .bar > .mdc-tab:not(#back) {
+        margin-right: 0;
+      }
+      .bar_right .transform_help_btn {
+        margin: 0 0.5em 0 0.25em;
+      }
+      /* Narrow window (e.g. half of the screen): stop centring the menu so
+         everything still fits in the bar. */
+      @media (max-width: 1150px) {
+        .bar.step3 {
+          grid-template-columns: auto auto 1fr;
+        }
+        #toggle .mdc-tab {
+          padding: 0 12px;
+          min-width: 0;
+        }
+        .segmented .seg {
+          padding: 0 14px;
+        }
+        .bar > * {
+          margin: 0.25em;
+        }
+        .bar.step2 > #compare {
+          left: 63%;
+        }
+      }
+      .bar.step2 #action {
+        display: none;
+      }
+      .bar.step3 #compare {
+        display: none;
+      }
+      /* the "which transform?" help button only belongs to step 2 */
+      .bar.step3 .transform_help_btn {
+        display: none;
+      }
+      /* The Compare button sits in the middle of the bar in step 2 */
+      .bar > #compare {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        margin: 0;
         background-color: #fff !important;
         color: var(--mdc-theme-primary, #6200ee) !important;
         padding: 0 2em;
-        height: 56px;
+        height: 48px;
       }
       #compare .mdc-button__label {
-        font-size: 1.3em;
+        font-size: 1.2em;
         font-weight: 700;
         letter-spacing: 0.05em;
       }
 
       div.result_container {
-        grid-area: 2 / 2;
+        /* spans the button's row as well, so the result view fills the full
+           height (row 3 is sized by the Compare button in the other column) */
+        grid-area: 2 / 2 / 4 / 3;
         position: relative;
         overflow: hidden;
         min-height: 0;
@@ -1618,13 +1739,14 @@
       </section>
       <footer>
         <span
-          >Developed by
+          >Book Compare is based on Image Compare, developed by
           <a
             href="https://robots.ox.ac.uk/~vgg/"
             rel="noopener noreferrer"
             target="_blank"
             >VGG, Oxford</a
-          ></span
+          >
+          &nbsp;|&nbsp; Modifications by Torge Schiefelbein</span
         >
       </footer>
     </div>
@@ -1770,12 +1892,6 @@
               <span class="material-icons"> change_circle </span>
             </div>
             <div class="image_adjust" onclick="event.stopPropagation()">
-              <label for="bw_toggle_checkbox_1" style="cursor: pointer">
-                <input type="checkbox" id="bw_toggle_checkbox_1" />
-                <span class="mdc-typography--caption mdc-theme--primary"
-                  >Black-and-white</span
-                >
-              </label>
               <input
                 type="range"
                 id="contrast_slider_1"
@@ -1802,12 +1918,6 @@
               <span class="material-icons"> change_circle </span>
             </div>
             <div class="image_adjust" onclick="event.stopPropagation()">
-              <label for="bw_toggle_checkbox_2" style="cursor: pointer">
-                <input type="checkbox" id="bw_toggle_checkbox_2" />
-                <span class="mdc-typography--caption mdc-theme--primary"
-                  >Black-and-white</span
-                >
-              </label>
               <input
                 type="range"
                 id="contrast_slider_2"
@@ -1823,6 +1933,15 @@
             </div>
           </li>
         </ul>
+
+        <div id="bw_row" onclick="event.stopPropagation()">
+          <label for="bw_toggle_checkbox_1" style="cursor: pointer">
+            <input type="checkbox" id="bw_toggle_checkbox_1" />
+            <span class="mdc-typography--caption mdc-theme--primary"
+              >Black-and-white (both images)</span
+            >
+          </label>
+        </div>
 
         <ul
           class="mdc-image-list horizontal-image-list fr f-justify-center f-stretch"
@@ -1865,14 +1984,6 @@
           </div>
         </div>
 
-        <button id="compare" class="mdc-button mdc-button--raised">
-          <span
-            class="mdc-button__ripple"
-            data-mdc-auto-init="MDCRipple"
-          ></span>
-          <span class="mdc-button__touch"></span>
-          <span class="mdc-button__label">Compare</span>
-        </button>
       </div>
       <footer class="w-100">
         <div
@@ -1899,7 +2010,7 @@
             <span class="mdc-linear-progress__bar-inner"></span>
           </div>
         </div>
-        <div class="w-100 fr f-auto mdc-theme--primary-bg mdc-elevation--z4">
+        <div class="w-100 bar step2 mdc-theme--primary-bg mdc-elevation--z4">
           <button id="back" class="mdc-tab mdc-tab--stacked">
             <span class="mdc-tab__content">
               <span
@@ -2191,6 +2302,7 @@
               </div>
             </span>
           </div>
+          <div class="bar_right">
           <button
             id="transform_help_btn"
             class="transform_help_btn"
@@ -2234,48 +2346,13 @@
                 </div>
               </div>
             </div>
-            <div id="slide" class="fr f-auto hide">
-              <div class="mdc-form-field" data-mdc-auto-init="MDCFormField">
-                <div
-                  class="mdc-radio mdc-radio--touch"
-                  data-mdc-auto-init="MDCRadio"
-                >
-                  <input
-                    class="mdc-radio__native-control"
-                    type="radio"
-                    id="radio-horizontal"
-                    name="radio-slider"
-                    value="horizontal"
-                    checked
-                  />
-                  <div class="mdc-radio__background">
-                    <div class="mdc-radio__outer-circle"></div>
-                    <div class="mdc-radio__inner-circle"></div>
-                  </div>
-                  <div class="mdc-radio__ripple"></div>
-                </div>
-                <label for="radio-horizontal">Horizontal</label>
+            <div id="slide" class="hide">
+              <div class="segmented" id="slide_seg">
+                <button type="button" class="seg active" data-value="horizontal">Horizontal</button>
+                <button type="button" class="seg" data-value="vertical">Vertical</button>
               </div>
-              <div class="mdc-form-field" data-mdc-auto-init="MDCFormField">
-                <div
-                  class="mdc-radio mdc-radio--touch"
-                  data-mdc-auto-init="MDCRadio"
-                >
-                  <input
-                    class="mdc-radio__native-control"
-                    type="radio"
-                    id="radio-vertical"
-                    name="radio-slider"
-                    value="vertical"
-                  />
-                  <div class="mdc-radio__background">
-                    <div class="mdc-radio__outer-circle"></div>
-                    <div class="mdc-radio__inner-circle"></div>
-                  </div>
-                  <div class="mdc-radio__ripple"></div>
-                </div>
-                <label for="radio-vertical">Vertical</label>
-              </div>
+              <input type="radio" class="gone" id="radio-horizontal" name="radio-slider" value="horizontal" checked />
+              <input type="radio" class="gone" id="radio-vertical" name="radio-slider" value="vertical" />
             </div>
             <!-- The "Red = image 1 / Cyan = Image 2" note now lives in the
                  "Superimposed" panel label itself (see panes.js) instead of
@@ -2423,6 +2500,15 @@
               </ul>
             </div>
           </button>
+          </div>
+          <button id="compare" class="mdc-button mdc-button--raised">
+            <span
+              class="mdc-button__ripple"
+              data-mdc-auto-init="MDCRipple"
+            ></span>
+            <span class="mdc-button__touch"></span>
+            <span class="mdc-button__label">Compare</span>
+          </button>
         </div>
       </footer>
     </div>
@@ -2539,6 +2625,17 @@
           compare = new Compare(compare_el, result, action_bar);
           samples = new Samples(samples_el);
 
+          document.querySelectorAll("#slide_seg .seg").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const r = document.getElementById("radio-" + btn.dataset.value);
+              r.checked = true;
+              r.dispatchEvent(new Event("change", { bubbles: true }));
+              document
+                .querySelectorAll("#slide_seg .seg")
+                .forEach((b) => b.classList.toggle("active", b === btn));
+            });
+          });
+
           main.c.addEventListener("select_image", (e) => {
             compare.set_image(e.detail.urls);
             compare.set_filename(e.detail.selected_filename_list);
@@ -2550,7 +2647,7 @@
           });
 
           compare.c.addEventListener("back", () => {
-            main.c.scrollIntoView({ behavior: "smooth" });
+            go_to_screen(main.c, {});
           });
 
           compare.c.addEventListener("more", () => {
@@ -2572,7 +2669,6 @@
         // now a fixed `const` (always full resolution), so there's nothing
         // to wire up for it any more.
         const bw_checkbox_1 = document.getElementById("bw_toggle_checkbox_1");
-        const bw_checkbox_2 = document.getElementById("bw_toggle_checkbox_2");
         const slider_1 = document.getElementById("contrast_slider_1");
         const slider_2 = document.getElementById("contrast_slider_2");
         const label_1 = document.getElementById("contrast_label_1");
@@ -2593,7 +2689,7 @@
         };
         const sync_settings = () => {
           BW_ENABLED_1 = bw_checkbox_1.checked;
-          BW_ENABLED_2 = bw_checkbox_2.checked;
+          BW_ENABLED_2 = bw_checkbox_1.checked; // one checkbox for both images
           CONTRAST_PERCENT_1 = Number(slider_1.value);
           CONTRAST_PERCENT_2 = Number(slider_2.value);
           label_1.textContent =
@@ -2603,7 +2699,6 @@
           apply_preview();
         };
         bw_checkbox_1.onchange = sync_settings;
-        bw_checkbox_2.onchange = sync_settings;
         slider_1.oninput = sync_settings;
         slider_2.oninput = sync_settings;
         sync_settings(); // also picks up boxes the browser restored after a reload

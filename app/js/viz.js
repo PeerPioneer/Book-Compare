@@ -215,6 +215,49 @@ class Visualization {
         this._input_image = val;
     }
 
+    // The superimposition can be drawn from four versions of the two pages:
+    // black & white or colour, each with or without the contrast boost chosen
+    // in Step 2. The alignment is computed ONCE (from the version that was
+    // used when Compare was pressed) and never again: the other versions are
+    // made by treating the untouched scans (rcanvas1 / rcanvas2, already
+    // moved with that same alignment), so nothing shifts between versions.
+    _variant(bw, ctr) {
+        if (bw === this.bw0 && ctr) return { a: this.ocanvas, b: this.tcanvas };
+        const key = bw + '|' + ctr;
+        if (!this._variants) this._variants = new Map();
+        if (this._variants.has(key)) return this._variants.get(key);
+        const make = (src, pct) => {
+            const d = src.getContext('2d').getImageData(0, 0, src.width, src.height);
+            apply_bw_contrast(d, bw, ctr ? pct : 100);
+            const cv = document.createElement('canvas');
+            cv.width = src.width;
+            cv.height = src.height;
+            cv.getContext('2d').putImageData(d, 0, 0);
+            return cv;
+        };
+        const v = {
+            a: make(this.rcanvas1, this.c1),
+            b: make(this.rcanvas2, this.c2),
+        };
+        this._variants.set(key, v);
+        // keep memory in check: at most two extra versions at a time
+        while (this._variants.size > 2) {
+            this._variants.delete(this._variants.keys().next().value);
+        }
+        return v;
+    }
+
+    set_view(bw, ctr) {
+        const v = this._variant(bw, ctr);
+        this._input_image = v.a;
+        this._aligned = v.b;
+        document.dispatchEvent(new CustomEvent('redraw_view'));
+    }
+
+    get aligned() {
+        return this._aligned || this.tcanvas;
+    }
+
     set_filename_list(filename_list) {
         this.selected_filename_list = filename_list;
     }
@@ -242,6 +285,12 @@ class Visualization {
         this.ocanvas.width = im1Data.width;
         this.ocanvas.height = im1Data.height;
         this.octx.putImageData(im1Data, 0, 0);
+        // remember the Step 2 settings this comparison was made with
+        this.bw0 = BW_ENABLED_1;
+        this.c1 = CONTRAST_PERCENT_1;
+        this.c2 = CONTRAST_PERCENT_2;
+        this._variants = new Map();
+        this._aligned = null;
         this.input_image = this.ocanvas;
 
         // The untreated, original image 1 needs no alignment - it's the
@@ -347,7 +396,7 @@ class Visualization {
         if (is_horizontal) {
           this.ctx.drawImage(this.input_image, 0, 0, iw * slide_factor, ih, 0, 0, ow, oh);
           this.ctx.drawImage(
-            this.tcanvas,
+            this.aligned,
             ow,
             0,
             rw - ow,
@@ -360,7 +409,7 @@ class Visualization {
         } else {
           this.ctx.drawImage(this.input_image, 0, 0, iw, ih * slide_factor, 0, 0, ow, oh);
           this.ctx.drawImage(
-            this.tcanvas,
+            this.aligned,
             0,
             oh,
             rw,
@@ -446,7 +495,7 @@ class Visualization {
     }
 
     draw_toggle_image(flag = false) {
-        this._draw_image(flag ? this.tcanvas : this.input_image, true);
+        this._draw_image(flag ? this.aligned : this.input_image, true);
         this.draw();
     }
 
@@ -457,7 +506,8 @@ class Visualization {
         // 2. https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Compositing
         // 3. https://stackoverflow.com/questions/33822092/greyscale-canvas-make-canvas-color-to-black-and-white
 
-        const { bctx, dctx, dcanvas, input_image, tcanvas } = this;
+        const { bctx, dctx, dcanvas, input_image } = this;
+        const tcanvas = this.aligned;
 
         // Copy image 1. Tinted teal: a pixel that's dark (inked) in image 1
         // stays dark regardless of tint, so the tint only shows through
@@ -498,7 +548,7 @@ class Visualization {
         this.bctx.save();
         this._draw_image(this.input_image, true);
         this.bctx.globalAlpha = factor;
-        this._draw_image(this.tcanvas, false);
+        this._draw_image(this.aligned, false);
         this.bctx.restore();
 
         this.draw();

@@ -10,6 +10,21 @@ const twice = () => {
         count++;
     }
 }
+// Scrolls to one of the app's screens and remembers it, so that when the
+// browser window is resized (or snapped to half the screen) the view can be
+// put back exactly on that screen instead of staying at a stale pixel offset.
+const go_to_screen = (el, opts) => {
+    window.__screen = { el, opts };
+    el.scrollIntoView(Object.assign({ behavior: 'smooth' }, opts));
+};
+window.addEventListener('resize', () => {
+    const sc = window.__screen;
+    if (!sc) return;
+    window.requestAnimationFrame(() => {
+        sc.el.scrollIntoView(Object.assign({}, sc.opts, { behavior: 'auto' }));
+    });
+});
+
 class Compare {
     constructor(container, result, action_bar) {
         this.c = container;
@@ -164,7 +179,8 @@ class Compare {
         this.visualisation_select.MDCSelect.setValue('diff');
         this.visualisation_select.querySelector('#selected-text').textContent = 'Difference';
 
-        this.cc.scrollIntoView({behavior: 'smooth', inline: 'start'});
+        go_to_screen(this.cc, {inline: 'start'});
+        this.footer.querySelector('.bar').classList.replace('step3', 'step2');
         window.requestAnimationFrame(() => {
             this.action_bar.reset();
         })
@@ -178,7 +194,8 @@ class Compare {
         this.link_option.classList.remove('hide');
 
         this.action_bar.show();
-        this.cc.scrollIntoView({behavior: 'smooth', inline: 'end'})
+        go_to_screen(this.cc, {inline: 'end'});
+        this.footer.querySelector('.bar').classList.replace('step2', 'step3');
         this.back_btn.onclick = this.show_compare_screen.bind(this);
     }
 }
