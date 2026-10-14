@@ -44,8 +44,32 @@ const COLOR_CHANNELS = {
 };
 
 // Colours of the Difference view: ink that is only in image 1 / only in image 2.
-const DIFF_COLOR_1 = "#F00";     // red
-const DIFF_COLOR_2 = "#28AA28";  // grass green
+// The user can change them via More > "Change colors (Difference mode)";
+// the choice is remembered in this browser (if it allows storing).
+const DIFF_PRESETS = [
+    { id: "red-green",   name: "Red / green",   c1: "#E60000", c2: "#00961E", n1: "Red",    n2: "Green",
+      note: "Default. Hard to tell apart with red-green colour blindness." },
+    { id: "orange-blue", name: "Orange / blue", c1: "#E66100", c2: "#005AC8", n1: "Orange", n2: "Blue",
+      note: "Clear for all common forms of colour blindness." },
+    { id: "orange-navy", name: "Orange / dark blue", c1: "#F07800", c2: "#0028A0", n1: "Orange", n2: "Dark blue",
+      note: "Also differs in lightness, so it works in greyscale too." },
+    { id: "red-blue",    name: "Red / blue",    c1: "#E60000", c2: "#0046C8", n1: "Red",    n2: "Blue",
+      note: "Keeps the red; clear for all common forms of colour blindness." },
+];
+let DIFF_COLOR_1 = DIFF_PRESETS[0].c1;
+let DIFF_COLOR_2 = DIFF_PRESETS[0].c2;
+try {
+    const saved = JSON.parse(localStorage.getItem("bookcompare_diff_colors") || "null");
+    const ok = (c) => typeof c === "string" && /^#[0-9A-Fa-f]{6}$/.test(c);
+    if (saved && ok(saved.c1) && ok(saved.c2)) { DIFF_COLOR_1 = saved.c1; DIFF_COLOR_2 = saved.c2; }
+} catch (e) { /* storing is optional */ }
+
+const set_diff_colors = (c1, c2) => {
+    DIFF_COLOR_1 = c1;
+    DIFF_COLOR_2 = c2;
+    try { localStorage.setItem("bookcompare_diff_colors", JSON.stringify({ c1, c2 })); } catch (e) {}
+    document.dispatchEvent(new CustomEvent("diffcolorschange"));
+};
 
 // Turns the picture on this canvas into an "ink layer": blank paper becomes
 // white and printed ink is tinted with `color`. The paper brightness is

@@ -45,6 +45,9 @@ class Action {
 
         this.draw = this._draw.bind(this);
         document.addEventListener('redraw_view', () => this._draw());
+        document.addEventListener('diffcolorschange', () => {
+            if (this.result && this.MODE === 'diff') this.result.draw_diff_image();
+        });
         this.updating = false;
 
         const { add: hover_add, remove: hover_remove } = this.hoverSwitch(this.result_container);
@@ -80,6 +83,9 @@ class Action {
                 this.download_el.target = '_blank';
                 this.download_el.removeAttribute('download');
                 this.download_el.click();
+                break;
+            case 'diff_colors':
+                document.dispatchEvent(new CustomEvent('opendiffcolors'));
                 break;
             case 'about':
                 this.info_dialog_el.MDCDialog.open();

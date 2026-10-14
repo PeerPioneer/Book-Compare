@@ -230,7 +230,10 @@
                 s.replace(/[&<>"']/g, (c) => ({
                     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
                 }[c]));
-            this.label.innerHTML = String(text).split('\n').map(escape_html).join('<br>');
+            // "[[#RRGGBB]]" becomes a small coloured square (the hex code is validated by the pattern)
+            const squares = (s) => s.replace(/\[\[(#[0-9A-Fa-f]{6})\]\]/g,
+                '<span style="color:$1;font-size:1.3em;line-height:1">\u25A0</span>');
+            this.label.innerHTML = String(text).split('\n').map((l) => squares(escape_html(l))).join('<br>');
             this.label.style.display = 'block';
         }
 
@@ -546,7 +549,7 @@
         main.gray_btn.innerHTML = mainview.bw ? ICON.paletteBW : ICON.paletteColor;
         main.gray_btn.classList.toggle('na', diff);
         main.gray_btn.title = diff
-            ? 'Not available in Difference mode (it is always shown in red and green)'
+            ? 'Not available in Difference mode (it is always shown in two ink colours)'
             : mainview.bw
             ? 'Showing black and white - click for colour'
             : 'Showing colour - click for black and white';
@@ -579,12 +582,17 @@
     // explaining the colors while in Difference mode specifically.
     let current_mode = 'diff'; // the app starts in Difference mode
     const update_main_label = () => {
-        main.set_label(
-            current_mode === 'diff'
-                ? 'Superimposed\nRed = image 1\nGreen = image 2'
-                : 'Superimposed'
-        );
+        let note = '';
+        if (current_mode === 'diff') {
+            const preset = DIFF_PRESETS.find((p) => p.c1 === DIFF_COLOR_1 && p.c2 === DIFF_COLOR_2);
+            const nm = (name) => (name ? ' ' + name : '');
+            note = `\n[[${DIFF_COLOR_1}]]${nm(preset && preset.n1)} = image 1` +
+                   `\n[[${DIFF_COLOR_2}]]${nm(preset && preset.n2)} = image 2`;
+        }
+        main.set_label('Superimposed' + note);
     };
+
+    document.addEventListener('diffcolorschange', update_main_label);
 
     document.addEventListener('modechange', (e) => {
         const mode = e.detail;

@@ -931,6 +931,15 @@
         width: 100px;
         vertical-align: middle;
       }
+      /* "Change colors (Difference mode)" dialog */
+      .diff_row { display: flex; align-items: center; gap: 0.75em; padding: 0.55em 0; border-top: 1px solid rgba(0,0,0,0.12); }
+      .diff_row input[type='radio'] { flex: 0 0 auto; width: 1.2em; height: 1.2em; accent-color: var(--mdc-theme-primary, #008080); }
+      .diff_label { min-width: 0; display: flex; align-items: center; gap: 0.5em; cursor: pointer; flex: 1 1 auto; }
+      .diff_swatch { display: inline-block; width: 2.2em; height: 2.2em; border-radius: 4px; border: 1px solid rgba(0,0,0,0.3); flex: 0 0 auto; }
+      .diff_label input[type='color'] { width: 2.6em; height: 2.4em; padding: 0; border: 1px solid rgba(0,0,0,0.3); border-radius: 4px; background: none; flex: 0 0 auto; }
+      .diff_name { margin-left: 0.5em; font-weight: 500; min-width: 0; white-space: normal; }
+      #diff_colors_dialog .mdc-dialog__surface { max-width: 640px; }
+      .diff_note { display: block; font-weight: 400; font-size: 0.85em; opacity: 0.75; }
       /* fixed width, so the slider does not move when the label text changes */
       #contrast_label_1,
       #contrast_label_2 {
@@ -1390,6 +1399,50 @@
             >
               <div class="mdc-button__ripple"></div>
               <span class="mdc-button__label">Got it!</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mdc-dialog__scrim"></div>
+    </div>
+    <div
+      class="mdc-dialog"
+      aria-modal="true"
+      aria-labelledby="diff-colors-title"
+      id="diff_colors_dialog"
+      data-mdc-auto-init="MDCDialog"
+    >
+      <div class="mdc-dialog__container">
+        <div class="mdc-dialog__surface">
+          <h2 class="mdc-dialog__title" id="diff-colors-title">
+            Colors for the Difference view
+          </h2>
+          <div class="mdc-dialog__content" id="diff-colors-content">
+            <p style="margin-top: 0">
+              Ink that is only in image 1 is shown in the first color, ink
+              that is only in image 2 in the second. Ink that is in both
+              turns out dark.
+            </p>
+            <div id="diff_presets"></div>
+            <div class="diff_row" id="diff_custom_row">
+              <input type="radio" name="diff_pair" id="diff_pair_custom" />
+              <label for="diff_pair_custom" class="diff_label">
+                <input type="color" id="diff_custom_1" value="#e60000" />
+                <input type="color" id="diff_custom_2" value="#00961e" />
+                <span class="diff_name">Your own colors
+                  <span class="diff_note">Pick any two colors: first for image 1, second for image 2.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <div class="mdc-dialog__actions">
+            <button type="button" class="mdc-button mdc-dialog__button" data-mdc-dialog-action="cancel">
+              <div class="mdc-button__ripple"></div>
+              <span class="mdc-button__label">Cancel</span>
+            </button>
+            <button type="button" class="mdc-button mdc-dialog__button" id="diff_apply" data-mdc-dialog-action="apply">
+              <div class="mdc-button__ripple"></div>
+              <span class="mdc-button__label">Apply</span>
             </button>
           </div>
         </div>
@@ -2478,6 +2531,21 @@
                     >Export Current View (e.g. Difference)</span
                   >
                 </li>
+                <li
+                  class="mdc-deprecated-list-item"
+                  role="menuitem"
+                  data-name="diff_colors"
+                >
+                  <span class="mdc-deprecated-list-item__ripple"></span>
+                  <span
+                    class="mdc-deprecated-list-item__graphic mdc-menu__selection-group-icon material-icons"
+                    aria-hidden="true"
+                    >palette</span
+                  >
+                  <span class="mdc-deprecated-list-item__text"
+                    >Change colors (Difference mode)</span
+                  >
+                </li>
                 <li class="mdc-list-divider" role="separator"></li>
                 <li
                   class="mdc-deprecated-list-item"
@@ -2767,6 +2835,50 @@
             refreshing = true;
           }
         );
+      });
+    </script>
+    <script>
+      // "Change colors (Difference mode)" dialog
+      window.addEventListener("load", () => {
+        const dlg = document.getElementById("diff_colors_dialog");
+        const list = document.getElementById("diff_presets");
+        const custom_radio = document.getElementById("diff_pair_custom");
+        const c1 = document.getElementById("diff_custom_1");
+        const c2 = document.getElementById("diff_custom_2");
+        const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+        DIFF_PRESETS.forEach((p) => {
+          const row = document.createElement("div");
+          row.className = "diff_row";
+          row.innerHTML =
+            `<input type="radio" name="diff_pair" id="diff_pair_${p.id}" value="${p.id}">` +
+            `<label for="diff_pair_${p.id}" class="diff_label">` +
+            `<span class="diff_swatch" style="background:${p.c1}"></span>` +
+            `<span class="diff_swatch" style="background:${p.c2}"></span>` +
+            `<span class="diff_name">${p.name}<span class="diff_note">${p.note}</span></span></label>`;
+          list.appendChild(row);
+        });
+        const select_current = () => {
+          const hit = DIFF_PRESETS.find((p) => same(p.c1, DIFF_COLOR_1) && same(p.c2, DIFF_COLOR_2));
+          c1.value = DIFF_COLOR_1.toLowerCase();
+          c2.value = DIFF_COLOR_2.toLowerCase();
+          if (hit) document.getElementById("diff_pair_" + hit.id).checked = true;
+          else custom_radio.checked = true;
+        };
+        [c1, c2].forEach((el) => el.addEventListener("input", () => { custom_radio.checked = true; }));
+        document.addEventListener("opendiffcolors", () => {
+          select_current();
+          dlg.MDCDialog.open();
+        });
+        dlg.addEventListener("MDCDialog:closed", (e) => {
+          if (e.detail.action !== "apply") return;
+          if (custom_radio.checked) {
+            set_diff_colors(c1.value.toUpperCase(), c2.value.toUpperCase());
+          } else {
+            const chosen = document.querySelector('input[name="diff_pair"]:checked');
+            const p = chosen && DIFF_PRESETS.find((q) => q.id === chosen.value);
+            if (p) set_diff_colors(p.c1, p.c2);
+          }
+        });
       });
     </script>
   </body>
