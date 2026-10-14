@@ -47,7 +47,7 @@ const COLOR_CHANNELS = {
 // The user can change them via More > "Change colors (Difference mode)";
 // the choice is remembered in this browser (if it allows storing).
 const DIFF_PRESETS = [
-    { id: "red-green",   name: "Red / green",   c1: "#FF0000", c2: "#28AA28", n1: "Red",    n2: "Green",
+    { id: "red-green",   name: "Red / green",   c1: "#FF0000", c2: "#00961E", n1: "Red",    n2: "Green",
       note: "Default. Hard to tell apart with red-green colour blindness." },
     { id: "orange-blue", name: "Orange / blue", c1: "#E66100", c2: "#005AC8", n1: "Orange", n2: "Blue",
       note: "Clear for all common forms of colour blindness." },

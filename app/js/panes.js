@@ -168,6 +168,8 @@
             this.locked = false;
             this.onchange = null;
             this._expected = null;
+            this._last_left = 0; // scroll position at the previous scroll event,
+            this._last_top = 0;  // to tell which direction the user moved
 
             this._build();
             this.vp.addEventListener('scroll', () => this._on_scroll());
@@ -296,6 +298,8 @@
             window.requestAnimationFrame(() => {
                 this._expected = null;
             });
+            this._last_left = this.vp.scrollLeft;
+            this._last_top = this.vp.scrollTop;
             this._read_center();
             this.update_bars();
         }
@@ -310,8 +314,10 @@
             this.cy = ch > vh + 0.5 ? clamp((this.vp.scrollTop + vh / 2 - pad) / this.H, 0, 1) : 0.5;
         }
 
-        _notify() {
-            if (this.onchange) this.onchange(this);
+        // `axes` says what changed ({x, y}); without it, everything changed
+        // (zoom, fit). The other linked panels then take over only that.
+        _notify(axes) {
+            if (this.onchange) this.onchange(this, axes);
         }
 
         _on_scroll() {
@@ -321,12 +327,18 @@
                 Math.abs(this.vp.scrollLeft - e.left) < 1.5 &&
                 Math.abs(this.vp.scrollTop - e.top) < 1.5
             ) {
+                this._last_left = this.vp.scrollLeft;
+                this._last_top = this.vp.scrollTop;
                 this.update_bars();
                 return;
             }
+            const moved_x = Math.abs(this.vp.scrollLeft - this._last_left) > 0.5;
+            const moved_y = Math.abs(this.vp.scrollTop - this._last_top) > 0.5;
+            this._last_left = this.vp.scrollLeft;
+            this._last_top = this.vp.scrollTop;
             this._read_center();
             this.update_bars();
-            this._notify();
+            if (moved_x || moved_y) this._notify({ x: moved_x, y: moved_y });
         }
 
         _on_resize() {
@@ -380,12 +392,17 @@
 
     const state = { linked: true, last: main };
 
-    const on_change = (src) => {
+    const on_change = (src, axes) => {
         state.last = src;
         if (!state.linked) return;
+        // Scrolling in one direction passes on only that direction. The panels
+        // differ in size, so sending the other direction too would drag them
+        // (and, through them, this panel) sideways when you move up or down
+        // while standing at a left or right edge.
+        const a = axes || { x: true, y: true };
         const v = src.get_view();
         panes.forEach((p) => {
-            if (p !== src) p.apply_view(v);
+            if (p !== src) p.apply_view({ z: v.z, cx: a.x ? v.cx : p.cx, cy: a.y ? v.cy : p.cy });
         });
         if (typeof result !== 'undefined' && result) result._measure_canvas();
     };
