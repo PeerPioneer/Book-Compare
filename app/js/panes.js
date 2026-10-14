@@ -546,7 +546,7 @@
         main.gray_btn.innerHTML = mainview.bw ? ICON.paletteBW : ICON.paletteColor;
         main.gray_btn.classList.toggle('na', diff);
         main.gray_btn.title = diff
-            ? 'Not available in Difference mode (it is always shown in grey, red and cyan)'
+            ? 'Not available in Difference mode (it is always shown in red and green)'
             : mainview.bw
             ? 'Showing black and white - click for colour'
             : 'Showing colour - click for black and white';
@@ -581,7 +581,7 @@
     const update_main_label = () => {
         main.set_label(
             current_mode === 'diff'
-                ? 'Superimposed\nRed = image 1\nCyan = Image 2'
+                ? 'Superimposed\nRed = image 1\nGreen = image 2'
                 : 'Superimposed'
         );
     };

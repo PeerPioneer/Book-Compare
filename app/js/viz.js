@@ -43,6 +43,62 @@ const COLOR_CHANNELS = {
     rgb: "#FFF",
 };
 
+// Colours of the Difference view: ink that is only in image 1 / only in image 2.
+const DIFF_COLOR_1 = "#F00";     // red
+const DIFF_COLOR_2 = "#28AA28";  // grass green
+
+// Turns the picture on this canvas into an "ink layer": blank paper becomes
+// white and printed ink is tinted with `color`. The paper brightness is
+// measured for each scan, so slightly yellowed or darker pages still come
+// out white in the background.
+const inkLayer = (_ctx, color) => {
+    const c = _ctx.canvas;
+    // Put the scan on white (areas outside the aligned page count as blank paper)
+    _ctx.save();
+    _ctx.globalCompositeOperation = "destination-over";
+    _ctx.fillStyle = "#FFF";
+    _ctx.fillRect(0, 0, c.width, c.height);
+    _ctx.restore();
+    grayscale(_ctx);
+
+    // Estimate the paper brightness from a small copy (90th percentile)
+    const k = Math.min(1, 200 / Math.max(c.width, c.height));
+    const small = document.createElement("canvas");
+    small.width = Math.max(1, Math.round(c.width * k));
+    small.height = Math.max(1, Math.round(c.height * k));
+    const sctx = small.getContext("2d");
+    sctx.drawImage(c, 0, 0, small.width, small.height);
+    const d = sctx.getImageData(0, 0, small.width, small.height).data;
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) hist[d[i]]++;
+    const total = small.width * small.height;
+    let acc = 0, level = 255;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= 0.9 * total) { level = v; break; } }
+    const p = Math.min(1, Math.max(0.5, level / 255));
+
+    // Stretch so that paper -> white and the darker ink -> full ink strength
+    const lo = 0.45 * p;
+    const m = 1 / (p - lo);
+    const q = -lo * m;
+    const cc = 1 - 2 * q;
+    const b = m / cc;
+    const tmp = document.createElement("canvas");
+    tmp.width = c.width; tmp.height = c.height;
+    tmp.getContext("2d").drawImage(c, 0, 0);
+    _ctx.save();
+    _ctx.clearRect(0, 0, c.width, c.height);
+    _ctx.filter = `brightness(${b}) contrast(${cc})`;
+    _ctx.drawImage(tmp, 0, 0);
+    _ctx.restore();
+
+    // "screen" with the colour: white stays white, black (ink) becomes `color`
+    _ctx.save();
+    _ctx.globalCompositeOperation = "screen";
+    _ctx.fillStyle = color;
+    _ctx.fillRect(0, 0, c.width, c.height);
+    _ctx.restore();
+};
+
 const multiplyChannel = (_ctx, cname) => {
     _ctx.save();
     _ctx.fillStyle = COLOR_CHANNELS[cname] || "#000";
@@ -501,43 +557,27 @@ class Visualization {
 
     draw_diff_image() {
 
-        // Based on
-        // 1. https://stackoverflow.com/questions/60937639/canvas-splitting-image-into-rgba-components
-        // 2. https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Compositing
-        // 3. https://stackoverflow.com/questions/33822092/greyscale-canvas-make-canvas-color-to-black-and-white
-
+        // How the Difference view is made (two "ink layers" multiplied):
+        // each scan becomes a grey picture; blank paper stays white and
+        // printed ink is tinted with that scan's colour (image 1 = red,
+        // image 2 = green). The two layers are then multiplied, so:
+        //   ink only in image 1  -> red
+        //   ink only in image 2  -> green
+        //   ink in both          -> dark (the two colours multiplied)
+        //   blank in both        -> white
         const { bctx, dctx, dcanvas, input_image } = this;
         const tcanvas = this.aligned;
 
-        // Copy image 1. Tinted teal: a pixel that's dark (inked) in image 1
-        // stays dark regardless of tint, so the tint only shows through
-        // where image 1 is blank - i.e. this layer's colour marks spots
-        // that are unique to image 2 (see the "lighter" blend below).
+        // image 1
         copyImage(dctx, input_image);
-
-        // gray scale
-        grayscale(dctx);
-
-        // Get channel
-        multiplyChannel(dctx, "bg");
-
-        // Copy it to diff canvas
+        inkLayer(dctx, DIFF_COLOR_1);
         this._draw_image(dcanvas, true);
 
-        // copy image2, tinted red - by the same logic, this layer's colour
-        // marks spots that are unique to image 1, so after the "lighter"
-        // (additive) blend below: red = image 1, teal = image 2.
+        // image 2, multiplied onto image 1
         copyImage(dctx, tcanvas);
-
-        // grayscale
-        grayscale(dctx);
-
-        // multiply red
-        multiplyChannel(dctx, "red");
-
-        // Copy it over diff canvas
+        inkLayer(dctx, DIFF_COLOR_2);
         bctx.save();
-        bctx.globalCompositeOperation = "lighter";
+        bctx.globalCompositeOperation = "multiply";
         this._draw_image(dcanvas, false);
         bctx.restore();
 

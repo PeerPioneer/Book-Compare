@@ -931,6 +931,14 @@
         width: 100px;
         vertical-align: middle;
       }
+      /* fixed width, so the slider does not move when the label text changes */
+      #contrast_label_1,
+      #contrast_label_2 {
+        display: inline-block;
+        width: 9.5em;
+        text-align: left;
+        white-space: nowrap;
+      }
 
       #result > div.image_slider {
         width: 100%;
@@ -1896,7 +1904,7 @@
                 type="range"
                 id="contrast_slider_1"
                 min="100"
-                max="400"
+                max="200"
                 value="100"
               />
               <span
@@ -1922,7 +1930,7 @@
                 type="range"
                 id="contrast_slider_2"
                 min="100"
-                max="400"
+                max="200"
                 value="100"
               />
               <span
