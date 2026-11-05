@@ -1,12 +1,12 @@
 @echo off
-rem Starts Book Compare on this computer (no internet needed) and opens it in Edge.
-title Book Compare
+rem Starts the Book Compare helper quietly in the background (no window) and opens Book Compare in your browser.
+rem If something goes wrong, use "Start Book Compare (with window, for problems).bat" instead.
 if not exist "%~dp0launcher\serve.ps1" (
   echo The folder "launcher" was not found next to this file.
-  echo Please unzip the whole Book Compare download first, then start this file from the unzipped folder.
+  echo Please unzip the whole Book Compare download first, then double-click this file again.
   echo.
   pause
   exit /b 1
 )
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0launcher\serve.ps1"
-if errorlevel 1 pause
+start "" /min powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0launcher\serve.ps1" -Hidden
+exit /b 0

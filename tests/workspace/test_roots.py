@@ -91,6 +91,16 @@ with sync_playwright() as p:
         pg4.click('#ws-banner [data-act=allow]'); clicks += 1; pg4.wait_for_timeout(700)
     assert hid(pg4, '#ws-banner') and pg4.locator('#ws-thumbs img').count() >= 2, clicks
     assert before == snapshot(pg4), 'scan folders must be unchanged'
+    # the project folder may lie NEXT TO the copy folders (inside the folder that holds them) - that is where many people keep it
+    pg.evaluate("(async()=>{ window.__h.P = await __h.scans.getDirectoryHandle('Project',{create:true}); })()")
+    pg.evaluate("window.__picks.push(window.__h.P)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1300)
+    assert 'Saved in folder' in pg.inner_text('#ws-save') and 'Project' in pg.inner_text('#ws-save'), pg.inner_text('#ws-save')
+    # a scan folder may be the folder that holds the project ...
+    pg.click('#ws .ws-addbtn'); pg.evaluate("window.__picks.push(window.__h.scans)"); pg.click('#ac-folder'); pg.wait_for_timeout(600)
+    assert pg.inner_text('#ac-err') == '', pg.inner_text('#ac-err'); pg.click('[data-close]')
+    # ... but a folder that holds scans of the project stays off limits for the project
+    pg.evaluate("window.__picks.push(window.__h.B)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(500)
+    assert 'scan folder' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
     assert not errs, errs
     print('ALL ROOT TESTS PASSED')
     b.close()

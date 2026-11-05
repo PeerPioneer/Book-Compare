@@ -43,8 +43,8 @@ with sync_playwright() as p:
     assert [lbl(1), lbl(2), lbl(3)] == ['1r', 'Index', '2r']
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(150); assert lbl(1) == 'Page 1'      # undo also undoes the switch
     pg.keyboard.press('Control+y'); pg.wait_for_timeout(150); assert lbl(1) == '1r'
-    # a project must never be saved in (or around) a scan folder
-    for target in ('A', 'scans'):
+    # a project must never be saved in a folder that holds scans of this project (a folder that only contains such folders is fine, see test_roots.py)
+    for target in ('B', 'AB'):
         pg.evaluate("k=>window.__picks.push(window.__h[k])", target); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(400)
         assert 'scan folder' in pg.inner_text('#ws-toast'), 'saving into a scan folder must be refused'
     pg.evaluate("window.__picks.push(window.__h.proj)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(900)

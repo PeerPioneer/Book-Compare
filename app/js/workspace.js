@@ -11,8 +11,12 @@
    Pages are placed in file-name order and then corrected by hand (automatic page matching is a later step).
    A chosen pair of pages is handed to the existing two-image screen; "Back" there returns to this layer.
 
-   Browsers: Edge/Chrome use the File System Access API (folder picker, remembered folders, automatic saving).
-   Other browsers fall back to a plain folder upload (kept in memory only) and a downloaded project file. */
+   Three ways to reach the scan folders:
+   - Helper mode: the small Book Compare helper program on this computer (launcher/serve.ps1) reads the scan folders and writes
+     the project file. Folders are remembered as plain addresses, so nothing has to be allowed again after a restart, and it works in
+     any browser (Firefox too). Used automatically when the page is opened through the helper (http://localhost:8765/).
+   - Edge/Chrome without the helper use the File System Access API (folder picker, remembered folders, automatic saving).
+   - Other browsers fall back to a plain folder upload (kept in memory only) and a downloaded project file. */
 (function () {
   'use strict';
 
@@ -85,6 +89,140 @@
         tx.onerror = function () { rej(tx.error); };
       });
     }).catch(function () { return false; });
+  }
+
+
+  /* ---------------------------------------------------------------- helper mode (folders read by the helper program, see launcher/serve.ps1) */
+  // HDir / HFile imitate the folder and file objects of the browser's File System Access API, so the rest of this file does not
+  // care where a folder comes from. A folder is a root (registered with the helper under a random id) plus a path inside it.
+  var HELPER = null;                 // the helper's answer to /api/ping, or null when there is no helper
+  var helperStart = { scans: null, project: null };
+  var helperReady = detectHelper();
+  async function detectHelper() {
+    if (!/^https?:$/.test(location.protocol) || !window.fetch) return false;
+    try {
+      var ctl = window.AbortController ? new AbortController() : null, t = ctl ? setTimeout(function () { ctl.abort(); }, 2500) : 0;
+      var r = await fetch('/api/ping', { cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+      if (t) clearTimeout(t);
+      if (!r.ok) return false;
+      var j = await r.json();
+      if (!j || j.app !== 'BookCompare') return false;
+      HELPER = j; HAS_FSA = true;
+      return true;
+    } catch (e) { return false; }
+  }
+  function helperError(status, j) {
+    var code = j && j.error, e = new Error((j && j.message) || 'The Book Compare helper refused the request.');
+    e.code = code;
+    e.name = status === 404 ? 'NotFoundError' : status === 403 ? 'NotAllowedError' : 'Error';
+    return e;
+  }
+  function helperLost() { var e = new Error('The Book Compare helper is not running. Start it with “Start Book Compare”.'); e.name = 'Lost'; return e; }
+  async function hrequest(method, url, body) {
+    var resp;
+    try { resp = await fetch(url, { method: method, headers: { 'X-BookCompare': '1' }, body: body, cache: 'no-store' }); }
+    catch (e) { throw helperLost(); }
+    return resp;
+  }
+  async function hjson(url, obj) {
+    var resp = await hrequest('POST', url, JSON.stringify(obj || {}));
+    var j = null; try { j = await resp.json(); } catch (e) { j = null; }
+    if (!resp.ok) throw helperError(resp.status, j);
+    return j;
+  }
+  // a request about a folder that was registered before; if the helper was restarted meanwhile, the folder is registered again
+  async function hcall(ref, method, endpoint, rel, body) {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      var resp = await hrequest(method, endpoint + '?root=' + encodeURIComponent(ref.id) + '&path=' + encodeURIComponent(rel), body);
+      if (resp.ok) return resp;
+      var j = null; try { j = await resp.json(); } catch (e) { j = null; }
+      if (j && j.error === 'unknown-root' && attempt === 0) { var again = await hjson('/api/register', { path: ref.path, kind: ref.kind }); ref.id = again.id; continue; }
+      throw helperError(resp.status, j);
+    }
+  }
+  function slashPath(p) { return String(p).replace(/\\/g, '/'); }
+  function hsegs(h) {
+    var base = slashPath(h.ref.path).split('/').filter(function (x) { return x; });
+    return h.rel ? base.concat(h.rel.split('/')) : base;
+  }
+  function hsame(a, b) { return HELPER && HELPER.os === 'windows' ? a.toLowerCase() === b.toLowerCase() : a === b; }
+  function HDir(ref, rel, name) { this.kind = 'directory'; this.isHelper = true; this.ref = ref; this.rel = rel; this.name = name; }
+  Object.defineProperty(HDir.prototype, 'rootPath', { get: function () { return this.ref.path; } });
+  HDir.prototype._stat = function (rel) { return hcall(this.ref, 'GET', '/api/stat', joinPath(this.rel, rel)).then(function (r) { return r.json(); }); };
+  HDir.prototype.getDirectoryHandle = async function (name) {
+    var st = await this._stat(name);
+    if (!st.dir) { var e = new Error('Not a folder: ' + name); e.name = 'TypeMismatchError'; throw e; }
+    return new HDir(this.ref, joinPath(this.rel, name), name);
+  };
+  HDir.prototype.getFileHandle = async function (name, opts) {
+    var f = new HFile(this, name);
+    if (opts && opts.create) return f;
+    var st = await this._stat(name);
+    if (st.dir) { var e = new Error('Not a file: ' + name); e.name = 'TypeMismatchError'; throw e; }
+    f._info = st;
+    return f;
+  };
+  HDir.prototype.entries = function () {
+    var self = this, list = null, i = 0, it = {};
+    it[Symbol.asyncIterator] = function () { return it; };
+    it.next = async function () {
+      if (!list) {
+        var j = await (await hcall(self.ref, 'GET', '/api/list', self.rel)).json();
+        list = j.entries.map(function (e) {
+          if (e.d) return [e.n, new HDir(self.ref, joinPath(self.rel, e.n), e.n)];
+          var f = new HFile(self, e.n); f._info = { size: e.s, mtime: e.m }; return [e.n, f];
+        });
+      }
+      if (i >= list.length) return { done: true, value: undefined };
+      return { done: false, value: list[i++] };
+    };
+    return it;
+  };
+  HDir.prototype.isSameEntry = async function (o) {
+    if (!o || !o.isHelper) return false;
+    var a = hsegs(this), b = hsegs(o);
+    return a.length === b.length && a.every(function (x, k) { return hsame(x, b[k]); });
+  };
+  // the path of folder o inside this folder (as a list of names), [] if it is this folder, null if it lies elsewhere
+  HDir.prototype.resolve = async function (o) {
+    if (!o || !o.isHelper) return null;
+    var a = hsegs(this), b = hsegs(o);
+    if (b.length < a.length) return null;
+    for (var k = 0; k < a.length; k++) if (!hsame(a[k], b[k])) return null;
+    return b.slice(a.length);
+  };
+  HDir.prototype.queryPermission = async function () { try { await this._stat(''); return 'granted'; } catch (e) { return 'denied'; } };
+  HDir.prototype.requestPermission = async function () { await this._stat(''); return 'granted'; };
+  function HFile(dir, name) { this.kind = 'file'; this.isHelper = true; this.dir = dir; this.name = name; this._info = null; }
+  HFile.prototype.getFile = async function () {
+    var resp = await hcall(this.dir.ref, 'GET', '/api/file', joinPath(this.dir.rel, this.name));
+    var blob = await resp.blob();
+    var m = parseInt(resp.headers.get('X-Mtime-Ms'), 10) || (this._info && this._info.mtime) || Date.now();
+    return new File([blob], this.name, { type: blob.type, lastModified: m });
+  };
+  HFile.prototype.createWritable = async function () {
+    var self = this, parts = [];
+    return {
+      write: async function (d) { parts.push(d); },
+      close: async function () { await hcall(self.dir.ref, 'PUT', '/api/write', joinPath(self.dir.rel, self.name), new Blob(parts, { type: 'application/octet-stream' })); }
+    };
+  };
+  async function helperRegister(path, kind) {
+    var j = await hjson('/api/register', { path: path, kind: kind });
+    return new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name);
+  }
+  // the Windows folder window, opened by the helper. If it cannot be shown, the folder address can be pasted instead.
+  async function helperPick(kind) {
+    var j;
+    try { j = await hjson('/api/pick', { kind: kind, start: helperStart[kind] || null }); }
+    catch (e) {
+      if (e && e.code !== 'no-dialog') throw e;
+      var typed = window.prompt('Book Compare could not open the Windows folder window.\nPaste the address of the folder here (in Explorer: click the address bar, copy, paste):', '');
+      if (!typed || !typed.trim()) { var ab = new Error('cancelled'); ab.name = 'AbortError'; throw ab; }
+      return helperRegister(typed.trim().replace(/^"|"$/g, ''), kind);
+    }
+    if (j.cancelled) { var ab2 = new Error('cancelled'); ab2.name = 'AbortError'; throw ab2; }
+    return new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name);
   }
 
   /* ---------------------------------------------------------------- state */
@@ -247,21 +385,36 @@
       inp.click();
     });
   }
-  async function sameOrNested(a, b) {
-    // true if folder a is the same as, inside, or contains folder b
-    if (await a.isSameEntry(b)) return true;
-    if (await a.resolve(b)) return true;
-    if (await b.resolve(a)) return true;
-    return false;
-  }
+  // Scans must not be read from the project folder (or from inside it).
   async function checkNotProjectFolder(dir) {
-    if (proj.handle && await sameOrNested(dir, proj.handle)) throw refusal('That folder is (or is inside, or contains) your project folder. Scans and project must be in different folders.');
+    if (proj.handle && await proj.handle.resolve(dir)) throw refusal('That folder is (or is inside) your project folder. Scans and project must be in different folders.');
+  }
+  // The folders that really hold the scans of this project (one entry per folder, not the whole root).
+  async function usedImageDirs() {
+    var seen = {}, out = [];
+    for (var i = 0; i < S.copies.length; i++) {
+      var c = S.copies[i];
+      for (var j = 0; j < c.cells.length; j++) {
+        var k = c.cells[j]; if (!k) continue;
+        var sk = splitKey(k), l = c.locs && c.locs[sk.n], r = l && rootById(l.root);
+        if (!r || !r.handle) continue;
+        var cut = sk.rel.lastIndexOf('/'), rel = joinPath(l.path, cut < 0 ? '' : sk.rel.slice(0, cut)), mk = r.id + '|' + rel;
+        if (seen[mk]) continue; seen[mk] = 1;
+        try { out.push({ d: await dirAt(r, rel), name: rel ? rel.split('/').pop() : r.name }); } catch (e) { /* not reachable right now: skipped */ }
+      }
+    }
+    return out;
+  }
+  // The project is saved in a folder of its own. It may lie next to the scan folders, or in a folder that holds them,
+  // but never in (or inside) a folder that holds scans used by this project.
+  async function projectConflict(h) {
+    var dirs = await usedImageDirs();
+    for (var i = 0; i < dirs.length; i++) if (await dirs[i].d.resolve(h)) return dirs[i].name;
+    return null;
   }
   async function checkNotScanFolder(h) {
-    for (var i = 0; i < S.roots.length; i++) {
-      var r = S.roots[i]; if (!r.handle) continue;
-      if (await sameOrNested(h, r.handle)) throw refusal('That folder is (or is inside, or contains) the scan folder “' + r.name + '”. The project must be saved in a separate folder, so that your scan folders are never touched.');
-    }
+    var n = await projectConflict(h);
+    if (n) throw refusal('That folder is (or is inside) the scan folder “' + n + '”. The project must be saved in a separate folder, so that your scan folders are never touched.');
   }
   // A picked folder becomes (or joins) a root. If a known root already covers it, that root is reused, so one permission is enough.
   async function rootFor(h, granted) {
@@ -277,7 +430,7 @@
       try { rel = await h.resolve(r.handle); } catch (e) { rel = null; }
       if (rel) { repoint(r, nr, rel.join('/')); S.roots.splice(i, 1); }
     }
-    idbPut('handles', S.projectId + '/root/' + nr.id, h);
+    if (!h.isHelper) idbPut('handles', S.projectId + '/root/' + nr.id, h);
     return { root: nr, path: '' };
   }
   function repoint(from, to, pre) {
@@ -288,6 +441,7 @@
   // The Windows folder window opens where you chose a folder last time. The browser does not always remember that by itself
   // (it often does not when the app is opened from a file), so the last folder is kept here and passed as the starting point.
   async function pickDir(kind, mode) {
+    if (HELPER) return helperPick(mode === 'read' ? 'scans' : 'project');
     var start = await idbGet('meta', 'start:' + kind), opts = { id: kind, mode: mode };
     if (start) opts.startIn = start;
     var h;
@@ -310,7 +464,9 @@
     var dir = await pickDir('book-scans', 'read');
     await checkNotProjectFolder(dir);
     var loc = await rootFor(dir, true);
-    if (loc.path && loc.root.handle) idbPut('meta', 'start:book-scans', loc.root.handle);     // next time start in the folder that holds the others
+    if (loc.path && loc.root.handle) {                                                          // next time start in the folder that holds the others
+      if (loc.root.handle.isHelper) helperStart.scans = loc.root.handle.rootPath; else idbPut('meta', 'start:book-scans', loc.root.handle);
+    }
     var g = await scanLoc(loc.root, loc.path);
     return { root: loc.root, path: loc.path, name: dir.name, groups: g.groups, ignored: g.ignored };
   }
@@ -327,6 +483,15 @@
     for (var i = 0; i < parts.length - 1; i++) d = await d.getDirectoryHandle(parts[i]);
     var fh = await d.getFileHandle(parts[parts.length - 1]);
     return fh.getFile();
+  }
+  // size and date of a scan without loading it (helper mode only; null otherwise)
+  async function statScan(copy, key) {
+    var sk = splitKey(key), loc = copy.locs && copy.locs[sk.n], r = loc && rootById(loc.root);
+    if (!r || !r.handle || !r.handle.isHelper || !rootReady(r)) return null;
+    var parts = joinPath(loc.path, sk.rel).split('/'), d = r.handle;
+    for (var i = 0; i < parts.length - 1; i++) d = await d.getDirectoryHandle(parts[i]);
+    var fh = await d.getFileHandle(parts[parts.length - 1]);
+    return fh._info ? { size: fh._info.size, mtime: fh._info.mtime } : null;
   }
 
   /* ---------------------------------------------------------------- thumbnails (small copies made in the browser; the scans are not changed) */
@@ -350,6 +515,9 @@
   // scan folder locked (after a restart); once the folder is readable the kept picture is checked against the file.
   async function makeThumb(copy, key) {
     var ck = 'v2|' + S.projectId + '|' + copy.id + '|' + key, cached = await idbGet('thumbs', ck), file;
+    if (cached && cached.blob && HELPER) {                       // helper mode: the picture only has to be loaded if the file changed
+      try { var st = await statScan(copy, key); if (st && st.size === cached.size && st.mtime === cached.mtime) return { url: URL.createObjectURL(cached.blob) }; } catch (e0) { /* load it below */ }
+    }
     try { file = await getScan(copy, key); }
     catch (e) { if (cached && cached.blob && e && e.name === 'Lost') return { url: URL.createObjectURL(cached.blob), kept: true }; throw e; }
     if (cached && cached.blob && cached.size === file.size && cached.mtime === file.lastModified) return { url: URL.createObjectURL(cached.blob) };
@@ -376,7 +544,10 @@
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
       nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, pair: S.pair, sel: S.sel,
-      roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) { return { id: r.id, name: r.name }; }),
+      roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
+        var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
+        return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
+      }),
       copies: S.copies.map(function (c) { return { id: c.id, name: c.name, folder: c.folder, locs: c.locs, keys: c.keys, cells: c.cells }; })
     };
   }
@@ -428,6 +599,11 @@
   }
   async function rememberProject() {
     if (!proj.handle) return;
+    if (proj.handle.isHelper) {                                  // the helper remembers folders by their address
+      lastProject = { handle: proj.handle, name: proj.name, projectId: S.projectId };
+      await idbPut('meta', 'lastProjectH', { path: proj.handle.rootPath, name: proj.name, projectId: S.projectId });
+      return;
+    }
     lastProject = { handle: proj.handle, name: proj.name, projectId: S.projectId };
     await idbPut('meta', 'lastProject', lastProject);
   }
@@ -461,7 +637,7 @@
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {};
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
-    (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, handle: null, files: null, ok: false }); });
+    (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
     var maxId = 0, legacy = [];
     for (var i = 0; i < json.copies.length; i++) {
       var r = json.copies[i], c = { id: r.id, name: r.name, folder: r.folder, keys: r.keys || [], cells: r.cells || [], locs: (r.locs || []).map(function (l) { return { root: l.root, path: l.path || '' }; }) };
@@ -475,12 +651,17 @@
     proj.handle = handle || null; proj.name = handle ? handle.name : ''; proj.state = handle ? 'saved' : 'none'; dirty = false;
     // folders this browser remembers for the project
     for (var k = 0; k < S.roots.length; k++) {
-      var rt = S.roots[k], hh = await idbGet('handles', S.projectId + '/root/' + rt.id);
+      var rt = S.roots[k];
+      if (HELPER) {                                              // helper mode: the project file holds the folder's address
+        if (rt.path) { try { rt.handle = await helperRegister(rt.path, 'scans'); rt.ok = true; } catch (e) { rt.handle = null; } }
+        continue;
+      }
+      var hh = await idbGet('handles', S.projectId + '/root/' + rt.id);
       if (hh) { rt.handle = hh; await refreshRootState(rt); }
     }
     // projects of the first version stored one folder per copy: those become roots
     for (var q = 0; q < legacy.length; q++) {
-      var lc = legacy[q], lh = await idbGet('handles', S.projectId + '/' + lc.id);
+      var lc = legacy[q], lh = HELPER ? null : await idbGet('handles', S.projectId + '/' + lc.id);
       if (lh) { var loc = await rootFor(lh, false); await refreshRootState(loc.root); lc.locs = [{ root: loc.root.id, path: loc.path }]; }
       else { var pr = newRoot(lc.folder || lc.name); lc.locs = [{ root: pr.id, path: '' }]; }
     }
@@ -488,13 +669,13 @@
     if (handle) {
       // safety: a project folder that is (or is inside, or contains) a scan folder must never be written to
       var unsafe = false;
-      try { for (var m = 0; m < S.roots.length; m++) if (S.roots[m].handle && await sameOrNested(handle, S.roots[m].handle)) { unsafe = true; break; } }
+      try { unsafe = !!(await projectConflict(handle)); }
       catch (e) { unsafe = true; }
       if (unsafe) { proj.handle = null; proj.state = 'none'; proj.name = ''; }
     }
     if (proj.handle) await rememberProject();
     renderAll(); renderSave();
-    if (handle && !proj.handle) toast('This project folder is in, or contains, a scan folder, so automatic saving is switched off. Save the project in a separate folder (More → Save project).');
+    if (handle && !proj.handle) toast('This project folder is in a folder that holds scans, so automatic saving is switched off. Save the project in a separate folder (More → Save project).');
     else toast('Project opened: ' + S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies') + '.');
     return true;
   }
@@ -671,7 +852,7 @@
         thumbPromise(c, key).then(function (r) {
           if (tok !== pvTok || !pg || !pg.isConnected) return;
           if (r && r.url) pg.innerHTML = '<img alt="" src="' + r.url + '">';
-          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? 'Not seen before: needs access to the scans' : esc((r && r.msg) || 'Not available')) + '</span>';
+          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? (HELPER ? 'The Book Compare helper is not running' : 'Not seen before: needs access to the scans') : esc((r && r.msg) || 'Not available')) + '</span>';
         });
       })(S.copies[ci], ci);
     }
@@ -952,7 +1133,8 @@
       '<button data-m="reconnect"' + (lost ? '' : ' disabled') + '><span class="tick"></span>Choose scan folder again …</button><hr>' +
       '<button data-m="folio"><span class="tick"></span>' + (S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') + '</button>' +
       '<button data-m="help"><span class="tick"></span>How this screen works</button><hr>' +
-      '<button data-m="new"><span class="tick"></span>Start a new empty project</button>';
+      '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
+      (HELPER ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');
   }
 
   /* ---------------------------------------------------------------- hand a pair of pages to the two-image screen */
@@ -975,7 +1157,7 @@
     if (need.length) renderAll();
     var f1, f2;
     try { f1 = await getScan(a, a.cells[r]); f2 = await getScan(b, b.cells[r]); }
-    catch (e) { return toast((e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e))); }
+    catch (e) { if (HELPER && e && e.name === 'Lost') return toast(e.message); return toast((e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e))); }
     var urls = [URL.createObjectURL(f1), URL.createObjectURL(f2)];
     hide();
     if (cb.compare) cb.compare({ urls: urls, names: [f1.name, f2.name] });
@@ -1007,6 +1189,7 @@
       else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
       else if (m === 'help') helpDialog();
       else if (m === 'new') newProject();
+      else if (m === 'quit') quitHelper();
       return;
     }
     var cell = t.closest('.ws-cell');
@@ -1087,6 +1270,10 @@
     commit(); var a = cp.cells[drag.row], b = cp.cells[row] || null; while (cp.cells.length <= row) cp.cells.push(null); cp.cells[row] = a; cp.cells[drag.row] = b; trim(cp);
     S.sel = { ci: ci, row: row }; drag = null; changed();
   }
+  async function quitHelper() {
+    if (!(await confirmDialog('Quit the Book Compare helper?', 'Book Compare can then no longer read your scan folders. Start it again with “Start Book Compare” (or the Desktop shortcut or the icon near the clock).', 'Quit helper'))) return;
+    try { await hjson('/api/quit'); toast('The helper has stopped.'); } catch (e) { toast(niceError(e)); }
+  }
   async function newProject() {
     if (S.copies.length && dirty && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
     S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); proj.handle = null; proj.state = 'none'; proj.name = ''; dirty = false;
@@ -1125,8 +1312,16 @@
     if (!S) S = blank();
     if (!root) build();
     root.hidden = false;
-    idbGet('meta', 'lastProject').then(function (lp) { if (lp && lp.handle && !S.copies.length) { lastProject = lp; renderAll(); } });
     renderAll();
+    helperReady.then(async function () {                        // the helper (if there is one) is known now
+      var lp = null;
+      if (HELPER) {
+        var rec = await idbGet('meta', 'lastProjectH');
+        if (rec && rec.path) { try { lp = { handle: await helperRegister(rec.path, 'project'), name: rec.name, projectId: rec.projectId }; } catch (e) { lp = null; } }
+      } else { lp = await idbGet('meta', 'lastProject'); }
+      if (lp && lp.handle && !S.copies.length) lastProject = lp;
+      renderAll();
+    });
     var vp = $('#ws-vp'); (vp || root).focus();
   }
   function hide() { if (root) { root.hidden = true; $('#ws-menu').hidden = true; closeModal(); } }

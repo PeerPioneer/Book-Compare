@@ -3,7 +3,7 @@
 // https://vaadin.com/learn/tutorials/learn-pwa/turn-website-into-a-pwa
 // https://github.com/jakearchibald/wittr/blob/cache-avatars/public/js/sw/index.js
 // Cache
-const CACHE_NAME = "imcomp-mdc-pwa-v8";
+const CACHE_NAME = "imcomp-mdc-pwa-v9";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -80,6 +80,8 @@ async function cacheFirst(req) {
 }
 
 self.addEventListener('fetch', event => {
+    // the helper's folder access (/api/...) is never cached and never touched here
+    if (new URL(event.request.url).pathname.indexOf('/api/') === 0) return;
     event.respondWith(cacheFirst(event.request));
 });
 

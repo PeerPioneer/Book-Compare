@@ -37,7 +37,7 @@ def start(p, build=True, ctx=None):
     c=ctx or b.new_context(viewport={'width':1500,'height':900}, service_workers='block')
     pg=c.new_page()
     pg.on('pageerror',lambda e:errs.append('PAGEERROR '+str(e)))
-    pg.on('console',lambda m: errs.append('CONSOLE '+m.text) if m.type=='error' else None)
+    pg.on('console',lambda m: errs.append('CONSOLE '+m.text) if m.type=='error' and '/api/' not in (m.location or {}).get('url','') else None)
     pg.goto(URL); pg.wait_for_timeout(900)
     for i in range(8):
         btn=pg.locator('#onboarding button:visible').last
@@ -62,7 +62,8 @@ def start(p, build=True, ctx=None):
     return b,c,pg
 def handles(pg):
     pg.evaluate("""(async () => { const r = await navigator.storage.getDirectory(); const s = await r.getDirectoryHandle('scans');
-      window.__h = {A: await s.getDirectoryHandle('Copy-A'), B: await s.getDirectoryHandle('Copy-B'), C: await s.getDirectoryHandle('Copy-C'), scans: s, proj: await r.getDirectoryHandle('proj')}; })()""")
+      window.__h = {A: await s.getDirectoryHandle('Copy-A'), B: await s.getDirectoryHandle('Copy-B'), C: await s.getDirectoryHandle('Copy-C'), scans: s, proj: await r.getDirectoryHandle('proj')};
+      window.__h.AB = await window.__h.A.getDirectoryHandle('Gesamtes Buch'); })()""")
 def add_copy(pg, key, name, start=None, ticks=()):
     pg.click('#ws .ws-tb[data-act=add]' if pg.locator('#ws .ws-tb[data-act=add]').count() else '#ws .ws-addbtn'); pg.wait_for_timeout(150)
     pg.evaluate("k=>window.__picks.push(window.__h[k])", key); pg.click('#ac-folder'); pg.wait_for_timeout(500)
