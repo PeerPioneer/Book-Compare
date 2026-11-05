@@ -50,7 +50,7 @@ jobs:
           foreach ($f in @('bc-progress.txt', 'bc-helper-test.txt')) {
             $p = Join-Path $env:TEMP $f
             $text += "=== $f`r`n"
-            if (Test-Path $p) { $c = Get-Content $p -Raw; if ($c.Length -gt 6000) { $c = '...' + $c.Substring($c.Length - 6000) }; $text += $c } else { $text += "(not written)" }
+            if (Test-Path $p) { $c = Get-Content $p -Raw -Encoding UTF8; if ($c.Length -gt 6000) { $c = '...' + $c.Substring($c.Length - 6000) }; $text += $c } else { $text += "(not written)" }
             $text += "`r`n"
           }
           $text = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')

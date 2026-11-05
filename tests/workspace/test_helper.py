@@ -22,7 +22,7 @@ PWSH = os.environ.get('PWSH') or shutil.which('pwsh') or shutil.which('powershel
 if not PWSH:
     print('SKIPPED: no PowerShell found (set PWSH)'); sys.exit(0)
 
-TMP = tempfile.mkdtemp(prefix='bc_helper_')
+TMP = os.path.realpath(tempfile.mkdtemp(prefix='bc_helper_'))       # (real path: on Windows the temp folder may be given in the short form RUNNER~1)
 BOOKS = os.path.join(TMP, 'Bücher mit Leerzeichen')       # spaces and a non-ASCII letter on purpose
 DATA = os.path.join(TMP, 'data'); PICKS = os.path.join(TMP, 'picks.txt')
 for d in (BOOKS, DATA): os.makedirs(d)
@@ -186,7 +186,7 @@ def scenario(p, kind):
     push_pick(os.path.join(BOOKS, 'Project')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
     assert 'Saved in folder' in pg.inner_text('#ws-save') and 'Project' in pg.inner_text('#ws-save'), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
     d = project_json()
-    assert d['version'] == 2 and len(d['roots']) == 3 and all(r['path'].startswith(BOOKS) for r in d['roots']), d['roots']
+    assert d['version'] == 2 and len(d['roots']) == 3 and all(os.path.normcase(r['path']).startswith(os.path.normcase(BOOKS)) for r in d['roots']), d['roots']
     pg.locator('#ws .ws-hname').first.click(); pg.keyboard.type('A-Renamed'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1500)      # changes are saved by themselves
     assert project_json()['copies'][0]['name'] == 'A-Renamed'
     c.close(); stop_helper()

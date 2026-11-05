@@ -66,7 +66,7 @@ public static string ListFor(uint pid) {
 }
 '@
   $p = Start-Process powershell -ArgumentList ('-NoProfile -STA -ExecutionPolicy Bypass -File "{0}"' -f (Join-Path $root 'launcher\pickfolder.ps1')) -PassThru -WindowStyle Hidden
-  [void](Wait-Until { $script:h = [BcWin.Native]::FindWindow($null, 'Book Compare CI dialog'); $script:h -ne [IntPtr]::Zero } 30)
+  [void](Wait-Until { $script:h = [BcWin.Native]::FindWindow([NullString]::Value, 'Book Compare CI dialog'); $script:h -ne [IntPtr]::Zero } 30)
   Remove-Item Env:BC_PICK_TITLE
   if ($script:h -eq [IntPtr]::Zero) {
     $exited = $p.HasExited; $code = $(if ($exited) { $p.ExitCode } else { 'still running' })
@@ -114,15 +114,15 @@ Check 'the start file starts the helper hidden, the icon near the clock appears,
   if (-not $bat.WaitForExit(20000)) { throw 'the start file did not finish' }
   if ($bat.ExitCode -ne 0) { throw "the start file ended with code $($bat.ExitCode)" }
   if (-not (Wait-Until { Test-Ping } 40)) { throw 'the helper did not answer' }
-  if (-not (Wait-Until { (Get-BcProcesses 'tray.ps1').Count -ge 1 } 20)) { $lg = ''; $lf = Join-Path $dir 'helper.log'; if (Test-Path $lf) { $lg = Get-Content $lf -Raw }; throw ('the tray program is not running. helper.log: ' + $lg + ' | powershell processes: ' + ((Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ForEach-Object { $_.CommandLine }) -join ' ;; ')) }
+  if (-not (Wait-Until { @(Get-BcProcesses 'tray.ps1').Count -ge 1 } 20)) { $lg = ''; $lf = Join-Path $dir 'helper.log'; if (Test-Path $lf) { $lg = Get-Content $lf -Raw }; throw ('the tray program is not running. helper.log: ' + $lg + ' | powershell processes: ' + ((Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ForEach-Object { $_.CommandLine }) -join ' ;; ')) }
   Start-Sleep -Seconds 4
-  if ((Get-BcProcesses 'tray.ps1').Count -lt 1) { throw ('the tray program stopped by itself. ' + (Get-Content (Join-Path $dir 'helper.log') -Raw)) }
+  if (@(Get-BcProcesses 'tray.ps1').Count -lt 1) { throw ('the tray program stopped by itself. ' + (Get-Content (Join-Path $dir 'helper.log') -Raw)) }
   $r = Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:8765/index.html' -TimeoutSec 5
   if ($r.StatusCode -ne 200) { throw 'index.html not served' }
   $q = [System.Net.WebRequest]::Create('http://localhost:8765/api/quit'); $q.Method = 'POST'; $q.ContentLength = 0; $q.Headers.Add('X-BookCompare', '1')
   $q.GetResponse().Close()
-  if (-not (Wait-Until { (Get-BcProcesses 'serve.ps1').Count -eq 0 } 15)) { throw 'the helper did not stop' }
-  if (-not (Wait-Until { (Get-BcProcesses 'tray.ps1').Count -eq 0 } 25)) { throw 'the tray program did not stop' }
+  if (-not (Wait-Until { @(Get-BcProcesses 'serve.ps1').Count -eq 0 } 15)) { throw 'the helper did not stop' }
+  if (-not (Wait-Until { @(Get-BcProcesses 'tray.ps1').Count -eq 0 } 25)) { throw 'the tray program did not stop' }
 }
 Write-Host ''
 if ($script:fail) { Note "$($script:fail) check(s) failed"; Get-ChildItem (Join-Path $env:LOCALAPPDATA 'BookCompare\*.log') -ErrorAction SilentlyContinue | ForEach-Object { Note "--- $($_.Name)"; Get-Content $_.FullName | ForEach-Object { Note $_ } }; exit 1 }
