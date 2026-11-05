@@ -26,19 +26,16 @@ Double-click the file  "Start Book Compare.bat"
    (the next time you simply start it again).
 
 
-3. Install it as an app (once, optional but recommended)
---------------------------------------------------------
-In Edge click the three dots "..." at the top right, then "Apps", then
-"Install this site as an app". Confirm with "Install".
+3. Install it as an app (once, recommended)
+-------------------------------------------
+In Edge click the three dots "..." at the top right, then "More tools", then
+"Apps", then "Install Book Compare". Confirm with "Install".
 
 From then on Book Compare is in your Start menu (and can be pinned to the taskbar)
-and opens in its own window, like any other program. Edge keeps its settings for
-an installed app better than for an ordinary tab. You can start it from the
-Start menu even without the black window.
-
-Edge may still ask for permission to read a scan folder after you restart the
-computer. That is a rule of the browser that cannot be switched off. If Edge offers
-"Allow on every visit" (or similar), choose it.
+and opens in its own window, like any other program. The installed app remembers
+the permission to read your scan folders, so Edge does not ask for each folder
+again after you restart the computer (tested). Keep using the Start menu entry
+from then on.
 
 
 4. Updating

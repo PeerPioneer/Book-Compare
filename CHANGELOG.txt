@@ -1,5 +1,6 @@
 ## [Book Compare launcher] - 2026-11-06
 - New: "Start Book Compare.bat" starts Book Compare on your own computer with one double-click (a small local server, address http://localhost:8765/, only reachable from your own computer, no internet needed) and opens it in Edge. In Edge "Install this site as an app" is then possible (not possible when index.html is opened as a file), and the installed app also starts without the launcher. See START-HERE.txt
+- START-HERE.txt: install path in Edge is "..." > More tools > Apps > Install Book Compare; the installed app keeps the folder permissions across restarts (tested by the author in Edge)
 - Name in the browser tab, install dialog and Start menu is now "Book Compare" (was "Image Compare")
 - tests/workspace: both automatic tests also pass when the app is served by the launcher script
 
