@@ -23,13 +23,39 @@ jobs:
         with:
           python-version: '3.12'
       - name: Windows pieces (folder window, shortcuts, start file, icon near the clock)
+        id: checks
         shell: powershell
+        timeout-minutes: 6
+        continue-on-error: true
         run: ./tests/windows/windows-checks.ps1
       - name: Install the browsers used by the tests
         run: |
           pip install playwright pillow
           python -m playwright install chromium firefox
       - name: Helper and workspace in Chromium and Firefox (Windows PowerShell 5.1)
+        shell: cmd
+        timeout-minutes: 12
         env:
           PWSH: powershell
-        run: python tests/workspace/test_helper.py
+        run: |
+          python tests\workspace\test_helper.py > "%TEMP%\bc-helper-test.txt" 2>&1
+          set RC=%ERRORLEVEL%
+          type "%TEMP%\bc-helper-test.txt"
+          exit /b %RC%
+      - name: Windows checks result (the text of both test runs, shown as a note on this job)
+        if: always()
+        shell: powershell
+        run: |
+          $text = ''
+          foreach ($f in @('bc-progress.txt', 'bc-helper-test.txt')) {
+            $p = Join-Path $env:TEMP $f
+            $text += "=== $f`r`n"
+            if (Test-Path $p) { $c = Get-Content $p -Raw; if ($c.Length -gt 6000) { $c = '...' + $c.Substring($c.Length - 6000) }; $text += $c } else { $text += "(not written)" }
+            $text += "`r`n"
+          }
+          $text = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+          Write-Host "::notice title=Windows test output::$text"
+      - name: Fail the job if the Windows pieces failed
+        if: steps.checks.outcome == 'failure'
+        shell: cmd
+        run: exit /b 1

@@ -3,9 +3,13 @@
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $script:fail = 0
+$script:progress = Join-Path $env:TEMP 'bc-progress.txt'
+Remove-Item $script:progress -ErrorAction SilentlyContinue
+function Note([string]$line) { Write-Host $line; Add-Content -Path $script:progress -Value $line -Encoding ASCII }
 function Check([string]$name, [scriptblock]$test) {
-  try { $r = & $test; if ($r -is [bool] -and -not $r) { throw 'returned false' }; Write-Host "PASS  $name" }
-  catch { Write-Host "FAIL  $name : $($_.Exception.Message)"; $script:fail++ }
+  Note "START $name"
+  try { $r = & $test; if ($r -is [bool] -and -not $r) { throw 'returned false' }; Note "PASS  $name" }
+  catch { Note "FAIL  $name : $($_.Exception.Message)"; $script:fail++ }
 }
 function Get-BcProcesses([string]$script) {
   @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match [regex]::Escape($script) })
@@ -65,7 +69,9 @@ Check 'shortcuts for Windows start and Desktop are created and removed' {
 Check 'the start file starts the helper hidden, the icon near the clock appears, quit stops both' {
   $dir = Join-Path $env:LOCALAPPDATA 'BookCompare'; New-Item -ItemType Directory -Force -Path $dir | Out-Null
   '{"asked":true,"autostart":false,"desktop":false,"lastScans":"","lastProject":""}' | Set-Content -Path (Join-Path $dir 'settings.json') -Encoding ASCII     # no first-start questions
-  & cmd.exe /c ('"{0}"' -f (Join-Path $root 'Start Book Compare.bat'))
+  $bat = Start-Process -FilePath (Join-Path $root 'Start Book Compare.bat') -WindowStyle Hidden -PassThru       # (not "& cmd.exe": that would wait for the helper, which keeps running)
+  if (-not $bat.WaitForExit(20000)) { throw 'the start file did not finish' }
+  if ($bat.ExitCode -ne 0) { throw "the start file ended with code $($bat.ExitCode)" }
   if (-not (Wait-Until { Test-Ping } 40)) { throw 'the helper did not answer' }
   if (-not (Wait-Until { (Get-BcProcesses 'tray.ps1').Count -ge 1 } 20)) { throw 'the tray program is not running' }
   Start-Sleep -Seconds 4
@@ -78,5 +84,5 @@ Check 'the start file starts the helper hidden, the icon near the clock appears,
   if (-not (Wait-Until { (Get-BcProcesses 'tray.ps1').Count -eq 0 } 25)) { throw 'the tray program did not stop' }
 }
 Write-Host ''
-if ($script:fail) { Write-Host "$($script:fail) check(s) failed"; Get-ChildItem (Join-Path $env:LOCALAPPDATA 'BookCompare\*.log') -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "--- $($_.Name)"; Get-Content $_.FullName }; exit 1 }
+if ($script:fail) { Note "$($script:fail) check(s) failed"; Get-ChildItem (Join-Path $env:LOCALAPPDATA 'BookCompare\*.log') -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "--- $($_.Name)"; Get-Content $_.FullName }; exit 1 }
 Write-Host 'ALL WINDOWS CHECKS PASSED'
