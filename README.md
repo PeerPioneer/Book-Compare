@@ -3,7 +3,11 @@ Do you work with books? Do you want to compare them? Boy, do I have good news fo
 Book compare is based on Image Compare but has a few added features and modifications that makes it more suitable for comparing entire books with each other.
 This is still very much a work in progress.
 
+## How to use it on your own computer (Windows)
+Download the ZIP, unzip the whole folder, double-click `Start Book Compare.bat` (it starts a small local server and opens Edge). Then in Edge use "Apps > Install this site as an app" once; afterwards Book Compare starts from the Start menu like a normal program. Details in `START-HERE.txt`. Nothing is uploaded; scans stay on your computer.
+
 ## What is in this repository
+- `Start Book Compare.bat`, `launcher/serve.ps1`, `START-HERE.txt`: the double-click start (a tiny local web server for the `app/` folder, using only what Windows already contains).
 - `app/`: the working two-image app (open `app/index.html` in Edge or Firefox; works offline). Contrast and black-and-white were removed after tests showed no benefit for alignment.
 - **Whole-book workspace** (button "Compare copies of a book" on the start screen; code in `app/js/workspace.js` and `workspace.css`): add each copy as a folder of scans, see all copies side by side (columns = copies, rows = page positions), fix the page order by hand (delete files, add files from another folder, pagination or foliation), save the project in a separate folder (reopening needs one permission click, not one folder choice per copy), and send a chosen pair of pages to the two-image screen. Page matching is still manual. Scan folders are only ever read. Tests: `tests/workspace/`.
 - `prototypes/whole-book-workspace/`: a clickable **mock-up** of the planned whole-book screen (the Pages grid part now exists for real, see above; Compare tab, annotations, flags and book map are still only in the mock-up).

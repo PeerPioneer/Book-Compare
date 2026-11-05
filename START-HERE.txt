@@ -1,0 +1,63 @@
+BOOK COMPARE - START HERE
+=========================
+
+Book Compare runs on your own computer. After the first start it does not need
+the internet. Your scans are never uploaded anywhere.
+
+
+1. Get the files
+----------------
+On the GitHub page of Book Compare click the green "Code" button, then
+"Download ZIP". Open the ZIP file and choose "Extract all ...".
+IMPORTANT: unzip the WHOLE folder. Do not start the program from inside the ZIP.
+Put the unzipped folder where you like (for example in Documents).
+
+
+2. Start it
+-----------
+Double-click the file  "Start Book Compare.bat"
+
+ * A black window opens and Microsoft Edge opens Book Compare.
+ * Windows may say "Windows protected your PC" the first time. This happens with
+   every program that is not from a big company. Click "More info", then
+   "Run anyway". The file is a few lines of readable text; you can open it in
+   Notepad to see everything it does (launcher\serve.ps1).
+ * Leave the black window open while you work. Closing it stops Book Compare
+   (the next time you simply start it again).
+
+
+3. Install it as an app (once, optional but recommended)
+--------------------------------------------------------
+In Edge click the three dots "..." at the top right, then "Apps", then
+"Install this site as an app". Confirm with "Install".
+
+From then on Book Compare is in your Start menu (and can be pinned to the taskbar)
+and opens in its own window, like any other program. Edge keeps its settings for
+an installed app better than for an ordinary tab. You can start it from the
+Start menu even without the black window.
+
+Edge may still ask for permission to read a scan folder after you restart the
+computer. That is a rule of the browser that cannot be switched off. If Edge offers
+"Allow on every visit" (or similar), choose it.
+
+
+4. Updating
+-----------
+Download the new ZIP, unzip it into a NEW folder, and double-click
+"Start Book Compare.bat" there. Your saved projects are not in this folder
+(they are in the project folder you chose), so nothing is lost.
+
+
+If something does not work
+--------------------------
+ * "Book Compare could not start on port 8765. Another program is using it.": close other Book Compare
+   windows (black windows) or restart the computer, then try again.
+ * "The folder "app" was not found next to the folder "launcher"": you started the file from inside the ZIP, or the
+   folder is incomplete. Unzip the whole download and try again.
+ * Windows blocks the script: right-click "Start Book Compare.bat", choose
+   "Properties", tick "Unblock" at the bottom, click OK, and try again.
+ * Nothing opens: start the file, leave the black window open, and type
+   http://localhost:8765/ into the address bar of Edge.
+
+Scan folders are only ever READ by Book Compare. It never changes, moves or
+deletes your scans.

@@ -1,10 +1,10 @@
 {
-    "name": "VGG Image Compare",
-    "short_name": "Image Compare",
+    "name": "Book Compare",
+    "short_name": "Book Compare",
     "start_url": "./",
     "display": "standalone",
     "background_color": "white",
-    "description": "PWA for Image Compare App",
+    "description": "Compare scans of early printed books (based on VGG Image Compare)",
     "theme_color": "white",
     "icons": [
         {

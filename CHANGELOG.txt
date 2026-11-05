@@ -1,3 +1,8 @@
+## [Book Compare launcher] - 2026-11-06
+- New: "Start Book Compare.bat" starts Book Compare on your own computer with one double-click (a small local server, address http://localhost:8765/, only reachable from your own computer, no internet needed) and opens it in Edge. In Edge "Install this site as an app" is then possible (not possible when index.html is opened as a file), and the installed app also starts without the launcher. See START-HERE.txt
+- Name in the browser tab, install dialog and Start menu is now "Book Compare" (was "Image Compare")
+- tests/workspace: both automatic tests also pass when the app is served by the launcher script
+
 ## [Book Compare workspace v2.1] - 2026-11-06
 - The folder window now opens where you chose a folder last time (the last scan folder, or the folder that holds the copies; separately for the project folder). Edge often forgets this when the app is opened from a file
 - Less asking for permission after a restart: previews of pages you have looked at before are shown right away from the browser's memory; the browser's permission question now comes only when you press COMPARE (or when you click "Allow access now" to see every page). The question can not be removed completely: it is a browser rule

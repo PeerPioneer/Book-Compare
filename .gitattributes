@@ -1,0 +1,4 @@
+# keep the Windows start files exactly as written (Windows line endings)
+*.bat -text
+*.ps1 -text
+START-HERE.txt -text
