@@ -38,6 +38,7 @@
       -->
 
     <link rel="shortcut icon" href="favicon.ico" />
+    <link rel="stylesheet" href="js/workspace.css" />
     <link rel="apple-touch-icon" href="./images/icons/imcomp-192x192.png" />
 
     <!-- Preloading -->
@@ -994,6 +995,7 @@
     <script defer src="js/compare.js"></script>
     <script defer src="js/panes.js"></script>
     <script defer src="js/samples.js"></script>
+    <script defer src="js/workspace.js"></script>
   </head>
   <body class="mdc-typography">
     <div
@@ -1681,6 +1683,15 @@
           ></span>
           <span class="mdc-button__touch"></span>
           <span class="mdc-button__label">Select 2 Images</span>
+        </button>
+        <span>OR</span>
+        <button id="books_btn" class="mdc-button mdc-button--raised">
+          <span
+            class="mdc-button__ripple"
+            data-mdc-auto-init="MDCRipple"
+          ></span>
+          <span class="mdc-button__touch"></span>
+          <span class="mdc-button__label">Compare copies of a book</span>
         </button>
         <span>OR</span>
         <button id="try_samples_btn" class="mdc-button mdc-button--outlined">
@@ -2582,7 +2593,27 @@
             samples.show();
           });
 
+          // Whole-book workspace (js/workspace.js): a layer on top of the app.
+          // "Compare" there hands two scans to the usual two-image screen; "Back" on that screen returns to the layer.
+          main.c.addEventListener("books", () => {
+            BookWorkspace.open();
+          });
+          BookWorkspace.onCompare((d) => {
+            compare.set_image(d.urls);
+            compare.set_filename(d.names);
+            window.__fromWorkspace = true;
+            compare.show_compare_screen();
+          });
+          BookWorkspace.onLeave(() => {
+            go_to_screen(main.c, {});
+          });
+
           compare.c.addEventListener("back", () => {
+            if (window.__fromWorkspace) {
+              window.__fromWorkspace = false;
+              BookWorkspace.show();
+              return;
+            }
             go_to_screen(main.c, {});
           });
 

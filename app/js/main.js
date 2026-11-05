@@ -7,6 +7,10 @@ class MainView {
         this.samples_btn.onclick = () => {
             this.c.dispatchEvent(new CustomEvent('samples'));
         }
+        this.books_btn = document.getElementById('books_btn');
+        this.books_btn.onclick = () => {
+            this.c.dispatchEvent(new CustomEvent('books'));
+        }
 
         this.file_input = document.getElementById('image_select_input');
 

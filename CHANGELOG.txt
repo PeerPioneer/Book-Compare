@@ -1,3 +1,12 @@
+## [Book Compare workspace v1] - 2026-11-05
+- New start-screen button "Compare copies of a book" opens the whole-book workspace (js/workspace.js, js/workspace.css)
+- Add each copy as a folder of scans (Edge/Chrome folder picker; other browsers use a plain folder upload); pictures are placed in file-name order, no page numbers are read from file names; folders with several sub-folders can be combined
+- Grid: columns = copies, rows = page positions, empty cells for missing pages; insert/close gaps, take files out and put them back, drag within a copy, rename copies and rows, "Start numbering at this row", "Don't compare this row", folio names, undo/redo
+- Preview of the selected row for all copies (small thumbnails made in the browser, remembered between sessions); mark two pages with 1 and 2 and press COMPARE to open them in the two-image screen; Back there returns to the workspace
+- Project is saved automatically as one small file in a separate project folder; Book Compare refuses a project folder that is, contains or lies inside a scan folder; scan folders are only read, never written
+- Reopening a project: remembered scan folders are reused where the browser allows, otherwise "Choose scan folder" reconnects them in one step
+- tests/workspace: automatic test with made-up scans (checks, among other things, that scan folders stay unchanged)
+
 ## [Book Compare snapshot] - 2026-11-05
 - Book Compare: contrast and black-and-white options removed (as alignment options and as display settings); tests showed no benefit for alignment
 - New folder prototypes/whole-book-workspace: clickable mock-up of the whole-book workspace (not connected to the app yet)
