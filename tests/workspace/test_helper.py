@@ -175,7 +175,10 @@ def scenario(p, kind):
     add_copy(pg, 'Copy-A', 'A-Test'); add_copy(pg, 'Copy-B ä', 'B-Test', start=2); add_copy(pg, 'Copy-C', 'C-Test', ticks=(0, 1))
     assert pg.locator('#ws .ws-hname').count() == 3, pg.inner_text('#ws')
     assert col(pg, 0)[:2] == ['scan_001.jpg', 'scan_002.jpg'] and col(pg, 1)[:3] == ['-', 'img_1.JPG', 'img_2.JPG'] and col(pg, 2)[:2] == ['x_1.jpg', 'x_2.jpg'] or col(pg, 2)[:2] == ['x_1.jpg', 'x_3.jpg'], (col(pg, 0), col(pg, 1), col(pg, 2))
-    assert pg.locator('#ws-thumbs img').count() >= 2
+    for _ in range(60):
+        if pg.locator('#ws-thumbs img').count() >= 2: break
+        pg.wait_for_timeout(500)
+    assert pg.locator('#ws-thumbs img').count() >= 2, ('thumbnails: ' + pg.inner_text('#ws-thumbs') + ' | errors: ' + str(errs) + ' | helper.log: ' + (open(os.path.join(DATA, 'helper.log'), encoding='utf-8').read()[-1500:] if os.path.exists(os.path.join(DATA, 'helper.log')) else '-'))
     # a project folder that is one of the scan folders is refused; the folder NEXT to them is accepted
     push_pick(os.path.join(BOOKS, 'Copy-B ä')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(600)
     assert 'scan folder' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
