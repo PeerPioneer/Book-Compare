@@ -100,6 +100,9 @@ def api_tests():
     st, sc = jcall('POST', '/api/register', {'path': os.path.join(BOOKS, 'Copy-A'), 'kind': 'scans'}); assert st == 200 and sc['name'] == 'Copy-A'
     st, pr = jcall('POST', '/api/register', {'path': os.path.join(BOOKS, 'Project'), 'kind': 'project'}); assert st == 200
     q = lambda r, p: '?root=%s&path=%s' % (r['id'], urllib.request.quote(p))
+    # letters like a-umlaut in folder names (Windows PowerShell 5.1 reads addresses with the old code page unless told otherwise)
+    st, allb = jcall('POST', '/api/register', {'path': BOOKS, 'kind': 'scans'}); assert st == 200
+    st, j = jcall('GET', '/api/list' + q(allb, 'Copy-B ä')); assert st == 200 and len(j['entries']) == 6, (st, j)
     # listing shows folders and pictures only
     st, j = jcall('GET', '/api/list' + q(sc, '')); names = sorted(e['n'] for e in j['entries'])
     assert st == 200 and names == ['Gesamtes Buch'], names

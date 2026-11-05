@@ -176,8 +176,20 @@ function Send-Json($res, [int]$code, [string]$json) {
 function Send-Err($res, [int]$code, [string]$err, [string]$msg = '') { Send-Json $res $code ('{"error":' + (ConvertTo-JsonString $err) + ',"message":' + (ConvertTo-JsonString $msg) + '}') }
 
 # ---------------------------------------------------------------------------------------------------- folders Book Compare may use
+# The value of ?name=... read as UTF-8 (letters like a-umlaut in folder names). The built-in $req.QueryString reads them with the
+# computer's old code page in Windows PowerShell 5.1, which garbles them, so the address is taken apart here.
+function Get-QueryValue($req, [string]$name) {
+  $q = $req.Url.Query
+  if (-not $q) { return $null }
+  foreach ($pair in $q.TrimStart('?').Split('&')) {
+    $i = $pair.IndexOf('=')
+    if ($i -lt 0) { $k = $pair; $v = '' } else { $k = $pair.Substring(0, $i); $v = $pair.Substring($i + 1) }
+    if ([System.Uri]::UnescapeDataString($k) -eq $name) { return [System.Uri]::UnescapeDataString($v) }
+  }
+  return $null
+}
 function Get-Root($req) {
-  $id = $req.QueryString['root']
+  $id = Get-QueryValue $req 'root'
   if ($id -and $script:Roots.ContainsKey($id)) { return $script:Roots[$id] }
   return $null
 }
@@ -358,7 +370,7 @@ function Handle-Api($ctx, [string]$path) {
   # everything below works on a folder that was registered before
   $r = Get-Root $req
   if (-not $r) { Send-Err $res 404 'unknown-root' 'The helper does not know this folder (it was restarted?).'; return $false }
-  $rel = [string]$req.QueryString['path']
+  $rel = [string](Get-QueryValue $req 'path')
   $full = Resolve-InRoot $r $rel
   if (-not $full) { Send-Err $res 400 'bad-path' 'Bad path.'; return $false }
   $isProjectName = ($rel.Trim('/') -eq $script:ProjectFile)
