@@ -210,8 +210,11 @@ def scenario(p, kind):
     pg.click('#ws .ws-empty [data-act=continue]'); pg.wait_for_timeout(2000)
     assert not pg.evaluate("document.getElementById('ws-banner').hidden") and pg.locator('#ws-banner [data-act=reconnect]').count() == 1, 'the missing folder should be reported'
     assert pg.locator('#ws .ws-hmeta.lost').count() == 1
-    push_pick(BOOKS); pg.click('#ws-banner [data-act=reconnect]'); pg.wait_for_timeout(2000)
-    assert pg.evaluate("document.getElementById('ws-banner').hidden") and pg.locator('#ws .ws-hmeta.lost').count() == 0
+    push_pick(BOOKS); pg.click('#ws-banner [data-act=reconnect]')
+    for _ in range(60):
+        pg.wait_for_timeout(500)
+        if pg.evaluate("document.getElementById('ws-banner').hidden") and pg.locator('#ws .ws-hmeta.lost').count() == 0: break
+    assert pg.evaluate("document.getElementById('ws-banner').hidden") and pg.locator('#ws .ws-hmeta.lost').count() == 0, ('banner: ' + pg.inner_text('#ws-banner') + ' | toast: ' + (pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '-') + ' | lost: ' + str(pg.locator('#ws .ws-hmeta.lost').count()) + ' | errors: ' + str(errs) + ' | helper.log: ' + (open(os.path.join(DATA, 'helper.log'), encoding='utf-8').read()[-1500:] if os.path.exists(os.path.join(DATA, 'helper.log')) else '-'))
     pg.wait_for_timeout(1200)
     shutil.move(os.path.join(moved, 'Copy-B ä'), os.path.join(BOOKS, 'Copy-B ä')); os.rmdir(moved)       # put everything back for the next run
     # --- the helper is stopped while the page is open: seen pages stay visible, new ones say why they are missing ---------
