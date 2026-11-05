@@ -226,8 +226,11 @@ def scenario(p, kind):
         if proc.poll() is not None: break
         time.sleep(0.25)
     assert proc.poll() is not None, 'the helper should have stopped'
-    pg.locator('#ws .ws-lbl[data-r="1"]').first.click(); pg.wait_for_timeout(1200)
-    assert pg.locator('#ws-thumbs img').count() >= 1, 'pages seen before stay visible'
+    pg.locator('#ws .ws-lbl[data-r="1"]').first.click()
+    for _ in range(40):
+        pg.wait_for_timeout(500)
+        if pg.locator('#ws-thumbs img').count() >= 1: break
+    assert pg.locator('#ws-thumbs img').count() >= 1, 'pages seen before stay visible: ' + pg.inner_text('#ws-thumbs') + ' | errors: ' + str(errs)
     pg.locator('#ws .ws-lbl[data-r="7"]').first.click(); pg.wait_for_timeout(1500)
     assert 'helper is not running' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
     c.close(); stop_helper()
