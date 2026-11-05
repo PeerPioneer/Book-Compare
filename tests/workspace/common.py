@@ -15,12 +15,25 @@ window.mkScan = async (dir, name, n, variant) => {
 window.snapshot = async (dir, path='') => { const out = []; for await (const [name, h] of dir.entries()) { if (h.kind === 'file') { const f = await h.getFile(); out.push(path+name+'|'+f.size+'|'+f.lastModified); } else out.push(...await window.snapshot(h, path+name+'/')); } return out.sort(); };
 window.__picks = [];
 window.showDirectoryPicker = async function (opts) { window.__lastOpts = window.__lastOpts || []; window.__lastOpts.push(JSON.stringify(opts)); const h = window.__picks.shift(); if (!h) throw new DOMException('no pick queued', 'AbortError'); return h; };
+
+// Simulates what Edge does after a project is reopened: the permission of remembered folders has lapsed until the user clicks "Allow".
+window.__locked = new Set(); window.__prompts = []; window.__deny = false;
+{ const P = FileSystemHandle.prototype, q = P.queryPermission, r = P.requestPermission;
+  P.queryPermission = async function (o) { return window.__locked.has(this.name) ? 'prompt' : q.call(this, o); };
+  // worst case: every permission prompt needs its own click (the browser may use up the click's "user activation")
+  window.__act = 0; document.addEventListener('click', () => { window.__act = 1; }, true);
+  P.requestPermission = async function (o) {
+    if (window.__locked.has(this.name)) {
+      if (window.__noact || window.__act < 1) throw new DOMException('User activation is required to request permissions.', 'SecurityError');
+      window.__act--; window.__prompts.push(this.name); if (window.__deny) return 'denied'; window.__locked.delete(this.name);
+    }
+    return r.call(this, o); }; }
 ; 0
 """
 
 errs=[]
 def start(p, build=True, ctx=None):
-    b=p.chromium.launch() if ctx is None else None
+    b=p.chromium.launch(args=['--allow-file-access-from-files'] if URL.startswith('file:') else []) if ctx is None else None
     c=ctx or b.new_context(viewport={'width':1500,'height':900}, service_workers='block')
     pg=c.new_page()
     pg.on('pageerror',lambda e:errs.append('PAGEERROR '+str(e)))
@@ -64,3 +77,13 @@ def setup3(p):
     pg.click('#books_btn'); pg.wait_for_timeout(300)
     add_copy(pg,'A','A-Test'); add_copy(pg,'B','B-Test',start=2); add_copy(pg,'C','C-Test',ticks=(0,1))
     return b,c,pg,before
+
+def lock(pg, *names): pg.evaluate("n=>{window.__locked=new Set(n); window.__prompts=[];}", list(names))
+def prompts(pg): return pg.evaluate("window.__prompts")
+def hid(pg, sel): return pg.evaluate("s=>document.querySelector(s).hidden", sel)
+def read_project(pg, which='proj'):
+    import json as _j
+    return _j.loads(pg.evaluate("async(w)=>{const fh=await __h[w].getFileHandle('book-compare-project.json'); return await (await fh.getFile()).text();}", which))
+def reopen(ctx, url=URL):
+    pg2 = ctx.new_page(); pg2.on('pageerror', lambda e: errs.append('PAGEERROR '+str(e))); pg2.goto(url); pg2.wait_for_timeout(900)
+    pg2.evaluate(HELPERS); handles(pg2); return pg2

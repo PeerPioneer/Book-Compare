@@ -8,5 +8,11 @@ It uses made-up scans created inside the browser's private storage, so none of y
     cd app && python3 -m http.server 8765        # leave running
     python3 tests/workspace/test_workspace.py    # in another window; prints ALL WORKSPACE TESTS PASSED
 
+`test_roots.py` checks how scan folders are remembered: one folder choice for a whole library, one permission after reopening a project (the browser's lapsed permission is simulated, even in the worst case that every prompt needs its own click), and projects saved by the first version.
+
+    python3 tests/workspace/test_roots.py        # prints ALL ROOT TESTS PASSED
+
+Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the app opened from a file path instead of the local server.
+
 `common.py` holds the helpers (making test scans, faking the folder picker with private-storage folders).
 Not covered by this script: the real Windows folder picker and permission prompts of Edge; these must be tried by hand.

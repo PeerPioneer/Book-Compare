@@ -1,3 +1,12 @@
+## [Book Compare workspace v2] - 2026-11-06
+- Reopening a saved project no longer asks for the folder of every copy: scan folders are remembered as "folders used so far" (a folder that holds several copies is chosen once, later copies are picked from a list). After reopening, one click on "Allow access to scans" is enough per remembered folder; "Choose scan folder" / "Choose one folder for all" merges many copies into one folder. Projects saved by v1 still open and are converted
+- "Set aside" row removed: "Delete file" removes a file from the workspace (the scan stays untouched; Undo and Delete key work)
+- New "Add files to this copy ...": add deleted files again or pictures from another folder, at the end or from a chosen row (empty cells are filled first, otherwise the pages below move down)
+- "Start numbering at this row" opens a window to choose pagination (Page 1, 2, 3 ...) or foliation (1r, 1v, 2r ...); More has "Switch to foliation / pagination"; rows you named yourself are kept when switching
+- Add a copy: the name field stays empty and now shows the example "Austria, Austrian National Library"
+- Two-image screen: "Perspective" is now the default transform mode
+- tests/workspace: new test_roots.py (library folders, permission after reopening, projects from v1)
+
 ## [Book Compare workspace v1] - 2026-11-05
 - New start-screen button "Compare copies of a book" opens the whole-book workspace (js/workspace.js, js/workspace.css)
 - Add each copy as a folder of scans (Edge/Chrome folder picker; other browsers use a plain folder upload); pictures are placed in file-name order, no page numbers are read from file names; folders with several sub-folders can be combined

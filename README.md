@@ -5,7 +5,7 @@ This is still very much a work in progress.
 
 ## What is in this repository
 - `app/`: the working two-image app (open `app/index.html` in Edge or Firefox; works offline). Contrast and black-and-white were removed after tests showed no benefit for alignment.
-- **Whole-book workspace** (button "Compare copies of a book" on the start screen; code in `app/js/workspace.js` and `workspace.css`): add each copy as a folder of scans, see all copies side by side (columns = copies, rows = page positions), fix the page order by hand, save the project in a separate folder, and send a chosen pair of pages to the two-image screen. Page matching is still manual. Scan folders are only ever read. Tests: `tests/workspace/`.
+- **Whole-book workspace** (button "Compare copies of a book" on the start screen; code in `app/js/workspace.js` and `workspace.css`): add each copy as a folder of scans, see all copies side by side (columns = copies, rows = page positions), fix the page order by hand (delete files, add files from another folder, pagination or foliation), save the project in a separate folder (reopening needs one permission click, not one folder choice per copy), and send a chosen pair of pages to the two-image screen. Page matching is still manual. Scan folders are only ever read. Tests: `tests/workspace/`.
 - `prototypes/whole-book-workspace/`: a clickable **mock-up** of the planned whole-book screen (the Pages grid part now exists for real, see above; Compare tab, annotations, flags and book map are still only in the mock-up).
 - `research/`: Python code and notes for printed-area detection and tile-based alignment (not yet part of the app) - start with `research/README.md` and `research/FINDINGS.md`.
 - `website/`: the original Image Compare website.

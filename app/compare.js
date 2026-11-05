@@ -29,7 +29,7 @@ class Compare {
         this.visualisation_select = document.getElementById('visualisation_select');
         this.transform_select = document.getElementById('transform_select')
         this.downscale_option = document.getElementById('skip_downscale_checkbox').closest('.mdc-tab');
-        this.current_transform = 'affine';
+        this.current_transform = 'perspective';
 
         this.back_btn = document.getElementById('back');
         this.more_btn = document.getElementById('more');
