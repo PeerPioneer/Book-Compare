@@ -1,32 +1,4 @@
 const MAX_DIM = Infinity; // always compare at full resolution - no downscaling
-let BW_ENABLED_1 = false; // set from image 1's "Black & white" checkbox before Compare is clicked
-let BW_ENABLED_2 = false; // set from image 2's "Black & white" checkbox before Compare is clicked
-let CONTRAST_PERCENT_1 = 100; // contrast of the first scan, from its slider; 100 = no change
-let CONTRAST_PERCENT_2 = 100; // contrast of the second scan, from its slider
-
-// Applies the black & white / contrast settings to a raw ImageData object.
-// Called once per image, inside process(), before the alignment/warp step,
-// so both the matching computation and every visualisation mode
-// (Difference, Toggle, Overlay, ...) see the same treated pixels.
-const apply_bw_contrast = (imageData, bwEnabled, contrastPercent) => {
-    if (!bwEnabled && contrastPercent === 100) {
-        return imageData;
-    }
-    const data = imageData.data;
-    const contrastFactor = contrastPercent / 100;
-    for (let i = 0; i < data.length; i += 4) {
-        let r = data[i], g = data[i + 1], b = data[i + 2];
-        if (bwEnabled) {
-            const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b; // same weights as the on-screen preview filter
-            r = g = b = gray;
-        }
-        data[i]     = (r - 127.5) * contrastFactor + 127.5;
-        data[i + 1] = (g - 127.5) * contrastFactor + 127.5;
-        data[i + 2] = (b - 127.5) * contrastFactor + 127.5;
-    }
-    return imageData;
-};
-
 const COLOR_CHANNELS = {
     red: "#F00",
     green: "#0F0",
@@ -215,20 +187,10 @@ class Visualization {
         // Temporary canvas to use for computing diff
         this.dcanvas = document.createElement('canvas');
 
-        // Holds image 1 after black & white / contrast treatment is applied,
-        // so every visualisation mode (not just the alignment computation)
-        // shows the same treated version of image 1 that image 2 gets
-        // automatically via the warp step in process().
+        // Holds image 1 (the reference everything else is aligned to), so
+        // every visualisation mode draws from the same picture.
         this.ocanvas = document.createElement('canvas');
         this.octx = this.ocanvas.getContext('2d');
-
-        // Hold the untreated, "Original" versions of image 1 and (aligned)
-        // image 2, for the "Only image 1" / "Only image 2" modes' switch
-        // between "User-adjusted" and "Original".
-        this.rcanvas1 = document.createElement('canvas');
-        this.rctx1 = this.rcanvas1.getContext('2d');
-        this.rcanvas2 = document.createElement('canvas');
-        this.rctx2 = this.rcanvas2.getContext('2d');
 
         this.bcanvas.width = this.tcanvas.width = this.dcanvas.width = this.canvas.width;
         this.bcanvas.height = this.tcanvas.height = this.dcanvas.height = this.canvas.height;
@@ -295,47 +257,9 @@ class Visualization {
         this._input_image = val;
     }
 
-    // The superimposition can be drawn from four versions of the two pages:
-    // black & white or colour, each with or without the contrast boost chosen
-    // in Step 2. The alignment is computed ONCE (from the version that was
-    // used when Compare was pressed) and never again: the other versions are
-    // made by treating the untouched scans (rcanvas1 / rcanvas2, already
-    // moved with that same alignment), so nothing shifts between versions.
-    _variant(bw, ctr) {
-        if (bw === this.bw0 && ctr) return { a: this.ocanvas, b: this.tcanvas };
-        const key = bw + '|' + ctr;
-        if (!this._variants) this._variants = new Map();
-        if (this._variants.has(key)) return this._variants.get(key);
-        const make = (src, pct) => {
-            const d = src.getContext('2d').getImageData(0, 0, src.width, src.height);
-            apply_bw_contrast(d, bw, ctr ? pct : 100);
-            const cv = document.createElement('canvas');
-            cv.width = src.width;
-            cv.height = src.height;
-            cv.getContext('2d').putImageData(d, 0, 0);
-            return cv;
-        };
-        const v = {
-            a: make(this.rcanvas1, this.c1),
-            b: make(this.rcanvas2, this.c2),
-        };
-        this._variants.set(key, v);
-        // keep memory in check: at most two extra versions at a time
-        while (this._variants.size > 2) {
-            this._variants.delete(this._variants.keys().next().value);
-        }
-        return v;
-    }
-
-    set_view(bw, ctr) {
-        const v = this._variant(bw, ctr);
-        this._input_image = v.a;
-        this._aligned = v.b;
-        document.dispatchEvent(new CustomEvent('redraw_view'));
-    }
-
+    // Image 2 after it has been moved onto image 1
     get aligned() {
-        return this._aligned || this.tcanvas;
+        return this.tcanvas;
     }
 
     set_filename_list(filename_list) {
@@ -343,41 +267,15 @@ class Visualization {
     }
 
     process(img1, img2, transform) {
-        let im1Data = this.getImageData(img1);
-        let im2Data = this.getImageData(img2);
+        const im1Data = this.getImageData(img1);
+        const im2Data = this.getImageData(img2);
 
-        // Keep untouched copies of both, for the "Original" option on the
-        // "Only image 1" / "Only image 2" modes - apply_bw_contrast mutates
-        // its argument in place, so these have to be cloned first.
-        const raw_im1 = new ImageData(
-            new Uint8ClampedArray(im1Data.data), im1Data.width, im1Data.height
-        );
-        const raw_im2 = new ImageData(
-            new Uint8ClampedArray(im2Data.data), im2Data.width, im2Data.height
-        );
-
-        im1Data = apply_bw_contrast(im1Data, BW_ENABLED_1, CONTRAST_PERCENT_1);
-        im2Data = apply_bw_contrast(im2Data, BW_ENABLED_2, CONTRAST_PERCENT_2);
-
-        // Store the treated version of image 1 and use it as input_image from
-        // now on, so Toggle/Difference/etc. all show the same black & white
-        // / contrast treatment that image 2 gets automatically via warp_image.
+        // Image 1 is the reference: it is kept as it is and used as
+        // input_image from now on, so Toggle/Difference/etc. all draw from it.
         this.ocanvas.width = im1Data.width;
         this.ocanvas.height = im1Data.height;
         this.octx.putImageData(im1Data, 0, 0);
-        // remember the Step 2 settings this comparison was made with
-        this.bw0 = BW_ENABLED_1;
-        this.c1 = CONTRAST_PERCENT_1;
-        this.c2 = CONTRAST_PERCENT_2;
-        this._variants = new Map();
-        this._aligned = null;
         this.input_image = this.ocanvas;
-
-        // The untreated, original image 1 needs no alignment - it's the
-        // reference image everything else is aligned to.
-        this.rcanvas1.width = raw_im1.width;
-        this.rcanvas1.height = raw_im1.height;
-        this.rctx1.putImageData(raw_im1, 0, 0);
 
         const buf = this.transform.estimate_transform(
             im2Data.data,
@@ -411,24 +309,6 @@ class Visualization {
         this.tcanvas.width = this.bcanvas.width = this.canvas.width = im1Data.width;
         this.tcanvas.height = this.bcanvas.height = this.canvas.height = im1Data.height;
         this.tctx.putImageData(this.resultData, 0, 0);
-
-        // Also warp the untreated, original image 2 using the exact same
-        // transform H, so "Only image 2: Original" still lines up - just
-        // without the black & white / contrast treatment.
-        const _raw_warped_buf = this.transform.warp_image(
-            raw_im2.data,
-            raw_im2.height,
-            H,
-            im1Data.height,
-            im1Data.width,
-            transform,
-        );
-        this.rcanvas2.width = im1Data.width;
-        this.rcanvas2.height = im1Data.height;
-        this.rctx2.putImageData(
-            new ImageData(new Uint8ClampedArray(_raw_warped_buf), im1Data.width, im1Data.height),
-            0, 0
-        );
 
         this.canvas.dispatchEvent(new CustomEvent('transform', {
             bubbles: true,

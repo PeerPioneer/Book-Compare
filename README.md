@@ -3,6 +3,13 @@ Do you work with books? Do you want to compare them? Boy, do I have good news fo
 Book compare is based on Image Compare but has a few added features and modifications that makes it more suitable for comparing entire books with each other.
 This is still very much a work in progress.
 
+## What is in this repository
+- `app/`: the working two-image app (open `app/index.html` in Edge or Firefox; works offline). Contrast and black-and-white were removed after tests showed no benefit for alignment.
+- `prototypes/whole-book-workspace/`: a clickable **mock-up** of the planned whole-book screen (not yet connected to the app).
+- `research/`: Python code and notes for printed-area detection and tile-based alignment (not yet part of the app) - start with `research/README.md` and `research/FINDINGS.md`.
+- `website/`: the original Image Compare website.
+No scan images are included. The new folders `prototypes/` and `research/` have no licence chosen yet; the rest remains under the original BSD 2-Clause licence.
+
 
 
 # Image Compare

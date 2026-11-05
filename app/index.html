@@ -426,38 +426,6 @@
         margin-bottom: 0.25em;
         background-color: #f7f7f7;
       }
-      #bw_row {
-        grid-area: 3 / 1 / 4 / 2;
-        justify-self: center;
-        padding: 0.4em 0 0.2em;
-        cursor: default;
-      }
-      #bw_row label {
-        display: flex;
-        align-items: center;
-        gap: 0.4em;
-        white-space: nowrap;
-      }
-      .image_adjust {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 0.6em;
-        padding: 0.5em 0.75em;
-        cursor: default;
-      }
-      .image_adjust label {
-        display: flex;
-        align-items: center;
-        gap: 0.3em;
-        white-space: nowrap;
-      }
-      .image_adjust input[type='range'] {
-        width: 90px;
-        vertical-align: middle;
-      }
 
       /* #action now lives in the purple footer bar, to the right of the
          Visualization dropdown, instead of its own white bar. Its children
@@ -540,53 +508,10 @@
         background: #fff;
         color: var(--mdc-theme-primary, #6200ee);
       }
-      .pane__btn.na {
-        opacity: 0.4;
-        cursor: not-allowed;
-      }
-      .pane__btn.na:hover {
-        background: #fafafa;
-      }
-      .pane__btn.on {
-        background: #d3e8e8;
-      }
-      .pane__btn.on svg {
-        stroke: #008080;
-      }
-      .pane__btn svg .f {
-        fill: #777;
-        stroke: none;
-      }
-      .pane__btn.on svg .f {
-        fill: #008080;
-      }
       .diff_note {
         line-height: 1.3;
         white-space: nowrap;
         text-align: left;
-      }
-      .image_variant_switch {
-        display: flex;
-        border: 1px solid rgba(255, 255, 255, 0.7);
-        border-radius: 4px;
-        overflow: hidden;
-      }
-      .image_variant_btn {
-        border: 0;
-        background: transparent;
-        color: #fff;
-        padding: 0.3em 0.6em;
-        font: inherit;
-        font-size: 12px;
-        cursor: pointer;
-      }
-      .image_variant_btn + .image_variant_btn {
-        border-left: 1px solid rgba(255, 255, 255, 0.7);
-      }
-      .image_variant_btn.active {
-        background: rgba(255, 255, 255, 0.85);
-        color: var(--mdc-theme-primary, #6200ee);
-        font-weight: 500;
       }
 
       /* ---- Bottom (teal) bar ----
@@ -926,11 +851,6 @@
         border-radius: 3px;
         pointer-events: none;
       }
-      #contrast_slider_1,
-      #contrast_slider_2 {
-        width: 100px;
-        vertical-align: middle;
-      }
       /* "Change colors (Difference mode)" dialog */
       .diff_row { display: flex; align-items: center; gap: 0.75em; padding: 0.55em 0; border-top: 1px solid rgba(0,0,0,0.12); }
       .diff_row input[type='radio'] { flex: 0 0 auto; width: 1.2em; height: 1.2em; accent-color: var(--mdc-theme-primary, #008080); }
@@ -940,14 +860,6 @@
       .diff_name { margin-left: 0.5em; font-weight: 500; min-width: 0; white-space: normal; }
       #diff_colors_dialog .mdc-dialog__surface { max-width: 640px; }
       .diff_note { display: block; font-weight: 400; font-size: 0.85em; opacity: 0.75; }
-      /* fixed width, so the slider does not move when the label text changes */
-      #contrast_label_1,
-      #contrast_label_2 {
-        display: inline-block;
-        width: 9.5em;
-        text-align: left;
-        white-space: nowrap;
-      }
 
       #result > div.image_slider {
         width: 100%;
@@ -1386,10 +1298,6 @@
                 uneven, non-linear bending.
               </li>
             </ul>
-            <p>
-              Turning the images black and white and/or increasing the
-              contrast may deliver a better result.
-            </p>
           </div>
           <div class="mdc-dialog__actions">
             <button
@@ -1952,20 +1860,6 @@
               />
               <span class="material-icons"> change_circle </span>
             </div>
-            <div class="image_adjust" onclick="event.stopPropagation()">
-              <input
-                type="range"
-                id="contrast_slider_1"
-                min="100"
-                max="200"
-                value="100"
-              />
-              <span
-                id="contrast_label_1"
-                class="mdc-typography--caption mdc-theme--primary"
-                >Contrast</span
-              >
-            </div>
           </li>
           <li
             class="mdc-image-list__item w-100 mdc-elevation--z4"
@@ -1978,31 +1872,8 @@
               />
               <span class="material-icons"> change_circle </span>
             </div>
-            <div class="image_adjust" onclick="event.stopPropagation()">
-              <input
-                type="range"
-                id="contrast_slider_2"
-                min="100"
-                max="200"
-                value="100"
-              />
-              <span
-                id="contrast_label_2"
-                class="mdc-typography--caption mdc-theme--primary"
-                >Contrast</span
-              >
-            </div>
           </li>
         </ul>
-
-        <div id="bw_row" onclick="event.stopPropagation()">
-          <label for="bw_toggle_checkbox_1" style="cursor: pointer">
-            <input type="checkbox" id="bw_toggle_checkbox_1" />
-            <span class="mdc-typography--caption mdc-theme--primary"
-              >Black-and-white (both images)</span
-            >
-          </label>
-        </div>
 
         <ul
           class="mdc-image-list horizontal-image-list fr f-justify-center f-stretch"
@@ -2422,22 +2293,11 @@
                  a matching element here - removing it would crash the app
                  when switching to or from Difference mode. -->
             <div id="diff" class="hide"></div>
-            <div id="onlyimage1" class="hide image_variant_switch">
-              <button type="button" class="image_variant_btn active" data-variant="adjusted">
-                User-adjusted
-              </button>
-              <button type="button" class="image_variant_btn" data-variant="original">
-                Original
-              </button>
-            </div>
-            <div id="onlyimage2" class="hide image_variant_switch">
-              <button type="button" class="image_variant_btn active" data-variant="adjusted">
-                User-adjusted
-              </button>
-              <button type="button" class="image_variant_btn" data-variant="original">
-                Original
-              </button>
-            </div>
+            <!-- Placeholders, like #diff above: "Only image 1" / "Only
+                 image 2" need no extra controls, but Action expects an
+                 element for every mode. -->
+            <div id="onlyimage1" class="hide"></div>
+            <div id="onlyimage2" class="hide"></div>
           </div>
           <button
             id="link_toggle"
@@ -2737,48 +2597,7 @@
         });
       });
 
-      // Step 2 settings, with a live preview on the two scans
       window.addEventListener("load", () => {
-        // ---- Step 2: settings, with a live preview on the two scans ----
-        // BW_ENABLED_1/2 and CONTRAST_PERCENT_1/2 are declared with `let` at
-        // the top of viz.js; classic scripts share that scope. MAX_DIM is
-        // now a fixed `const` (always full resolution), so there's nothing
-        // to wire up for it any more.
-        const bw_checkbox_1 = document.getElementById("bw_toggle_checkbox_1");
-        const slider_1 = document.getElementById("contrast_slider_1");
-        const slider_2 = document.getElementById("contrast_slider_2");
-        const label_1 = document.getElementById("contrast_label_1");
-        const label_2 = document.getElementById("contrast_label_2");
-
-        const filter_for = (bwEnabled, contrast) => {
-          const parts = [];
-          if (bwEnabled) parts.push("grayscale(1)");
-          if (contrast !== 100) parts.push(`contrast(${contrast}%)`);
-          return parts.join(" ");
-        };
-        const apply_preview = () => {
-          const imgs = document.querySelectorAll(
-            "#compare_container > .vertical-image-list img"
-          );
-          if (imgs[0]) imgs[0].style.filter = filter_for(BW_ENABLED_1, CONTRAST_PERCENT_1);
-          if (imgs[1]) imgs[1].style.filter = filter_for(BW_ENABLED_2, CONTRAST_PERCENT_2);
-        };
-        const sync_settings = () => {
-          BW_ENABLED_1 = bw_checkbox_1.checked;
-          BW_ENABLED_2 = bw_checkbox_1.checked; // one checkbox for both images
-          CONTRAST_PERCENT_1 = Number(slider_1.value);
-          CONTRAST_PERCENT_2 = Number(slider_2.value);
-          label_1.textContent =
-            CONTRAST_PERCENT_1 === 100 ? "Contrast 1" : `Contrast 1: ${CONTRAST_PERCENT_1}%`;
-          label_2.textContent =
-            CONTRAST_PERCENT_2 === 100 ? "Contrast 2" : `Contrast 2: ${CONTRAST_PERCENT_2}%`;
-          apply_preview();
-        };
-        bw_checkbox_1.onchange = sync_settings;
-        slider_1.oninput = sync_settings;
-        slider_2.oninput = sync_settings;
-        sync_settings(); // also picks up boxes the browser restored after a reload
-
         // "Which transform mode should I use?" help popup
         document.getElementById("transform_help_btn").onclick = () => {
           document.getElementById("transform_help_dialog").MDCDialog.open();

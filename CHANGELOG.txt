@@ -1,3 +1,8 @@
+## [Book Compare snapshot] - 2026-11-05
+- Book Compare: contrast and black-and-white options removed (as alignment options and as display settings); tests showed no benefit for alignment
+- New folder prototypes/whole-book-workspace: clickable mock-up of the whole-book workspace (not connected to the app yet)
+- New folder research/: printed-area detection and tile-based alignment in Python, with notes (FINDINGS.md, ROADMAP.md); not yet part of the app
+
 ## [WIP]
 - Photometric transform
 - WebGL for faster computation and to remove the 1024px limit on resolution.

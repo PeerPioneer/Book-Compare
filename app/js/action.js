@@ -44,7 +44,6 @@ class Action {
         }
 
         this.draw = this._draw.bind(this);
-        document.addEventListener('redraw_view', () => this._draw());
         document.addEventListener('diffcolorschange', () => {
             if (this.result && this.MODE === 'diff') this.result.draw_diff_image();
         });
