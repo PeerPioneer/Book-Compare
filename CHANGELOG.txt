@@ -1,3 +1,7 @@
+## [Book Compare workspace v2.1] - 2026-11-06
+- The folder window now opens where you chose a folder last time (the last scan folder, or the folder that holds the copies; separately for the project folder). Edge often forgets this when the app is opened from a file
+- Less asking for permission after a restart: previews of pages you have looked at before are shown right away from the browser's memory; the browser's permission question now comes only when you press COMPARE (or when you click "Allow access now" to see every page). The question can not be removed completely: it is a browser rule
+
 ## [Book Compare workspace v2] - 2026-11-06
 - Reopening a saved project no longer asks for the folder of every copy: scan folders are remembered as "folders used so far" (a folder that holds several copies is chosen once, later copies are picked from a list). After reopening, one click on "Allow access to scans" is enough per remembered folder; "Choose scan folder" / "Choose one folder for all" merges many copies into one folder. Projects saved by v1 still open and are converted
 - "Set aside" row removed: "Delete file" removes a file from the workspace (the scan stays untouched; Undo and Delete key work)

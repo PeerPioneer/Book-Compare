@@ -14,7 +14,7 @@ window.mkScan = async (dir, name, n, variant) => {
 };
 window.snapshot = async (dir, path='') => { const out = []; for await (const [name, h] of dir.entries()) { if (h.kind === 'file') { const f = await h.getFile(); out.push(path+name+'|'+f.size+'|'+f.lastModified); } else out.push(...await window.snapshot(h, path+name+'/')); } return out.sort(); };
 window.__picks = [];
-window.showDirectoryPicker = async function (opts) { window.__lastOpts = window.__lastOpts || []; window.__lastOpts.push(JSON.stringify(opts)); const h = window.__picks.shift(); if (!h) throw new DOMException('no pick queued', 'AbortError'); return h; };
+window.showDirectoryPicker = async function (opts) { window.__lastOpts = window.__lastOpts || []; window.__lastOpts.push(JSON.stringify({id: opts.id, mode: opts.mode, startIn: opts.startIn ? opts.startIn.name : null})); const h = window.__picks.shift(); if (!h) throw new DOMException('no pick queued', 'AbortError'); return h; };
 
 // Simulates what Edge does after a project is reopened: the permission of remembered folders has lapsed until the user clicks "Allow".
 window.__locked = new Set(); window.__prompts = []; window.__deny = false;
@@ -87,3 +87,6 @@ def read_project(pg, which='proj'):
 def reopen(ctx, url=URL):
     pg2 = ctx.new_page(); pg2.on('pageerror', lambda e: errs.append('PAGEERROR '+str(e))); pg2.goto(url); pg2.wait_for_timeout(900)
     pg2.evaluate(HELPERS); handles(pg2); return pg2
+def pick_opts(pg):
+    import json as _j
+    return [_j.loads(o) for o in pg.evaluate("window.__lastOpts||[]")]

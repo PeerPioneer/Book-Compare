@@ -165,6 +165,11 @@
     for (var i = 0; i < u.length; i++) { var l = c.locs[u[i]]; if (!l || !rootReady(rootById(l.root))) return true; }
     return false;
   }
+  function lostWhy(c) {
+    var u = usedLocs(c);
+    for (var i = 0; i < u.length; i++) { var l = c.locs && c.locs[u[i]], r = l && rootById(l.root); if (!r || (!r.handle && !r.files)) return 'folder not found'; }
+    return 'permission needed';
+  }
   function usedRoots() {
     var seen = {}, out = [];
     S.copies.forEach(function (c) { usedLocs(c).forEach(function (n) { var l = c.locs && c.locs[n], r = l && rootById(l.root); if (r && !seen[r.id]) { seen[r.id] = 1; out.push(r); } }); });
@@ -280,6 +285,20 @@
       (REG[id].locs || []).forEach(function (l) { if (l.root === from.id) { l.root = to.id; l.path = l.path ? (pre ? pre + '/' + l.path : l.path) : pre; } });
     });
   }
+  // The Windows folder window opens where you chose a folder last time. The browser does not always remember that by itself
+  // (it often does not when the app is opened from a file), so the last folder is kept here and passed as the starting point.
+  async function pickDir(kind, mode) {
+    var start = await idbGet('meta', 'start:' + kind), opts = { id: kind, mode: mode };
+    if (start) opts.startIn = start;
+    var h;
+    try { h = await window.showDirectoryPicker(opts); }
+    catch (e) {
+      if (!start || (e && (e.name === 'AbortError' || e.name === 'SecurityError'))) throw e;
+      delete opts.startIn; h = await window.showDirectoryPicker(opts);                // the remembered folder is gone: start anywhere
+    }
+    idbPut('meta', 'start:' + kind, h);
+    return h;
+  }
   // result: { root, path, name, groups, ignored }
   async function pickScanFolder() {
     if (!HAS_FSA) {
@@ -288,9 +307,10 @@
       var g0 = await scanLoc(r, '');
       return { root: r, path: '', name: f.name, groups: g0.groups, ignored: g0.ignored };
     }
-    var dir = await window.showDirectoryPicker({ id: 'book-scans', mode: 'read' });
+    var dir = await pickDir('book-scans', 'read');
     await checkNotProjectFolder(dir);
     var loc = await rootFor(dir, true);
+    if (loc.path && loc.root.handle) idbPut('meta', 'start:book-scans', loc.root.handle);     // next time start in the folder that holds the others
     var g = await scanLoc(loc.root, loc.path);
     return { root: loc.root, path: loc.path, name: dir.name, groups: g.groups, ignored: g.ignored };
   }
@@ -326,15 +346,16 @@
       makeThumb(job.copy, job.key).then(job.resolve, function (e) { job.resolve({ err: e && e.name === 'Lost' ? 'lost' : 'missing', msg: niceError(e) }); }).then(function () { thumbActive--; pumpThumbs(); });
     }
   }
+  // A small picture is kept in the browser for every page you have looked at. It is shown even while the browser has the
+  // scan folder locked (after a restart); once the folder is readable the kept picture is checked against the file.
   async function makeThumb(copy, key) {
-    var file = await getScan(copy, key);
-    var ck = copy.folder + '|' + key + '|' + file.size + '|' + file.lastModified;
-    var blob = await idbGet('thumbs', ck);
-    if (!blob) {
-      blob = await decodeToBlob(file);
-      if (blob) idbPut('thumbs', ck, blob);
-    }
+    var ck = 'v2|' + S.projectId + '|' + copy.id + '|' + key, cached = await idbGet('thumbs', ck), file;
+    try { file = await getScan(copy, key); }
+    catch (e) { if (cached && cached.blob && e && e.name === 'Lost') return { url: URL.createObjectURL(cached.blob), kept: true }; throw e; }
+    if (cached && cached.blob && cached.size === file.size && cached.mtime === file.lastModified) return { url: URL.createObjectURL(cached.blob) };
+    var blob = await decodeToBlob(file);
     if (!blob) return { err: 'decode', msg: 'This file could not be shown as a picture.' };
+    idbPut('thumbs', ck, { blob: blob, size: file.size, mtime: file.lastModified });
     return { url: URL.createObjectURL(blob) };
   }
   async function decodeToBlob(file) {
@@ -389,7 +410,7 @@
   async function chooseProjectFolder() {
     if (!HAS_FSA) { downloadProject(); return; }
     var h;
-    try { h = await window.showDirectoryPicker({ id: 'book-project', mode: 'readwrite' }); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
+    try { h = await pickDir('book-project', 'readwrite'); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
     try { await checkNotScanFolder(h); } catch (e) { return toast(niceError(e)); }
     var exists = false;
     try { await h.getFileHandle(PROJECT_FILE); exists = true; } catch (e) { exists = false; }
@@ -420,7 +441,7 @@
   async function openProject() {
     if (!HAS_FSA) { $('#ws-jsoninput').value = ''; $('#ws-jsoninput').click(); return; }
     var h;
-    try { h = await window.showDirectoryPicker({ id: 'book-project', mode: 'readwrite' }); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
+    try { h = await pickDir('book-project', 'readwrite'); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
     await readProjectFolder(h);
   }
   async function continueLast() {
@@ -474,8 +495,7 @@
     if (proj.handle) await rememberProject();
     renderAll(); renderSave();
     if (handle && !proj.handle) toast('This project folder is in, or contains, a scan folder, so automatic saving is switched off. Save the project in a separate folder (More → Save project).');
-    else toast('Project opened: ' + S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies') + (S.copies.some(copyLost) ? '. The scans need your permission once.' : '.'));
-    if (S.copies.some(copyLost)) allowAccess(true);       // works silently where the browser still honours the click that opened the project
+    else toast('Project opened: ' + S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies') + '.');
     return true;
   }
 
@@ -522,7 +542,7 @@
     if (!pending.length) return toast('All scans are reachable.');
     if (!HAS_FSA) { var inp = $('#ws-dirinput'); inp.value = ''; inp.onchange = function () { attachFiles(Array.prototype.slice.call(inp.files || [])); }; inp.click(); return; }
     var dir;
-    try { dir = await window.showDirectoryPicker({ id: 'book-scans', mode: 'read' }); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
+    try { dir = await pickDir('book-scans', 'read'); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
     try { await checkNotProjectFolder(dir); } catch (e) { return toast(niceError(e)); }
     var total = pending.length, base = await rootFor(dir, true);                       // roots that lie inside the picked folder are folded in here
     pending = pending.filter(function (r) { return rootById(r.id); });
@@ -588,7 +608,7 @@
     bn.hidden = !lost.length || (!allow.length && !find.length);
     if (bn.hidden) return;
     var h = '';
-    if (allow.length) h += '<span>Book Compare needs your permission to read the scans of <b>' + nameList(lost) + '</b> again. The browser asks once after a project is reopened. One click is enough for all copies in the same folder.</span><button class="ws-tb primary" data-act="allow">Allow access to scans</button>';
+    if (allow.length) h += '<span>The browser locks your scans after a restart (<b>' + nameList(lost) + '</b>). Pictures you have seen before are still shown. When you press COMPARE the browser asks for permission by itself; to see every page now, allow access here.</span><button class="ws-tb primary" data-act="allow">Allow access now</button>';
     if (find.length) h += '<span>' + (allow.length ? 'For some copies the folder is not known on this computer. ' : 'Book Compare cannot find the scans of <b>' + nameList(lost) + '</b> on this computer. ') + 'Choose the folder that holds them (one choice is enough for all copies inside it).</span><button class="ws-tb' + (allow.length ? '' : ' primary') + '" data-act="reconnect">Choose scan folder …</button>';
     else if (allow.length > 1) h += '<button class="ws-tb" data-act="reconnect" title="Pick the folder that holds all your copies once. After that a single permission is enough.">Choose one folder for all …</button>';
     bn.innerHTML = h;
@@ -606,7 +626,7 @@
     S.copies.forEach(function (c, i) {
       var cnt = 0; c.cells.forEach(function (x) { if (x) cnt++; });
       var k = c.id === S.pair[0] ? ' k1' : c.id === S.pair[1] ? ' k2' : '', lost = copyLost(c);
-      h += '<div class="ws-hcell' + k + '"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (lost ? 'scans not reachable' : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button></div>';
+      h += '<div class="ws-hcell' + k + '"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button></div>';
     });
     h += '<div class="ws-addcell"><button class="ws-addbtn" data-act="add"><span class="plus">+</span><small>Add new copy</small></button></div></div><div id="ws-rowshost"></div></div></div>';
     gb.innerHTML = h;
@@ -651,7 +671,7 @@
         thumbPromise(c, key).then(function (r) {
           if (tok !== pvTok || !pg || !pg.isConnected) return;
           if (r && r.url) pg.innerHTML = '<img alt="" src="' + r.url + '">';
-          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? 'Scans not reachable yet' : esc((r && r.msg) || 'Not available')) + '</span>';
+          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? 'Not seen before: needs access to the scans' : esc((r && r.msg) || 'Not available')) + '</span>';
         });
       })(S.copies[ci], ci);
     }
@@ -940,9 +960,22 @@
     var a = copyById(S.pair[0]), b = copyById(S.pair[1]), r = S.sel.row;
     if (!a || !b) return toast('First mark two pages with “1” and “2” in the preview on the right.');
     if (!a.cells[r] || !b.cells[r]) return toast('In this row ' + (!a.cells[r] ? a.name : b.name) + ' has no page. Pick another row, or other copies with “1” and “2”.');
+    // the original scans are needed now: if the browser has locked a folder, ask for it here, at the click on COMPARE
+    var need = [];
+    [[a, a.cells[r]], [b, b.cells[r]]].forEach(function (x) {
+      var sk = splitKey(x[1]), l = x[0].locs && x[0].locs[sk.n], rt = l && rootById(l.root);
+      if (rt && rt.handle && !rt.ok && need.indexOf(rt) < 0) need.push(rt);
+    });
+    for (var i = 0; i < need.length; i++) {
+      var granted = false;
+      try { granted = await ensureAccess(need[i]); }
+      catch (e) { renderAll(); return toast(e && e.name === 'SecurityError' ? 'The browser asks for one folder per click. Press COMPARE once more to allow the next folder.' : niceError(e)); }
+      if (!granted) { renderAll(); return toast('The browser did not give access to “' + need[i].name + '”. COMPARE needs the original scans.'); }
+    }
+    if (need.length) renderAll();
     var f1, f2;
     try { f1 = await getScan(a, a.cells[r]); f2 = await getScan(b, b.cells[r]); }
-    catch (e) { return toast((e && e.name === 'Lost' ? e.message + ' Click “Allow access to scans” at the top first.' : 'Could not open the scan: ' + niceError(e))); }
+    catch (e) { return toast((e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e))); }
     var urls = [URL.createObjectURL(f1), URL.createObjectURL(f2)];
     hide();
     if (cb.compare) cb.compare({ urls: urls, names: [f1.name, f2.name] });

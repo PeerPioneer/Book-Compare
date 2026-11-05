@@ -106,11 +106,19 @@ with sync_playwright() as p:
     pg2.click('#books_btn'); pg2.wait_for_timeout(600); pg2.click('#ws .ws-empty [data-act=continue]'); pg2.wait_for_timeout(1500)
     assert pg2.locator('#ws .ws-hname').count() == 3
     assert not hid(pg2, '#ws-banner') and pg2.locator('#ws-banner [data-act=allow]').count() == 1 and pg2.locator('#ws-banner [data-act=reconnect]').count() <= 1
-    assert 1 <= pg2.locator('#ws .ws-hmeta.lost').count() <= 3          # the click on Continue may already have allowed the first folder
+    assert pg2.locator('#ws .ws-hmeta.lost').count() == 3 and 'permission needed' in pg2.inner_text('#ws .ws-hmeta.lost')
+    assert pg2.locator('#ws-thumbs img').count() >= 2 and prompts(pg2) == [], 'pages seen before are shown from memory, no permission asked yet'
+    # COMPARE asks for the folders it needs (the test browser allows one folder per click, the worst case)
+    pg2.locator('#ws .ws-cell[data-c="0"][data-r="2"]').click(); pg2.wait_for_timeout(300)
+    pg2.click('#ws-compare'); pg2.wait_for_timeout(1000)
+    assert not pg2.evaluate("document.getElementById('ws').hidden") and 'once more' in pg2.inner_text('#ws-toast'), pg2.inner_text('#ws-toast')
+    pg2.click('#ws-compare'); pg2.wait_for_timeout(1500)
+    assert pg2.evaluate("document.getElementById('ws').hidden") and prompts(pg2) == ['Copy-A', 'Copy-B'], prompts(pg2)
+    pg2.click('#back'); pg2.wait_for_timeout(600)
     clicks = 0
     while not hid(pg2, '#ws-banner') and clicks < 6:
         pg2.click('#ws-banner [data-act=allow]'); clicks += 1; pg2.wait_for_timeout(700)
-    assert hid(pg2, '#ws-banner') and pg2.locator('#ws-thumbs img').count() >= 2 and pg2.locator('#ws .ws-hmeta.lost').count() == 0
+    assert hid(pg2, '#ws-banner') and pg2.locator('#ws .ws-hmeta.lost').count() == 0 and pg2.locator('#ws-thumbs img').count() >= 2
     assert sorted(prompts(pg2)) == ['Copy-A', 'Copy-B', 'Copy-C'], prompts(pg2)       # three separate folders = three permissions, never a folder picker
     assert pg2.evaluate("window.__picks.length") == 0
     d2 = read_project(pg2); assert d2['labels'] == {'2': 'Index'} and d2['copies'][0]['cells'][8] == '@1/img_1.JPG'

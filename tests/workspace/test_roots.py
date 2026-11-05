@@ -44,12 +44,19 @@ with sync_playwright() as p:
     assert [c['locs'] for c in d['copies']] == [[{'root': d['roots'][0]['id'], 'path': ''}]] * 3
     pg2 = reopen(ctx); lock(pg2, 'scans')
     pg2.click('#books_btn'); pg2.wait_for_timeout(600); pg2.click('#ws .ws-empty [data-act=continue]'); pg2.wait_for_timeout(1500)
-    clicks = 0
-    while not hid(pg2, '#ws-banner') and clicks < 3:
-        pg2.click('#ws-banner [data-act=allow]'); clicks += 1; pg2.wait_for_timeout(700)
-    assert hid(pg2, '#ws-banner') and prompts(pg2) == ['scans'] and clicks <= 1, (prompts(pg2), clicks)
+    # previews of pages seen before appear at once, without any permission; COMPARE then asks for the one folder it needs
+    assert not hid(pg2, '#ws-banner') and pg2.locator('#ws-thumbs img').count() >= 2 and prompts(pg2) == [], prompts(pg2)
     assert pg2.evaluate("(window.__lastOpts||[]).length") == 0, 'no folder picker was needed'
-    assert pg2.locator('#ws-thumbs img').count() >= 2 and pg2.locator('#ws .ws-hmeta.lost').count() == 0
+    pg2.click('#ws-compare'); pg2.wait_for_timeout(1500)
+    assert pg2.evaluate("document.getElementById('ws').hidden") and prompts(pg2) == ['scans'], prompts(pg2)
+    pg2.click('#back'); pg2.wait_for_timeout(600)
+    assert hid(pg2, '#ws-banner') and pg2.locator('#ws .ws-hmeta.lost').count() == 0
+
+    # --- the folder window starts where the last folder was chosen ---------------------------------------------------
+    o = pick_opts(pg)
+    assert o[0]['startIn'] == 'Copy-C' and o[1]['id'] == 'book-scans' and o[1]['startIn'] == 'scans', o
+    pg.click('#ws .ws-addbtn'); pg.evaluate("window.__picks.push(window.__h.A)"); pg.click('#ac-folder'); pg.wait_for_timeout(500); pg.click('[data-close]')
+    o = pick_opts(pg); assert o[-1]['startIn'] == 'scans', o                      # Copy-B lay inside the known folder "scans": the next window starts there, not inside Copy-B
 
     # --- a project saved by the first version: one remembered folder per copy ---------------------------------------
     legacy = {'format': 'book-compare-project', 'version': 1, 'projectId': 'legacy1', 'nextCopy': 3, 'ns': 0, 'folio': False, 'labels': {}, 'skip': {}, 'pair': [1, 2], 'sel': {'ci': 0, 'row': 0}, 'tray': [],
