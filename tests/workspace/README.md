@@ -14,5 +14,12 @@ It uses made-up scans created inside the browser's private storage, so none of y
 
 Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the app opened from a file path instead of the local server.
 
+`test_helper.py` checks the Book Compare helper (`launcher/serve.ps1`) with real folders on disk, in Chromium and in Firefox: the helper's safety rules (other web sites and other host names are refused, scan folders are read-only, only `book-compare-project.json` can be written), choosing folders, saving and reopening a project, and a simulated restart of the browser (no permission question, because the helper holds the folder access). It needs PowerShell (on Windows the built-in one; elsewhere `pwsh`):
+
+    pip install playwright && playwright install chromium firefox
+    PWSH=pwsh python3 tests/workspace/test_helper.py      # prints ALL HELPER TESTS PASSED
+
+`tests/windows/windows-checks.ps1` tests the Windows-only parts (folder window, shortcuts, hidden start, icon near the clock). It runs by itself on GitHub (`.github/workflows/windows-test.yml`, on a real Windows machine) after every push; see the "Actions" tab of the repository.
+
 `common.py` holds the helpers (making test scans, faking the folder picker with private-storage folders).
-Not covered by this script: the real Windows folder picker and permission prompts of Edge; these must be tried by hand.
+Not covered by these scripts: how the real Windows folder window looks and feels and the permission prompts of Edge/Chrome; these must be tried by hand.

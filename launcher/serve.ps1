@@ -75,19 +75,56 @@ $types = @{
 }
 
 # ---------------------------------------------------------------------------------------------------------------- starting
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add($url)
-try {
-  $listener.Start()
-} catch {
-  if (Test-AlreadyRunning) {
-    Write-Log 'already running; opening the browser'
-    if (-not $Hidden) { Write-Host 'Book Compare is already running. Opening it ...' }
-    Open-App
-    Start-Sleep -Seconds 1
-    exit 0
+function Get-RunningInfo {            # the answer of a Book Compare helper that already uses our port (text), or $null
+  try {
+    $r = [System.Net.WebRequest]::Create($url + 'api/ping'); $r.Timeout = 2000; $r.Proxy = $null
+    $resp = $r.GetResponse()
+    $sr = New-Object System.IO.StreamReader($resp.GetResponseStream(), [System.Text.Encoding]::UTF8)
+    $txt = $sr.ReadToEnd(); $sr.Close(); $resp.Close()
+    if ($txt -match '"app":"BookCompare"') { return $txt }
+  } catch { }
+  return $null
+}
+function Stop-Running {
+  try {
+    $r = [System.Net.WebRequest]::Create($url + 'api/quit'); $r.Method = 'POST'; $r.Timeout = 3000; $r.Proxy = $null
+    $r.Headers.Add('X-BookCompare', '1'); $r.ContentLength = 0
+    $resp = $r.GetResponse(); $resp.Close()
+  } catch { Write-Log ('could not stop the other helper: ' + $_.Exception.Message) }
+}
+$listener = $null
+for ($attempt = 0; $attempt -lt 2 -and -not $listener; $attempt++) {
+  $l = New-Object System.Net.HttpListener
+  $l.Prefixes.Add($url)
+  try { $l.Start(); $listener = $l; break }
+  catch {
+    $startError = $_.Exception.Message
+    $info = Get-RunningInfo
+    if ($info) {
+      if ($info -match [regex]::Escape((ConvertTo-JsonString $appRoot))) {            # the same copy of Book Compare is running already
+        Write-Log 'already running; opening the browser'
+        if (-not $Hidden) { Write-Host 'Book Compare is already running. Opening it ...' }
+        Open-App
+        Start-Sleep -Seconds 1
+        exit 0
+      }
+      Write-Log 'a helper from another folder is running: asking it to stop'          # e.g. an older download: this one takes over
+      Stop-Running
+      for ($w = 0; $w -lt 20; $w++) { Start-Sleep -Milliseconds 500; if (-not (Get-RunningInfo)) { break } }
+      continue
+    }
+    if (Test-AlreadyRunning) {
+      Say ('An older Book Compare is still running (it has a black window).' + [Environment]::NewLine + 'Please close that window, then start Book Compare again.') $true
+      Wait-Close
+      exit 1
+    }
+    Say ("Book Compare could not start on port $Port. Another program is using it." + [Environment]::NewLine + "(Technical message: $startError)" + [Environment]::NewLine + 'Close that program, or ask for help.') $true
+    Wait-Close
+    exit 1
   }
-  Say ("Book Compare could not start on port $Port. Another program is using it." + [Environment]::NewLine + "(Technical message: $($_.Exception.Message))" + [Environment]::NewLine + 'Close that program, or ask for help.') $true
+}
+if (-not $listener) {
+  Say 'Book Compare could not take over from the other copy that is running. Please quit it (icon near the clock) and try again.' $true
   Wait-Close
   exit 1
 }
@@ -96,6 +133,7 @@ Write-Log ("helper $HelperVersion started on port $Port (hidden=$([bool]$Hidden)
 # The questions of the very first start
 if ($script:IsWin -and -not $NoSetup) {
   $settings = Read-Settings
+  if ($settings.asked) { Update-Shortcuts }
   if (-not $settings.asked) {
     $a = Ask-YesNo ('Book Compare will now run quietly in the background (look for its icon near the clock).' + [Environment]::NewLine + [Environment]::NewLine + 'Start it automatically when Windows starts? Then it is always ready, and you never need to start anything yourself.' + [Environment]::NewLine + 'You can change this later with a right-click on the icon.')
     $b = Ask-YesNo 'Put a Book Compare shortcut on your Desktop?'
@@ -294,7 +332,7 @@ function Handle-Api($ctx, [string]$path) {
 
   if ($path -eq '/api/ping') {
     $pick = $(if ($TestPickFile) { 'test' } elseif ($script:IsWin) { 'dialog' } else { 'none' })
-    Send-Json $res 200 ('{"app":"BookCompare","api":1,"version":' + (ConvertTo-JsonString $HelperVersion) + ',"os":' + (ConvertTo-JsonString $(if ($script:IsWin) { 'windows' } else { 'other' })) + ',"pick":"' + $pick + '","autostart":' + $(if (Test-Autostart) { 'true' } else { 'false' }) + '}')
+    Send-Json $res 200 ('{"app":"BookCompare","api":1,"version":' + (ConvertTo-JsonString $HelperVersion) + ',"os":' + (ConvertTo-JsonString $(if ($script:IsWin) { 'windows' } else { 'other' })) + ',"dir":' + (ConvertTo-JsonString $appRoot) + ',"pick":"' + $pick + '","autostart":' + $(if (Test-Autostart) { 'true' } else { 'false' }) + '}')
     return $false
   }
   if ($path -eq '/api/quit') {

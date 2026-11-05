@@ -109,17 +109,31 @@ function New-BcShortcut([string]$lnk, [string]$arguments, [string]$description) 
 function Get-StartupLink { return (Join-Path ([System.Environment]::GetFolderPath('Startup')) 'Book Compare helper.lnk') }
 function Get-DesktopLink { return (Join-Path ([System.Environment]::GetFolderPath('Desktop')) 'Book Compare.lnk') }
 function Test-Autostart { if (-not $script:IsWin) { return $false }; return (Test-Path -LiteralPath (Get-StartupLink)) }
+function Get-AutostartArgs { return ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Hidden -NoBrowser' -f (Join-Path $script:LauncherDir 'serve.ps1')) }
+function Get-DesktopArgs { return ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Hidden' -f (Join-Path $script:LauncherDir 'serve.ps1')) }
 function Set-Autostart([bool]$on) {
   if (-not $script:IsWin) { return }
   try {
-    if ($on) { New-BcShortcut (Get-StartupLink) ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Hidden -NoBrowser' -f (Join-Path $script:LauncherDir 'serve.ps1')) 'Starts the Book Compare helper quietly when Windows starts' }
+    if ($on) { New-BcShortcut (Get-StartupLink) (Get-AutostartArgs) 'Starts the Book Compare helper quietly when Windows starts' }
     else { Remove-Item -LiteralPath (Get-StartupLink) -Force -ErrorAction SilentlyContinue }
   } catch { Write-Log ('autostart: ' + $_.Exception.Message) }
 }
 function Set-DesktopShortcut([bool]$on) {
   if (-not $script:IsWin) { return }
   try {
-    if ($on) { New-BcShortcut (Get-DesktopLink) ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Hidden' -f (Join-Path $script:LauncherDir 'serve.ps1')) 'Book Compare' }
+    if ($on) { New-BcShortcut (Get-DesktopLink) (Get-DesktopArgs) 'Book Compare' }
     else { Remove-Item -LiteralPath (Get-DesktopLink) -Force -ErrorAction SilentlyContinue }
   } catch { Write-Log ('desktop shortcut: ' + $_.Exception.Message) }
+}
+# If the Book Compare folder was moved, the shortcuts still point to the old place: make them point to this one.
+# (A shortcut you deleted yourself is not brought back.)
+function Update-Shortcuts {
+  if (-not $script:IsWin) { return }
+  try {
+    $sh = New-Object -ComObject WScript.Shell
+    foreach ($spec in @(@{ link = (Get-StartupLink); args = (Get-AutostartArgs); desc = 'Starts the Book Compare helper quietly when Windows starts' }, @{ link = (Get-DesktopLink); args = (Get-DesktopArgs); desc = 'Book Compare' })) {
+      if (-not (Test-Path -LiteralPath $spec.link)) { continue }
+      if ($sh.CreateShortcut($spec.link).Arguments -ne $spec.args) { New-BcShortcut $spec.link $spec.args $spec.desc; Write-Log ('shortcut updated: ' + $spec.link) }
+    }
+  } catch { Write-Log ('shortcuts: ' + $_.Exception.Message) }
 }

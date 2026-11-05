@@ -1,3 +1,11 @@
+## [Book Compare helper] - 2026-11-06
+- New: the Book Compare helper (launcher/serve.ps1) reads the scan folders for Book Compare. Folders are chosen once in the Windows folder window and remembered as addresses in the project file: after restarting the computer there is no permission question at all, and the workspace works in Firefox too. Book Compare switches to this mode by itself when it is opened through the helper (http://localhost:8765/); opening index.html directly works as before
+- The helper runs hidden: "Start Book Compare.bat" has no black window any more. An icon near the clock offers Open / Start with Windows / Quit. The first start asks (once) whether to start with Windows and whether to put a shortcut on the Desktop. A new download takes over from an older helper by itself; shortcuts follow when the folder is moved. "Start Book Compare (with window, for problems).bat" and "Stop Book Compare.bat" added
+- Safety: the helper only answers Book Compare in a browser on the same computer (other web sites, other host names and requests without the Book Compare header are refused), only reads pictures inside folders you chose, never writes in scan folders, and writes nothing but book-compare-project.json in the project folder
+- The project folder may now lie next to the copy folders (or in a folder that holds them). Only a folder that holds scans of the project is refused as a project folder (before: the whole scan folder tree)
+- More menu: "Quit the Book Compare helper"
+- tests: test_helper.py (real folders, Chromium and Firefox), tests/windows/windows-checks.ps1 and .github/workflows/windows-test.yml (GitHub tests the helper on a real Windows machine)
+
 ## [Book Compare launcher] - 2026-11-06
 - New: "Start Book Compare.bat" starts Book Compare on your own computer with one double-click (a small local server, address http://localhost:8765/, only reachable from your own computer, no internet needed) and opens it in Edge. In Edge "Install this site as an app" is then possible (not possible when index.html is opened as a file), and the installed app also starts without the launcher. See START-HERE.txt
 - START-HERE.txt: install path in Edge is "..." > More tools > Apps > Install Book Compare; the installed app keeps the folder permissions across restarts (tested by the author in Edge)

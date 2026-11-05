@@ -1,60 +1,83 @@
 BOOK COMPARE - START HERE
 =========================
 
-Book Compare runs on your own computer. After the first start it does not need
-the internet. Your scans are never uploaded anywhere.
+Book Compare runs on your own computer. Your scans are never uploaded, and Book Compare
+only READS them: it never changes, moves or deletes a scan.
+
+How it works: a small helper program runs quietly in the background. It reads your scan
+folders for Book Compare, so your browser never has to ask for permission to every folder.
+You choose each scan folder once in the normal Windows folder window, and Book Compare
+remembers it. It works in Edge, Chrome and Firefox.
 
 
 1. Get the files
 ----------------
-On the GitHub page of Book Compare click the green "Code" button, then
-"Download ZIP". Open the ZIP file and choose "Extract all ...".
+On the GitHub page of Book Compare click the green "Code" button, then "Download ZIP".
+Open the ZIP file and choose "Extract all ...".
 IMPORTANT: unzip the WHOLE folder. Do not start the program from inside the ZIP.
-Put the unzipped folder where you like (for example in Documents).
+Put the unzipped folder where you want to keep it (for example in Documents) BEFORE the
+first start.
 
 
 2. Start it
 -----------
 Double-click the file  "Start Book Compare.bat"
 
- * A black window opens and Microsoft Edge opens Book Compare.
- * Windows may say "Windows protected your PC" the first time. This happens with
-   every program that is not from a big company. Click "More info", then
-   "Run anyway". The file is a few lines of readable text; you can open it in
-   Notepad to see everything it does (launcher\serve.ps1).
- * Leave the black window open while you work. Closing it stops Book Compare
-   (the next time you simply start it again).
+ * Windows may say "Windows protected your PC" the first time. This happens with every
+   program that does not come from a big company. Click "More info", then "Run anyway".
+   The start files are short readable text: open them in Notepad to see everything they do.
+ * The very first time, Book Compare asks two questions:
+     - Start automatically when Windows starts? (Recommended: Yes. Then it is always ready.)
+     - Put a shortcut on the Desktop?
+ * There is no black window. Book Compare opens in your default browser (set Firefox as the
+   default browser in Windows if you prefer it). The helper has a small icon near the clock
+   (click the little arrow next to the clock if you do not see it). Right-click it for:
+   Open Book Compare / Start with Windows / Quit Book Compare.
 
 
-3. Install it as an app (once, recommended)
--------------------------------------------
-In Edge click the three dots "..." at the top right, then "More tools", then
-"Apps", then "Install Book Compare". Confirm with "Install".
+3. Every day
+------------
+Use the Desktop shortcut, or "Open Book Compare" in the icon near the clock, or type
+http://localhost:8765/ into your browser (bookmark it). If you chose "start automatically",
+the helper is already running when you switch on the computer.
 
-From then on Book Compare is in your Start menu (and can be pinned to the taskbar)
-and opens in its own window, like any other program. The installed app remembers
-the permission to read your scan folders, so Edge does not ask for each folder
-again after you restart the computer (tested). Keep using the Start menu entry
-from then on.
+The helper only has to be running while you use Book Compare. If it is not running, Book
+Compare says so and shows the pictures it has seen before.
+
+You do NOT need to "install Book Compare as an app" in Edge any more. (If you did earlier,
+it still works as long as the helper is running.)
 
 
 4. Updating
 -----------
-Download the new ZIP, unzip it into a NEW folder, and double-click
-"Start Book Compare.bat" there. Your saved projects are not in this folder
-(they are in the project folder you chose), so nothing is lost.
+Download the new ZIP, unzip it, and double-click "Start Book Compare.bat" in the NEW
+folder. It takes over from the old one by itself, and your Desktop and start-with-Windows
+shortcuts are repaired to point to the new folder. Your saved projects are not in this folder
+(they are in the project folder you chose), so nothing is lost. If you move the Book Compare
+folder, double-click "Start Book Compare.bat" once at the new place.
+
+
+5. Stopping it
+--------------
+Right-click the icon near the clock and choose "Quit Book Compare". (Or use "Stop Book
+Compare.bat", or "More" - "Quit the Book Compare helper" inside Book Compare.)
+To stop it from starting with Windows: right-click the icon and untick "Start with Windows".
 
 
 If something does not work
 --------------------------
- * "Book Compare could not start on port 8765. Another program is using it.": close other Book Compare
-   windows (black windows) or restart the computer, then try again.
- * "The folder "app" was not found next to the folder "launcher"": you started the file from inside the ZIP, or the
-   folder is incomplete. Unzip the whole download and try again.
- * Windows blocks the script: right-click "Start Book Compare.bat", choose
-   "Properties", tick "Unblock" at the bottom, click OK, and try again.
- * Nothing opens: start the file, leave the black window open, and type
-   http://localhost:8765/ into the address bar of Edge.
-
-Scan folders are only ever READ by Book Compare. It never changes, moves or
-deletes your scans.
+ * Nothing opens: double-click "Start Book Compare (with window, for problems).bat". It
+   shows a window that tells you what is going on.
+ * "Book Compare could not start on port 8765. Another program is using it.": restart the
+   computer, or close the other program, then try again.
+ * 'The folder "app" was not found next to the folder "launcher"': you started the file from
+   inside the ZIP, or the folder is incomplete. Unzip the whole download and try again.
+ * Windows blocks the script: right-click "Start Book Compare.bat", choose "Properties", tick
+   "Unblock" at the bottom, click OK, and try again.
+ * The Windows folder window does not appear: Book Compare then asks you to paste the folder
+   address instead (in Explorer: click the address bar, copy, paste).
+ * A short log of what the helper did is kept in %LOCALAPPDATA%\BookCompare\helper.log
+   (type that into the address bar of a File Explorer window).
+ * You opened index.html directly (without the helper): the two-image screen works, but the
+   workspace then has to ask the browser for permission to the scan folders (Edge and Chrome
+   only). Use "Start Book Compare.bat" for the full experience.
