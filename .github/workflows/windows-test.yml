@@ -1,0 +1,35 @@
+# Tests the Book Compare helper on a real Windows machine (Windows PowerShell 5.1 and a Windows folder window),
+# which is the one thing that can not be tested on the machine where the code is written.
+name: Windows test of the helper
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'launcher/**'
+      - 'app/js/workspace.js'
+      - 'tests/**'
+      - '*.bat'
+      - '.github/workflows/windows-test.yml'
+  workflow_dispatch:
+jobs:
+  helper:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Windows pieces (folder window, shortcuts, start file, icon near the clock)
+        shell: powershell
+        run: ./tests/windows/windows-checks.ps1
+      - name: Install the browsers used by the tests
+        run: |
+          pip install playwright pillow
+          python -m playwright install chromium firefox
+      - name: Helper and workspace in Chromium and Firefox (Windows PowerShell 5.1)
+        env:
+          PWSH: powershell
+        run: python tests/workspace/test_helper.py
