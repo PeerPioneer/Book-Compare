@@ -48,3 +48,41 @@ tiles 5-6 s), i.e. cropping roughly **halves** the work. Real speed on an ordina
 - Double-page spreads must be split before detection.
 - Spine shadows fool simple luminance thresholds (D-W), so the red-channel ink map with background normalisation is used.
 - Problem copies still to examine: F-Pm (ink map), A-Wn / D-ARk / D-SHk (distortion at edge and spine).
+
+## 7. Automatic page matching (`page_matching.py`, tested 5 November 2026)
+Goal: for every page of one copy, find the page of another copy that shows the same printed page, without using file names.
+**Method**: each page gets a small "fingerprint" (ink map at 1000 px, big dark blobs touching the border removed, 2 % border
+removed, long straight lines removed so that staves and frames do not dominate, shrunk to 240 px height, blurred). Two pages are
+compared by normalised cross-correlation over 13 scales (0.7-1.45); near-blank pages score 0. Then two stages:
+*anchors* (pairs that are each other's best match, clearly ahead of the runner-up, similarity >= 0.3; no page order assumed) and
+*fill* (the rest, matched with an order-preserving dynamic programme, tau 0.25; reported as "probable").
+
+**Test 1 - Melopoiae** (US-R, D-As, D-Mu, CH-Bu; raw scans, all 12 ordered pairs, 216 true shared pages, exact ground truth):
+- fingerprint 160 px, staff lines kept, order-preserving only: 200 correct, 10 wrong, 4 missed
+- fingerprint 240 px, lines removed, order-preserving only: **215 correct, 1 wrong, 0 missed (99.5 %)**
+- the same without any order constraint (best match per page): 193 / 216
+- anchors only (margin 0.05): **169 correct, 0 wrong, 0 false matches** (78 % recall, 100 % precision)
+- anchors + fill: **213 correct / 216, 1 wrong**, plus ~38 "probable" matches among covers/blank leaves/endpapers that have no printed counterpart
+  (harmless, but the app must show them as low confidence)
+- resolution matters (120 px: 203, 160 px: 209, 240 px: 215 correct); 7 vs 13 scales made no real difference; a cheap
+  40x56 moment-normalised descriptor was 100x faster but far too inaccurate (156 / 216).
+
+**Test 2 - Liber selectarum cantionum**, D-ARk fol. 40r-54v against CH-E scans 0086-0115 (30 pages each; grey/dark backgrounds,
+neighbouring page visible at the edge): every page with a counterpart in the window was found with similarity 0.48-0.68
+(runner-up 0.26-0.49). **Finding: D-ARk's rectos match CH-E at offset 0, but D-ARk's versos match CH-E two positions
+earlier** (D-ARk "fol. 041v" shows the same page as CH-E 0087, the back of the leaf whose front is 40r), i.e. the verso file
+names/order of one copy are shifted by one leaf against the other. An order-preserving matcher alone would drop half of these
+pairs (the pairs cross); the anchor stage found all 29 pairs correctly (offsets only 0 and -2). **Page order in file names cannot
+be trusted - the workspace must be able to show and accept such shifts.**
+
+**Cost** (Python + OpenCV, one core): about 27 ms per page pair with 13 scales. A full 544 x 544 matrix is ~8000 s per pair of copies,
+which is too slow; the plan is (estimates, not yet measured): find the offset between two copies from a few probe pages, then
+compare each page only with its neighbours within +-10..15 pages (banded), use ~3 scales around the scale found once per copy
+(~6 ms), Web Workers in parallel, and a lower resolution (120 px) for the first pass. That gives roughly 1-2 minutes per pair of
+copies in Python terms; the JavaScript speed has to be measured.
+
+**Limits / open points**: no gap penalty yet; blank-page detection and a confidence score per match are needed for the UI;
+multi-copy matching (progressive alignment against a reference copy) is not built; spreads (two pages per scan) must be split
+first; copies whose scans contain two states of a page or different layouts will give low similarity and must be matched manually.
+Result for the UI: matching *proposes* (sure / probable / none), the user corrects.
+
