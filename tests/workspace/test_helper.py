@@ -207,6 +207,10 @@ def scenario(p, kind):
     assert pg.evaluate("document.getElementById('ws').hidden") and pg.is_visible('.ct-top'), 'the Compare tab should be showing'
     pg.click('#ct_flag'); pg.wait_for_timeout(1800)                                          # a flag is saved with the project (by itself)
     assert project_json().get('flags') == {'1': 0}, project_json().get('flags')
+    pg.wait_for_function("!document.querySelector('div.result_container').classList.contains('ct-stale')", timeout=120000)       # (annotations need the aligned picture)
+    pg.click('.ct-atools [data-t=rect]'); bx = pg.locator('#pane_main .ct-ann svg').bounding_box()
+    pg.mouse.click(bx['x'] + bx['width'] * 0.5, bx['y'] + bx['height'] * 0.5); pg.wait_for_timeout(200); pg.keyboard.type('Ä ö mark'); pg.wait_for_timeout(1800)      # an annotation too
+    an = project_json().get('annotations', {}).get('1'); assert an and an[0]['t'] == 'rect' and an[0]['text'] == 'Ä ö mark' and len(an[0]['pair']) == 2, project_json().get('annotations')
     pg.click('#back'); pg.wait_for_timeout(700)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'back to the pages'
     assert pg.locator('#ws .ws-lbl[data-r="1"] svg.ws-flag').count() == 1, 'the flag shows in the grid'
@@ -218,6 +222,7 @@ def scenario(p, kind):
     assert not pg.evaluate("document.getElementById('ws-banner').hidden") and pg.locator('#ws-banner [data-act=reconnect]').count() == 1, 'the missing folder should be reported'
     assert pg.locator('#ws .ws-hmeta.lost').count() == 1
     assert pg.locator('#ws .ws-lbl[data-r="1"] svg.ws-flag').count() == 1, 'the flag was kept in the project file'
+    assert pg.evaluate("BookWorkspace.tab.annList(1).map(a => a.text)") == ['Ä ö mark'], 'the annotation was kept in the project file'
     push_pick(BOOKS); pg.click('#ws-banner [data-act=reconnect]')
     for _ in range(60):
         pg.wait_for_timeout(500)

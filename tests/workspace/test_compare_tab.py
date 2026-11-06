@@ -35,6 +35,7 @@ for ci, name in ((0, 'Copy-A'), (1, 'Copy-B')):
 os.makedirs(os.path.join(BOOKS, 'Copy-C'))
 for i in (0, 1): shutil.copy(os.path.join(U, PAIRS[i][1]), os.path.join(BOOKS, 'Copy-C', 'p%d.jpg' % (i + 1)))
 errs = []
+SHOTS = os.environ.get('BOOKCOMPARE_SHOTS', '')
 
 def snapshot():
     out = {}
@@ -205,6 +206,64 @@ def scenario(p, kind):
     pg.keyboard.press('Control+Shift+z'); pg.wait_for_timeout(300)
     assert pg.evaluate("getComputedStyle(document.querySelector('#ws .ws-lbl[data-r=\"1\"] svg.ws-flag')).color") == 'rgb(6, 214, 160)', 'redo'
     pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'back from the pages')
+    # ---------------------------------------------------------------- annotations (on page 2 of the book, pair A + B)
+    pg.click('#ct_list li[data-i="1"]'); wait_aligned(pg, 'annotations: page 2'); assert 'Page 2' in where(pg), where(pg)
+    assert pg.is_visible('.ct-atools') and pg.locator('.ct-atools button[data-t]').count() == 4
+    def anns(): return pg.evaluate("BookWorkspace.tab.annList(1)")
+    def svgbox(sel='#pane_main .ct-ann svg'): return pg.locator(sel).bounding_box()
+    def pt(fx, fy):
+        b = svgbox(); return b['x'] + fx * b['width'], b['y'] + fy * b['height']
+    assert anns() == [] and pg.locator('#pane_main .ct-ann svg [data-id]').count() == 0
+    pg.click('.ct-atools [data-t=ellipse]'); assert pg.get_attribute('.ct-atools [data-t=ellipse]', 'aria-pressed') == 'true'
+    pg.mouse.move(*pt(0.20, 0.20)); pg.mouse.down(); pg.mouse.move(*pt(0.30, 0.25)); pg.mouse.move(*pt(0.40, 0.30)); pg.mouse.up(); pg.wait_for_timeout(200)
+    a = anns(); assert len(a) == 1 and a[0]['t'] == 'ellipse', a
+    assert abs(a[0]['x'] - 0.20) < 0.02 and abs(a[0]['y'] - 0.20) < 0.02 and abs(a[0]['w'] - 0.20) < 0.02 and abs(a[0]['h'] - 0.10) < 0.02, a   # stored as fractions of the picture
+    assert pg.get_attribute('.ct-atools [data-t=select]', 'aria-pressed') == 'true', 'after drawing: back to the select tool'
+    assert pg.is_visible('.ct-annocard') and 'Circle' in pg.inner_text('.ct-annocard') and 'Drawn with A-Test and B-Test' in pg.inner_text('.ct-annocard')
+    assert pg.evaluate("document.activeElement && document.activeElement.id") == 'ct_annText', 'the comment box is ready for typing'
+    pg.keyboard.type('Owner added a mark?'); assert anns()[0]['text'] == 'Owner added a mark?'
+    assert pg.locator('#pane_o1 .ct-ann svg ellipse').count() == 1 and pg.locator('#pane_o2 .ct-ann svg ellipse').count() == 1, 'shown on copy 1 and copy 2 as well'
+    assert pg.locator('#pane_o1 .ct-ann svg [data-id]').count() == 0, 'but only changed on the superimposed picture'
+    pg.screenshot(path=SHOTS + '/annot1.png') if SHOTS else None
+    pg.keyboard.press('Escape'); assert pg.locator('.ct-annocard').count() == 0, 'Escape closes the comment box'
+    pg.click('.ct-atools [data-t=rect]'); pg.mouse.click(*pt(0.65, 0.55)); pg.wait_for_timeout(200)      # a click without dragging: a rectangle of a usual size
+    a = anns(); assert len(a) == 2 and a[1]['t'] == 'rect' and a[1]['w'] > 0.03 and a[1]['h'] > 0.02, a
+    pg.keyboard.press('Escape')
+    pg.click('.ct-atools [data-t=note]'); pg.mouse.click(*pt(0.30, 0.70)); pg.wait_for_timeout(200)
+    a = anns(); assert len(a) == 3 and a[2]['t'] == 'note' and abs(a[2]['x'] - 0.30) < 0.02, a
+    assert 'Text note' in pg.inner_text('.ct-annocard')
+    pg.click('#ct_acol'); assert pg.locator('#ct_apal button').count() == 6
+    pg.click('#ct_apal button[data-c="3"]'); assert pg.is_hidden('#ct_apal')
+    assert anns()[2]['col'] == 3, 'the colour of the selected annotation changes with it'
+    pg.keyboard.type('x') if False else None
+    pg.screenshot(path=SHOTS + '/annot2.png') if SHOTS else None
+    # move: drag the rectangle; resize: drag its corner handle
+    before = anns()[1]; cx, cy = pt(before['x'] + before['w'] / 2, before['y'] + before['h'] / 2)
+    pg.mouse.move(cx, cy); pg.mouse.down(); pg.mouse.move(cx + 20, cy + 10); pg.mouse.move(cx + 40, cy + 20); pg.mouse.up(); pg.wait_for_timeout(200)
+    after = anns()[1]; assert after['x'] > before['x'] + 0.005 and after['y'] > before['y'] + 0.005 and abs(after['w'] - before['w']) < 1e-6, (before, after)
+    hb = pg.locator('#pane_main .ct-ann svg [data-h=se]').bounding_box(); hx, hy = hb['x'] + hb['width'] / 2, hb['y'] + hb['height'] / 2
+    pg.mouse.move(hx, hy); pg.mouse.down(); pg.mouse.move(hx + 15, hy + 15); pg.mouse.move(hx + 30, hy + 30); pg.mouse.up(); pg.wait_for_timeout(200)
+    grown = anns()[1]; assert grown['w'] > after['w'] + 0.005 and grown['h'] > after['h'] + 0.005 and abs(grown['x'] - after['x']) < 1e-6, (after, grown)
+    assert 'Page 2' in where(pg) and pg.locator('#ct_list li[data-i="1"] svg.ct-an').count() == 1, 'the page list shows that this page has annotations'
+    # delete (key), hide (eye), other pages show none
+    pg.keyboard.press('Delete'); assert len(anns()) == 2 and pg.locator('.ct-annocard').count() == 0
+    pg.click('#ct_aeye'); assert pg.locator('#pane_main .ct-ann svg *').count() == 0 and pg.locator('#pane_o1 .ct-ann svg *').count() == 0, 'hidden everywhere'
+    pg.click('#ct_aeye'); assert pg.locator('#pane_main .ct-ann svg [data-id]').count() == 2
+    pg.click('#ct_next'); wait_aligned(pg, 'annotations: next page'); assert pg.locator('#pane_main .ct-ann svg [data-id]').count() == 0 and pg.locator('#ct_list li[data-i="2"] svg.ct-an').count() == 0
+    pg.click('#ct_prev'); wait_aligned(pg, 'annotations: back'); assert pg.locator('#pane_main .ct-ann svg [data-id]').count() == 2, 'they belong to the page'
+    # another pair of copies: the annotations of the page are there too (and say that their position can be a little off)
+    pg.select_option('#ct_c2', label='C-Test'); wait_aligned(pg, 'annotations: pair A + C'); assert pg.locator('#pane_main .ct-ann svg [data-id]').count() == 2
+    pg.click('#pane_main .ct-ann svg ellipse[data-id]'); assert 'a little off' in pg.inner_text('.ct-annocard'), pg.inner_text('.ct-annocard')
+    assert pg.input_value('#ct_annText') == 'Owner added a mark?'
+    pg.keyboard.press('Escape') if False else None
+    pg.select_option('#ct_c2', label='B-Test'); wait_aligned(pg, 'annotations: back to A + B')
+    # the Pages view can undo what was done (the colour change of the note was the last step before the move, the move, the resize, the delete)
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
+    pg.locator('#ws-vp').focus() if pg.locator('#ws-vp').count() else None
+    pg.keyboard.press('Control+z'); pg.wait_for_timeout(300); assert len(anns()) == 3, 'undo: the deleted annotation is back'
+    pg.keyboard.press('Control+Shift+z'); pg.wait_for_timeout(300); assert len(anns()) == 2
+    pg.locator('#ws .ws-lbl[data-r="1"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'annotations: back from the pages')
+    assert pg.locator('#pane_main .ct-ann svg [data-id]').count() == 2
     # the Pages tab and back: the same pair and row are shown again without aligning anew
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'Pages layer visible'

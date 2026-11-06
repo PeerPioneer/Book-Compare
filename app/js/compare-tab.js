@@ -8,6 +8,7 @@
    - the two pages are aligned automatically whenever the page or a copy changes (a moment after the last key press)
    - flags: a colour mark on a page (button "Flag page" or the key F; six colours); flagged pages show in the page list, which can be
      filtered to the flagged ones, and in the book map. Flags belong to the page of the book, not to a pair of copies, and are saved in the project.
+   - annotations (circle, rectangle, text note with a comment, in the six flag colours) on the superimposed picture: see js/compare-annot.js
    - the book map: a thin strip at the bottom edge that opens when the pointer comes near; one tick per page of the book (grey = a copy lacks
      the page, colour = flag), a mark for the page on screen, a click jumps there, and a small picture of the page appears while you hover.
 
@@ -23,6 +24,7 @@
     on: false, token: 0, timer: 0, skip: true, q: '', side: true, transform: 'perspective',
     shown: null,                        // which pair and row the pictures on screen belong to
     stale: false,
+    shownRow: null, shownPair: null,    // the row and the two copies of the picture on screen (annotations belong to this row)
     filter: 'all', fcol: null,          // page list: all pages / flagged pages, and one flag colour only
     pin: false                          // the book map stays open
   };
@@ -100,6 +102,11 @@
     ui.svg = $('ct_mapsvg'); ui.tip = $('ct_tip'); ui.hov = $('ct_maphov'); ui.pin = $('ct_pin');
     ui.flagpath = $('ct_flagpath'); ui.flagpath.setAttribute('d', W().flagPath);
     try { st.pin = localStorage.getItem('bc-map-pinned') === '1'; } catch (e) { /* no browser storage: not remembered */ }
+    if (window.CompareAnnot) CompareAnnot.init({
+      W: W, say: function (t) { note(t); }, changed: function () { renderList(); },
+      shown: function () { return st.shownRow == null ? null : { row: st.shownRow, pair: st.shownPair }; },
+      stale: function () { return st.stale; }
+    });
 
     $('ct_sidebtn').onclick = function () { st.side = !st.side; layout(); };
     $('ct_tab_pages').onclick = toPages;
@@ -168,6 +175,7 @@
     ui.map.style.setProperty('--ct-map-left', (st.on && st.side ? 300 : 0) + 'px');           // the opened map does not cover the left panel
     document.body.classList.toggle('ct-active', st.on);
     renderPin();
+    if (window.CompareAnnot) CompareAnnot.setActive(st.on);
   }
   function renderCopies(s) {
     var opts = s.copies.map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
@@ -191,6 +199,7 @@
       var cls = (j === s.row ? 'cur ' : '') + (r2.skip ? 'skip ' : '') + (!r2.skip && !(r2.a && r2.b) ? 'miss' : '');
       var tip = r2.skip ? 'Not compared' : (!r2.a || !r2.b) ? 'One of the two copies has no page here' : '';
       html.push('<li data-i="' + j + '" role="option" class="' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + (j === s.row ? ' aria-selected="true"' : '') + '><i class="dot"></i><span class="l">' + esc(r2.label) + '</span>' +
+        (r2.ann ? '<svg class="ct-an" viewBox="0 0 24 24" width="14" height="14" role="img" aria-label="' + r2.ann + ' annotation' + (r2.ann > 1 ? 's' : '') + '"><title>' + r2.ann + ' annotation' + (r2.ann > 1 ? 's' : '') + '</title><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>' : '') +
         (r2.flag != null ? flagSvg(r2.flag, 14) : '') + '<span class="n">' + (j + 1) + '</span></li>');
       shown++;
     }
@@ -358,6 +367,7 @@
     if (e.key === 'Escape' && !ui.pal.hidden) { closePalette(); ui.flag.focus(); e.preventDefault(); return; }
     var t = e.target, tag = t && t.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
+    if (window.CompareAnnot && CompareAnnot.key(e)) { e.preventDefault(); return; }
     if (e.key === 'f' || e.key === 'F') { if (e.shiftKey) return; closePalette(); toggleFlag(); }
     else if (e.key === 'ArrowRight') stepPage(1);
     else if (e.key === 'ArrowLeft') stepPage(-1);
@@ -389,10 +399,11 @@
       return;
     }
     if (!done || my !== st.token) return;
-    st.shown = key(s);
+    st.shown = key(s); st.shownRow = s.row; st.shownPair = s.pair.slice();
     E.compare.back_btn.onclick = toPages;                                                    // "Back" in the teal bar returns to the pages
     labelPanels(s);
     clearStale(); setBusy(null);
+    if (window.CompareAnnot) CompareAnnot.refresh();
   }
   // the panels say which copy and page they show (the file names stay the names of the exported files)
   function labelPanels(s) {
@@ -415,7 +426,9 @@
     E.go_to_screen(E.compare.cc, { inline: 'end', behavior: 'auto' });
     if (st.shown === key(s)) {                                                               // nothing changed since the pictures on screen
       if (first && first.urls) first.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { /* ignore */ } });
-      clearStale(); setBusy(null); return;
+      clearStale(); setBusy(null);
+      if (window.CompareAnnot) CompareAnnot.refresh();
+      return;
     }
     markStale();
     st.token++;

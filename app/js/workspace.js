@@ -228,7 +228,7 @@
 
   /* ---------------------------------------------------------------- state */
   function blank() {
-    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
+    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -249,6 +249,35 @@
     if (f && typeof f === 'object') Object.keys(f).forEach(function (k) { var v = f[k]; if (/^\d+$/.test(k) && typeof v === 'number' && v >= 0 && v < FLAG_COLORS.length && v === Math.floor(v)) out[k] = v; });
     return out;
   }
+  // Annotations: circle, rectangle or text note on a row (a position in the book), in the same six colours. They are drawn on the superimposed
+  // picture, whose size is that of the page of copy 1, so the position is stored as a FRACTION of the picture (0-1 across and down): it does not
+  // depend on zoom or on the scan resolution. "pair" remembers the two copies the annotation was drawn with (its position is exact for that pair).
+  var ANN_TYPES = ['ellipse', 'rect', 'note'];
+  function num(v, lo, hi) { v = +v; return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo; }
+  function cleanAnn(a, id) {
+    if (!a || ANN_TYPES.indexOf(a.t) < 0) return null;
+    var note = a.t === 'note';
+    var col = typeof a.col === 'number' && a.col >= 0 && a.col < FLAG_COLORS.length && a.col === Math.floor(a.col) ? a.col : 0;
+    var pr = Array.isArray(a.pair) ? a.pair.slice(0, 2).map(function (x) { return typeof x === 'number' && isFinite(x) ? x : null; }) : [null, null];
+    while (pr.length < 2) pr.push(null);
+    return { id: id, t: a.t, x: num(a.x, 0, 1), y: num(a.y, 0, 1), w: note ? 0 : num(a.w, 0, 1), h: note ? 0 : num(a.h, 0, 1), col: col, text: typeof a.text === 'string' ? a.text.slice(0, 2000) : '', pair: pr };
+  }
+  function cleanAnnots(f) {                                           // from a project file: only real rows, known shapes, numbers in range
+    var out = {}, seen = {};
+    if (f && typeof f === 'object') Object.keys(f).forEach(function (k) {
+      if (!/^\d+$/.test(k) || !Array.isArray(f[k])) return;
+      var list = [];
+      f[k].slice(0, 200).forEach(function (a) {
+        var id = a && typeof a.id === 'number' && a.id >= 1 && a.id === Math.floor(a.id) && !seen[a.id] ? a.id : 0;
+        if (!id) { id = 1; while (seen[id]) id++; }                  // a missing or repeated number: take a free one
+        var c = cleanAnn(a, id); if (c) { seen[id] = true; list.push(c); }
+      });
+      if (list.length) out[k] = list;
+    });
+    return out;
+  }
+  function maxAnnId() { var m = 0; Object.keys(S.annots).forEach(function (k) { S.annots[k].forEach(function (a) { if (a.id > m) m = a.id; }); }); return m; }
+  function findAnnot(row, id) { var l = S.annots[row] || []; for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
   function selected() {
     var ci = S.sel.ci;
     if (ci == null || !S.copies[ci]) return null;
@@ -268,12 +297,12 @@
 
   /* ---------------------------------------------------------------- undo / redo */
   function snap() {
-    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, s: S.sel, p: S.pair });
+    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, s: S.sel, p: S.pair });
   }
   function restore(str) {
     var o = JSON.parse(str);
     S.copies = o.c.map(function (r) { var c = REG[r.id]; c.name = r.name; c.cells = r.cells; return c; });
-    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.sel = o.s; S.pair = o.p;
+    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.sel = o.s; S.pair = o.p;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
   }
   function commit() { hist.undo.push(snap()); if (hist.undo.length > 60) hist.undo.shift(); hist.redo = []; }
@@ -553,7 +582,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, pair: S.pair, sel: S.sel,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
@@ -645,6 +674,7 @@
     S = blank(); REG = {};
     S.projectId = json.projectId || uid();
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
+    S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1);
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
     (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
@@ -932,7 +962,7 @@
       '<li><b>Add files to this copy</b> also adds pictures from another folder, for example pages that were scanned later.</li>' +
       '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later under <b>More</b>. Double-click a row name to rename it.</li>' +
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
-      '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>COMPARE</b>: they open in the two-image screen. <b>Back</b> there brings you here again.</li>' +
+      '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>COMPARE</b>: they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The <b>Pages</b> tab or <b>Back</b> there brings you here again.</li>' +
       '<li>When you reopen a saved project the browser asks once for permission to read your scans again. Click <b>Allow access to scans</b>; you do not have to pick the folders again.</li>' +
       '<li>Ctrl+Z undoes the last change. Arrow keys move the selection.</li></ul>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
@@ -1197,7 +1227,33 @@
     },
     rowInfo: function (i) {
       var a = copyById(S.pair[0]), b = copyById(S.pair[1]);
-      return { label: rowLabel(i), a: !!(a && a.cells[i]), b: !!(b && b.cells[i]), skip: !!S.skip[i], flag: S.flags[i] != null ? S.flags[i] : null };
+      return { label: rowLabel(i), a: !!(a && a.cells[i]), b: !!(b && b.cells[i]), skip: !!S.skip[i], flag: S.flags[i] != null ? S.flags[i] : null, ann: (S.annots[i] || []).length };
+    },
+    // Annotations of a row (copies, so the caller can not change the project by accident); every change goes through the three methods below
+    annList: function (row) { return (S.annots[row] || []).map(function (a) { var c = cleanAnn(a, a.id); return c; }); },
+    annBegin: function () { commit(); },                                 // one undo step before a gesture (moving, resizing, typing a comment)
+    annAdd: function (row, a) {
+      if (row < 0 || row >= rows()) return 0;
+      var list = S.annots[row] || (S.annots[row] = []);
+      if (list.length >= 200) return 0;
+      var c = cleanAnn(a, S.nextAnn); if (!c) return 0;
+      commit(); S.nextAnn++; list.push(c); touch();
+      return c.id;
+    },
+    annSet: function (row, id, patch) {                                  // x y w h col text; the undo step is made by annBegin
+      var a = findAnnot(row, id); if (!a || !patch) return false;
+      var m = Object.assign({}, a);
+      ['x', 'y', 'w', 'h', 'col', 'text'].forEach(function (k) { if (k in patch) m[k] = patch[k]; });          // nothing else can be changed
+      var c = cleanAnn(m, id);
+      if (c) { Object.assign(a, c); touch(); }
+      return !!c;
+    },
+    annDel: function (row, id) {
+      var l = S.annots[row] || [], k = -1;
+      l.forEach(function (a, i) { if (a.id === id) k = i; });
+      if (k < 0) return false;
+      commit(); l.splice(k, 1); if (!l.length) delete S.annots[row]; touch();
+      return true;
     },
     flagColors: FLAG_COLORS.slice(), flagNames: FLAG_NAMES.slice(), flagPath: FLAG_PATH,
     // colour 0-5 puts a flag on the row, null takes it away (every change can be undone in the Pages view)
