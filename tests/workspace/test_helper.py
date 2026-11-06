@@ -204,8 +204,9 @@ def scenario(p, kind):
     # compare a pair of pages: the two-image screen gets the scans
     pg.locator('#ws .ws-cell[data-c="0"][data-r="1"]').click(); pg.wait_for_timeout(300)
     pg.click('#ws-compare'); pg.wait_for_timeout(2500)
-    assert pg.evaluate("document.getElementById('ws').hidden"), 'the two-image screen should be showing'
+    assert pg.evaluate("document.getElementById('ws').hidden") and pg.is_visible('.ct-top'), 'the Compare tab should be showing'
     pg.click('#back'); pg.wait_for_timeout(700)
+    assert not pg.evaluate("document.getElementById('ws').hidden"), 'back to the pages'
     # --- a scan folder was moved: one choice of the folder that holds it is enough -----------------------------------------
     moved = os.path.join(BOOKS, 'Archiv'); os.makedirs(moved)
     shutil.move(os.path.join(BOOKS, 'Copy-B ä'), os.path.join(moved, 'Copy-B ä'))

@@ -6,7 +6,8 @@ on:
     branches: [main]
     paths:
       - 'launcher/**'
-      - 'app/js/workspace.js'
+      - 'app/js/**'
+      - 'app/index.html'
       - 'tests/**'
       - '*.bat'
       - '.github/workflows/windows-test.yml'
@@ -42,12 +43,23 @@ jobs:
           set RC=%ERRORLEVEL%
           type "%TEMP%\bc-helper-test.txt"
           exit /b %RC%
+      - name: Compare tab with the real alignment (Windows PowerShell 5.1)
+        if: always()
+        shell: cmd
+        timeout-minutes: 15
+        env:
+          PWSH: powershell
+        run: |
+          python tests\workspace\test_compare_tab.py > "%TEMP%\bc-compare-test.txt" 2>&1
+          set RC=%ERRORLEVEL%
+          type "%TEMP%\bc-compare-test.txt"
+          exit /b %RC%
       - name: Windows checks result (the text of both test runs, shown as a note on this job)
         if: always()
         shell: powershell
         run: |
           $text = ''
-          foreach ($f in @('bc-progress.txt', 'bc-helper-test.txt')) {
+          foreach ($f in @('bc-progress.txt', 'bc-helper-test.txt', 'bc-compare-test.txt')) {
             $p = Join-Path $env:TEMP $f
             $text += "=== $f`r`n"
             if (Test-Path $p) { $c = Get-Content $p -Raw -Encoding UTF8; if ($c.Length -gt 6000) { $c = '...' + $c.Substring($c.Length - 6000) }; $text += $c } else { $text += "(not written)" }

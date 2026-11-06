@@ -1,3 +1,13 @@
+## [Compare tab, first version] - 2026-11-06
+- New: COMPARE in the whole-book workspace now opens the Compare tab instead of the two-image screen. The two pages are aligned automatically (Perspective is the default; Affine and Thin Plate Spline can be chosen in the left panel)
+- Left panel: menu for copy 1, menu and step buttons for copy 2, a button that swaps them, the list of all pages with a search box (grey italic = one of the two copies has no page here, dashed = row not compared), a switch "Skip pages that one of the two copies lacks", and the panel can be hidden with the button at the top left
+- Above the teal bar: previous page / next page with the name of the page and its position. Keys: left/right arrow = page, up/down = copy 2, Shift + up/down = copy 1. A moment after the last key press the new pair is aligned; until then the pictures are shown faded
+- The tabs COMPARE and PAGES at the top (and Back in the teal bar) switch between the Compare tab and the grid of copies and pages; coming back to the same pair and page shows the picture at once. The chosen row and copies are saved with the project
+- The pictures say which copy and page they show (for example "Copy 2, aligned - D-Sl - f.4r"); if a pair cannot be aligned or a copy has no page in that row, a message with a way out is shown
+- The two-image screen (start page: "Select two images", samples) is unchanged
+- tests: test_compare_tab.py (real alignment, Chromium and Firefox)
+- Not yet in the Compare tab (planned): preparing the whole book in advance and saving the results, the book map along the bottom edge, flags and annotations, "next to check", focus mode
+
 ## [Book Compare helper] - 2026-11-06
 - New: the Book Compare helper (launcher/serve.ps1) reads the scan folders for Book Compare. Folders are chosen once in the Windows folder window and remembered as addresses in the project file: after restarting the computer there is no permission question at all, and the workspace works in Firefox too. Book Compare switches to this mode by itself when it is opened through the helper (http://localhost:8765/); opening index.html directly works as before
 - The helper runs hidden: "Start Book Compare.bat" has no black window any more. An icon near the clock offers Open / Start with Windows / Quit. The first start asks (once) whether to start with Windows and whether to put a shortcut on the Desktop. A new download takes over from an older helper by itself; shortcuts follow when the folder is moved. "Start Book Compare (with window, for problems).bat" and "Stop Book Compare.bat" added

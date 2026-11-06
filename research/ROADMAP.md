@@ -20,9 +20,10 @@ alignment is settled)  7. host Book Compare on a website (browser-based)  8. a "
 3. Printed-area UI: automatic outline, draggable edges/corners, "back to automatic", remembered per scan, split double-page spreads.
 4. Robust rough alignment (D-W title page); examine F-Pm, A-Wn, D-ARk, D-SHk.
 5. Two switchable views of a registered pair: tile-based and smooth-only.
-6. Whole-book workspace: **first real version built** (`app/js/workspace.js`): real folders, thumbnails, manual page placement, project saving in a separate folder, hand-over of a pair to the two-image screen.
+6. Whole-book workspace: **first real version built** (`app/js/workspace.js`): real folders, thumbnails, manual page placement, project saving in a separate folder, hand-over of a pair to the Compare tab.
    Next for the workspace: automatic page matching ("Suggest matches", see FINDINGS section 7: ~99 % on Melopoiae, works on Liber scans; still to do: banded/faster version,
-   confidence + blank-page handling, JavaScript port, multi-copy matching), then Compare tab inside the workspace, flags/annotations, book map, saving batch alignment.
+   confidence + blank-page handling, JavaScript port, multi-copy matching), then flags/annotations, book map, saving batch alignment.
+   **Compare tab, first version built (6 November 2026)** (`app/js/compare-tab.js`): left panel (copies, page list, search), tabs Compare/Pages, previous/next page and keys, automatic alignment with the app's existing engine (one pair at a time, on the main thread). Still missing from the approved mock-up: prepared/saved alignments ("Prepare whole book"), book map, flags and annotations, "next to check", focus mode, quality dots, "All copies" chips.
 
 ## Still open
 - saving batch alignment to a file; licences (the new folders have **no licence chosen yet**; the app itself is BSD 2-Clause, VGG);

@@ -9,7 +9,8 @@
    not about every single copy.
 
    Pages are placed in file-name order and then corrected by hand (automatic page matching is a later step).
-   A chosen pair of pages is handed to the existing two-image screen; "Back" there returns to this layer.
+   A chosen pair of pages is handed to the Compare tab (js/compare-tab.js), which aligns it and lets you go through the book page by page;
+   its PAGES tab (or Back) returns to this layer.
 
    Three ways to reach the scan folders:
    - Helper mode: the small Book Compare helper program on this computer (launcher/serve.ps1) reads the scan folders and writes
@@ -1137,12 +1138,14 @@
       (HELPER ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');
   }
 
-  /* ---------------------------------------------------------------- hand a pair of pages to the two-image screen */
-  async function compareNow() {
+  /* ---------------------------------------------------------------- hand a pair of pages to the Compare tab */
+  // Loads the two scans of the current row (copy 1 and copy 2). Asks the browser for a locked folder if needed (that needs a click).
+  // Throws an Error whose message can be shown to the person as it is.
+  async function loadPair() {
     var a = copyById(S.pair[0]), b = copyById(S.pair[1]), r = S.sel.row;
-    if (!a || !b) return toast('First mark two pages with “1” and “2” in the preview on the right.');
-    if (!a.cells[r] || !b.cells[r]) return toast('In this row ' + (!a.cells[r] ? a.name : b.name) + ' has no page. Pick another row, or other copies with “1” and “2”.');
-    // the original scans are needed now: if the browser has locked a folder, ask for it here, at the click on COMPARE
+    if (!a || !b) throw refusal('First mark two pages with “1” and “2” in the preview on the right.');
+    if (!a.cells[r] || !b.cells[r]) throw refusal('In this row ' + (!a.cells[r] ? a.name : b.name) + ' has no page. Pick another page, or another copy.');
+    // the original scans are needed now: if the browser has locked a folder, ask for it here, at the click
     var need = [];
     [[a, a.cells[r]], [b, b.cells[r]]].forEach(function (x) {
       var sk = splitKey(x[1]), l = x[0].locs && x[0].locs[sk.n], rt = l && rootById(l.root);
@@ -1151,17 +1154,50 @@
     for (var i = 0; i < need.length; i++) {
       var granted = false;
       try { granted = await ensureAccess(need[i]); }
-      catch (e) { renderAll(); return toast(e && e.name === 'SecurityError' ? 'The browser asks for one folder per click. Press COMPARE once more to allow the next folder.' : niceError(e)); }
-      if (!granted) { renderAll(); return toast('The browser did not give access to “' + need[i].name + '”. COMPARE needs the original scans.'); }
+      catch (e) { renderAll(); throw refusal(e && e.name === 'SecurityError' ? 'The browser asks for one folder per click. Press COMPARE once more to allow the next folder.' : niceError(e)); }
+      if (!granted) { renderAll(); throw refusal('The browser did not give access to “' + need[i].name + '”. COMPARE needs the original scans.'); }
     }
     if (need.length) renderAll();
     var f1, f2;
     try { f1 = await getScan(a, a.cells[r]); f2 = await getScan(b, b.cells[r]); }
-    catch (e) { if (HELPER && e && e.name === 'Lost') return toast(e.message); return toast((e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e))); }
-    var urls = [URL.createObjectURL(f1), URL.createObjectURL(f2)];
-    hide();
-    if (cb.compare) cb.compare({ urls: urls, names: [f1.name, f2.name] });
+    catch (e) { if (HELPER && e && e.name === 'Lost') throw refusal(e.message); throw refusal(e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e)); }
+    return { urls: [URL.createObjectURL(f1), URL.createObjectURL(f2)], names: [f1.name, f2.name] };
   }
+  // COMPARE in the Pages view: check that the two scans can be read (errors stay here as a message), then open the Compare tab.
+  async function compareNow() {
+    var d;
+    try { d = await loadPair(); } catch (e) { return toast(e && e.message ? e.message : String(e)); }
+    hide();
+    if (cb.compare) cb.compare(d);
+  }
+
+  /* ---------------------------------------------------------------- what the Compare tab (js/compare-tab.js) may ask for and change */
+  // It never touches the scan files; it only reads the project and changes which row and which two copies are shown.
+  var tabApi = {
+    state: function () {
+      ensurePair();
+      return {
+        name: proj.name || '', rows: rows(), row: S.sel.row, folio: S.folio,
+        copies: S.copies.map(function (c) { return { id: c.id, name: c.name, pages: c.cells.filter(Boolean).length }; }),
+        pair: S.pair.slice()
+      };
+    },
+    rowInfo: function (i) {
+      var a = copyById(S.pair[0]), b = copyById(S.pair[1]);
+      return { label: rowLabel(i), a: !!(a && a.cells[i]), b: !!(b && b.cells[i]), skip: !!S.skip[i] };
+    },
+    setRow: function (i) { if (i < 0 || i >= rows()) return; S.sel = { ci: S.sel.ci != null && S.copies[S.sel.ci] ? S.sel.ci : 0, row: i }; touch(); },
+    setCopy: function (slot, id) {                                     // slot 0 = copy 1, slot 1 = copy 2; choosing the other one's copy swaps them
+      var c = null; S.copies.forEach(function (x) { if (String(x.id) === String(id)) c = x; });      // (a menu hands over the id as text)
+      if (!c) return;
+      var o = 1 - slot;
+      if (S.pair[o] === c.id) S.pair[o] = S.pair[slot];
+      S.pair[slot] = c.id; touch();
+    },
+    swap: function () { S.pair = [S.pair[1], S.pair[0]]; touch(); },
+    loadPair: loadPair,
+    showPages: function () { show(); }
+  };
 
   /* ---------------------------------------------------------------- events */
   function startRename(el, getVal, setVal) {
@@ -1332,6 +1368,7 @@
     show: show,
     hide: hide,
     onCompare: function (fn) { cb.compare = fn; },
-    onLeave: function (fn) { cb.leave = fn; }
+    onLeave: function (fn) { cb.leave = fn; },
+    tab: tabApi
   };
 })();

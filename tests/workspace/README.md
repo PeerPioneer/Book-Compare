@@ -21,5 +21,9 @@ Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the ap
 
 `tests/windows/windows-checks.ps1` tests the Windows-only parts (folder window, shortcuts, hidden start, icon near the clock). It runs by itself on GitHub (`.github/workflows/windows-test.yml`, on a real Windows machine) after every push; see the "Actions" tab of the repository.
 
+`test_compare_tab.py` checks the Compare tab with the **real alignment engine** (sample pictures of the app in three made-up copies, one of them incomplete), through the helper, in Chromium and Firefox: COMPARE opens the tab and aligns, next/previous page, keys, copy menus and swap, page list and search, skipping pages a copy lacks, the PAGES tab and Back. It takes a few minutes.
+
+    PWSH=pwsh python3 tests/workspace/test_compare_tab.py   # prints ALL COMPARE TAB TESTS PASSED
+
 `common.py` holds the helpers (making test scans, faking the folder picker with private-storage folders).
 Not covered by these scripts: how the real Windows folder window looks and feels and the permission prompts of Edge/Chrome; these must be tried by hand.

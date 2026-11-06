@@ -166,6 +166,37 @@ class Compare {
         v_imgs[index].src = h_imgs[index].src = images[0]
     }
 
+    // ---- used by the Compare tab (js/compare-tab.js): the result screen is reached directly, without the step-2 screen ----
+    prepare_for_tab () {
+        this.transform_select.classList.add('hide');
+        this.visualisation_select.classList.remove('hide');
+        this.link_option.classList.remove('hide');
+        this.visualisation_select.MDCSelect.setValue('diff');
+        this.visualisation_select.querySelector('#selected-text').textContent = 'Difference';
+        this.footer.querySelector('.bar').classList.replace('step2', 'step3');
+        window.requestAnimationFrame(() => {
+            this.action_bar.reset();
+        });
+    }
+
+    // Loads two scans and aligns the second onto the first. Resolves true when the result is shown, false when `is_current()` says
+    // meanwhile that another page was asked for. Rejects if a picture cannot be read or the alignment fails.
+    async align_images (urls, names, transform, is_current) {
+        const v = this.v_image_list.querySelectorAll('img');
+        // wait for the "loaded" signal of both pictures (listening starts before the new addresses are set)
+        const loaded = [0, 1].map((i) => new Promise((resolve, reject) => {
+            v[i].addEventListener('load', () => resolve(), { once: true });
+            v[i].addEventListener('error', () => reject(new Error('a picture could not be read')), { once: true });
+        }));
+        this.set_image(urls);
+        this.set_filename(names);
+        await Promise.all(loaded);
+        if (is_current && !is_current()) return false;
+        this.result.set_filename_list(names);
+        this.result.process(v[0], v[1], transform || this.current_transform);
+        return true;
+    }
+
     show_compare_screen () {
         var li = this.more_menu_el.querySelectorAll('.mdc-deprecated-list-item');
         for(var i=0; i<3; ++i) {

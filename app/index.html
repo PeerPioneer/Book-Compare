@@ -39,6 +39,7 @@
 
     <link rel="shortcut icon" href="favicon.ico" />
     <link rel="stylesheet" href="js/workspace.css" />
+    <link rel="stylesheet" href="js/compare-tab.css" />
     <link rel="apple-touch-icon" href="./images/icons/imcomp-192x192.png" />
 
     <!-- Preloading -->
@@ -996,6 +997,7 @@
     <script defer src="js/panes.js"></script>
     <script defer src="js/samples.js"></script>
     <script defer src="js/workspace.js"></script>
+    <script defer src="js/compare-tab.js"></script>
   </head>
   <body class="mdc-typography">
     <div
@@ -2598,17 +2600,20 @@
           main.c.addEventListener("books", () => {
             BookWorkspace.open();
           });
+          // "COMPARE" in the workspace opens the Compare tab (js/compare-tab.js), which aligns the two pages by itself.
+          CompareTab.init({ compare, result, action_bar, go_to_screen });
           BookWorkspace.onCompare((d) => {
-            compare.set_image(d.urls);
-            compare.set_filename(d.names);
-            window.__fromWorkspace = true;
-            compare.show_compare_screen();
+            CompareTab.enter(d);
           });
           BookWorkspace.onLeave(() => {
             go_to_screen(main.c, {});
           });
 
           compare.c.addEventListener("back", () => {
+            if (CompareTab.isOpen()) {
+              CompareTab.leave();
+              return;
+            }
             if (window.__fromWorkspace) {
               window.__fromWorkspace = false;
               BookWorkspace.show();

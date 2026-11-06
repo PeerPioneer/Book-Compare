@@ -3,7 +3,7 @@
 // https://vaadin.com/learn/tutorials/learn-pwa/turn-website-into-a-pwa
 // https://github.com/jakearchibald/wittr/blob/cache-avatars/public/js/sw/index.js
 // Cache
-const CACHE_NAME = "imcomp-mdc-pwa-v9";
+const CACHE_NAME = "imcomp-mdc-pwa-v10";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -27,6 +27,8 @@ const staticAssets = [
     './js/samples.js',
     './js/workspace.js',
     './js/workspace.css',
+    './js/compare-tab.js',
+    './js/compare-tab.css',
     './js/viz.js',
     './js/transform.js',
     './deps/gifshot.js',
