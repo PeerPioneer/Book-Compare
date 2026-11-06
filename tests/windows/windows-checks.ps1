@@ -81,6 +81,71 @@ public static string ListFor(uint pid) {
   if ($p.ExitCode -ne 1) { throw "expected 'cancelled' (exit code 1), got $($p.ExitCode)" }
 }
 
+Check 'the folder window opens IN FRONT of another program (not behind the browser)' {
+  Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices; using System.Text; using System.Collections.Generic;
+namespace BcZ {
+  public static class Win {
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    public static string Title(IntPtr h) { StringBuilder t = new StringBuilder(256); GetWindowText(h, t, 256); return t.ToString(); }
+    // the visible top-level windows, from the front to the back
+    public static IntPtr[] Stack() {
+      List<IntPtr> l = new List<IntPtr>();
+      EnumWindows(delegate(IntPtr h, IntPtr x) { if (IsWindowVisible(h) && Title(h).Length > 0) l.Add(h); return true; }, IntPtr.Zero);
+      return l.ToArray();
+    }
+    public static IntPtr Find(string title) { foreach (IntPtr h in Stack()) if (Title(h) == title) return h; return IntPtr.Zero; }
+    public static int Position(string title) { IntPtr[] s = Stack(); for (int i = 0; i < s.Length; i++) if (Title(s[i]) == title) return i; return -1; }
+    public static string Top(int n) { IntPtr[] s = Stack(); StringBuilder b = new StringBuilder(); for (int i = 0; i < s.Length && i < n; i++) b.Append((i + 1) + ". " + Title(s[i]) + "  "); return b.ToString(); }
+    // makes a window the front window (a tap on the Alt key first, so Windows allows it)
+    public static void Raise(IntPtr h) { keybd_event(0x12, 0, 0, UIntPtr.Zero); SetForegroundWindow(h); keybd_event(0x12, 0, 2, UIntPtr.Zero); }
+  }
+}
+'@
+  $standTitle = 'Book Compare CI stand-in browser'; $dlgTitle = 'Book Compare CI front dialog'
+  $sf = Join-Path $env:TEMP 'bc-standin.ps1'
+  @"
+Add-Type -AssemblyName System.Windows.Forms
+`$f = New-Object System.Windows.Forms.Form
+`$f.Text = '$standTitle'
+`$f.WindowState = [System.Windows.Forms.FormWindowState]::Maximized
+[System.Windows.Forms.Application]::Run(`$f)
+"@ | Set-Content -Path $sf -Encoding ASCII
+  $stand = $null; $p = $null
+  try {
+    $stand = Start-Process powershell -ArgumentList ('-NoProfile -STA -ExecutionPolicy Bypass -File "{0}"' -f $sf) -PassThru
+    if (-not (Wait-Until { [BcZ.Win]::Find($standTitle) -ne [IntPtr]::Zero } 30)) { throw 'the stand-in window did not appear' }
+    $sh = [BcZ.Win]::Find($standTitle); Start-Sleep -Milliseconds 800; [BcZ.Win]::Raise($sh); Start-Sleep -Milliseconds 800
+    Note ('stand-in program is the front window before the test: ' + ([BcZ.Win]::GetForegroundWindow() -eq $sh))
+    $out = Join-Path $env:TEMP 'bc-front.txt'; Remove-Item $out -ErrorAction SilentlyContinue
+    $env:BC_PICK_OUT = $out; $env:BC_PICK_START = $env:TEMP; $env:BC_PICK_TITLE = $dlgTitle
+    # started exactly like serve.ps1 starts it: a hidden helper program that is not the front program
+    $p = Start-Process powershell -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}"' -f (Join-Path $root 'launcher\pickfolder.ps1')) -WindowStyle Hidden -PassThru
+    Remove-Item Env:BC_PICK_TITLE, Env:BC_PICK_OUT, Env:BC_PICK_START -ErrorAction SilentlyContinue
+    if (-not (Wait-Until { [BcZ.Win]::Find($dlgTitle) -ne [IntPtr]::Zero } 30)) { throw 'the folder window did not appear' }
+    Start-Sleep -Seconds 3
+    $dp = [BcZ.Win]::Position($dlgTitle); $sp = [BcZ.Win]::Position($standTitle)
+    $front = ([BcZ.Win]::GetForegroundWindow() -eq [BcZ.Win]::Find($dlgTitle))
+    Note ("folder window position from the front: $dp, stand-in program: $sp, folder window is the front window: $front")
+    $top = [BcZ.Win]::Top(6)
+    [void][BcZ.Win]::PostMessage([BcZ.Win]::Find($dlgTitle), 0x10, [IntPtr]::Zero, [IntPtr]::Zero)
+    if (-not $p.WaitForExit(20000)) { $p.Kill() }
+    if ($dp -lt 0 -or $sp -lt 0) { throw "a window was not found (folder window $dp, stand-in $sp). Front windows: $top" }
+    if ($dp -gt $sp) { throw "the folder window is BEHIND the other program (position $dp, the other program $sp). Front windows: $top" }
+    if (-not $front) { throw "the folder window is in front but does not have the keyboard focus. Front windows: $top" }
+  } finally {
+    if ($p -and -not $p.HasExited) { try { $p.Kill() } catch { } }
+    if ($stand -and -not $stand.HasExited) { try { $stand.Kill() } catch { } }
+  }
+}
+
 Check 'shortcuts for Windows start and Desktop are created and removed' {
   . (Join-Path $root 'launcher\lib.ps1')
   [void](Get-DataDir (Join-Path $env:TEMP 'bc-data'))
