@@ -1,3 +1,11 @@
+## [Compare tab: flags and book map] - 2026-11-06
+- New: **flags**. The button "Flag page" above the teal bar (or the key F) marks the page you are looking at in the standard colour; click the button again to choose one of six colours (pink-red, coral, yellow, green, blue, dark teal) or to remove the flag. F flags and un-flags. A flag belongs to the page of the book (the same row in every pairing of copies), is saved in the project file and shows as a small flag in the page list of the Compare tab and in the page grid (Pages tab). Changes of flags can be undone in the Pages view (Ctrl+Z)
+- Page list: as soon as a page is flagged, the chips "All" and "Flagged N" appear; "Flagged" can be narrowed to one colour
+- New: **book map**, a thin line at the bottom edge of the Compare tab, one position per page of the book: grey tick = one of the two copies has no page there, coloured tick = flag, teal mark = the page on screen. Moving the pointer to the line opens it; a small picture of the page (from copy 1, otherwise copy 2) and its name appear while you hover over it; a click jumps to that page (with "Skip pages that one copy lacks" switched on, to the nearest page both copies have). The pin button keeps the map open (remembered); on a touch screen the first tap opens it
+- Project file: new field "flags" (row number -> colour 0-5); older projects open without flags, wrong entries are ignored
+- tests: test_compare_tab.py now also covers flags (button, colours, F, filter, grid, undo) and the book map (opens, picture, jump, grey ticks, pin); test_workspace.py and test_helper.py check the saved flags
+- Still not in the Compare tab (planned): preparing the whole book in advance and saving the results, annotations, "next to check", focus mode, quality dots
+
 ## [Compare tab, first version] - 2026-11-06
 - New: COMPARE in the whole-book workspace now opens the Compare tab instead of the two-image screen. The two pages are aligned automatically (Perspective is the default; Affine and Thin Plate Spline can be chosen in the left panel)
 - Left panel: menu for copy 1, menu and step buttons for copy 2, a button that swaps them, the list of all pages with a search box (grey italic = one of the two copies has no page here, dashed = row not compared), a switch "Skip pages that one of the two copies lacks", and the panel can be hidden with the button at the top left
@@ -6,7 +14,7 @@
 - The pictures say which copy and page they show (for example "Copy 2, aligned - D-Sl - f.4r"); if a pair cannot be aligned or a copy has no page in that row, a message with a way out is shown
 - The two-image screen (start page: "Select two images", samples) is unchanged
 - tests: test_compare_tab.py (real alignment, Chromium and Firefox)
-- Not yet in the Compare tab (planned): preparing the whole book in advance and saving the results, the book map along the bottom edge, flags and annotations, "next to check", focus mode
+- Not yet in the Compare tab (planned): preparing the whole book in advance and saving the results, the book map along the bottom edge, flags and annotations, "next to check", focus mode (book map and flags: see the entry above)
 
 ## [Book Compare helper] - 2026-11-06
 - New: the Book Compare helper (launcher/serve.ps1) reads the scan folders for Book Compare. Folders are chosen once in the Windows folder window and remembered as addresses in the project file: after restarting the computer there is no permission question at all, and the workspace works in Firefox too. Book Compare switches to this mode by itself when it is opened through the helper (http://localhost:8765/); opening index.html directly works as before

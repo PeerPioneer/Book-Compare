@@ -228,7 +228,7 @@
 
   /* ---------------------------------------------------------------- state */
   function blank() {
-    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
+    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -239,6 +239,15 @@
     if (j < 0) return 'Front ' + (i + 1);
     if (S.folio) return (Math.floor(j / 2) + 1) + (j % 2 === 0 ? 'r' : 'v');
     return 'Page ' + (j + 1);
+  }
+  // Flags: a colour mark on a row (a position in the book), the same in every pairing. Six colours; 0 is the standard one.
+  var FLAG_COLORS = ['#ef476f', '#f78c6b', '#ffd166', '#06d6a0', '#118ab2', '#073b4c'];
+  var FLAG_NAMES = ['pink-red', 'coral', 'yellow', 'green', 'blue', 'dark teal'];
+  var FLAG_PATH = 'M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z';
+  function cleanFlags(f) {                                            // from a project file: only row numbers with a colour 0-5
+    var out = {};
+    if (f && typeof f === 'object') Object.keys(f).forEach(function (k) { var v = f[k]; if (/^\d+$/.test(k) && typeof v === 'number' && v >= 0 && v < FLAG_COLORS.length && v === Math.floor(v)) out[k] = v; });
+    return out;
   }
   function selected() {
     var ci = S.sel.ci;
@@ -259,12 +268,12 @@
 
   /* ---------------------------------------------------------------- undo / redo */
   function snap() {
-    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, s: S.sel, p: S.pair });
+    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, s: S.sel, p: S.pair });
   }
   function restore(str) {
     var o = JSON.parse(str);
     S.copies = o.c.map(function (r) { var c = REG[r.id]; c.name = r.name; c.cells = r.cells; return c; });
-    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.sel = o.s; S.pair = o.p;
+    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.sel = o.s; S.pair = o.p;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
   }
   function commit() { hist.undo.push(snap()); if (hist.undo.length > 60) hist.undo.shift(); hist.redo = []; }
@@ -544,7 +553,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, pair: S.pair, sel: S.sel,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, pair: S.pair, sel: S.sel,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
@@ -635,7 +644,7 @@
     if (!json || json.format !== 'book-compare-project' || !Array.isArray(json.copies)) { toast('This is not a Book Compare project file.'); return false; }
     S = blank(); REG = {};
     S.projectId = json.projectId || uid();
-    S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {};
+    S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
     (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
@@ -814,6 +823,10 @@
     gb.innerHTML = h;
     $('#ws-vp').addEventListener('scroll', renderRows);
   }
+  function flagMark(i) {                                              // the small flag at the right edge of a row label
+    var f = S.flags[i]; if (f == null) return '';
+    return '<svg class="ws-flag" viewBox="0 0 24 24" width="15" height="15" role="img" style="color:' + FLAG_COLORS[f] + '"><title>Flagged (' + FLAG_NAMES[f] + ')</title><path fill="currentColor" d="' + FLAG_PATH + '"/></svg>';
+  }
   function renderRows() {
     var vp = $('#ws-vp'), host = $('#ws-rowshost'); if (!vp || !host) return;
     var N = rows(), top = vp.scrollTop, vh = vp.clientHeight;
@@ -828,7 +841,7 @@
         else cells += '<div class="ws-cell empty' + sel + '" data-c="' + ci + '" data-r="' + i + '"><span class="gap">no page</span></div>';
       });
       var sk = !!S.skip[i], small = sk ? 'not compared' : (i === S.ns && S.ns > 0 ? 'starts here' : n + ' of ' + S.copies.length + ' copies');
-      h += '<div class="ws-row' + (S.sel.row === i ? ' selrow' : '') + (sk ? ' skipped' : '') + (i === S.ns && S.ns > 0 ? ' numstart' : '') + '" style="top:' + (HEAD_H + i * ROW_H) + 'px" data-r="' + i + '"><div class="ws-lbl" data-act="lbl" data-r="' + i + '"><b>' + esc(rowLabel(i)) + '</b><small>' + small + '</small></div>' + cells + '</div>';
+      h += '<div class="ws-row' + (S.sel.row === i ? ' selrow' : '') + (sk ? ' skipped' : '') + (i === S.ns && S.ns > 0 ? ' numstart' : '') + '" style="top:' + (HEAD_H + i * ROW_H) + 'px" data-r="' + i + '"><div class="ws-lbl" data-act="lbl" data-r="' + i + '"><b>' + esc(rowLabel(i)) + '</b><small>' + small + '</small>' + flagMark(i) + '</div>' + cells + '</div>';
     }
     host.innerHTML = h;
   }
@@ -1184,7 +1197,27 @@
     },
     rowInfo: function (i) {
       var a = copyById(S.pair[0]), b = copyById(S.pair[1]);
-      return { label: rowLabel(i), a: !!(a && a.cells[i]), b: !!(b && b.cells[i]), skip: !!S.skip[i] };
+      return { label: rowLabel(i), a: !!(a && a.cells[i]), b: !!(b && b.cells[i]), skip: !!S.skip[i], flag: S.flags[i] != null ? S.flags[i] : null };
+    },
+    flagColors: FLAG_COLORS.slice(), flagNames: FLAG_NAMES.slice(), flagPath: FLAG_PATH,
+    // colour 0-5 puts a flag on the row, null takes it away (every change can be undone in the Pages view)
+    setFlag: function (i, c) {
+      if (i < 0 || i >= rows()) return;
+      var now = S.flags[i] != null ? S.flags[i] : null;
+      if (c != null && !(c >= 0 && c < FLAG_COLORS.length)) return;
+      if (now === c) return;
+      commit();
+      if (c == null) delete S.flags[i]; else S.flags[i] = c;
+      touch(); if (root && !root.hidden) renderAll();
+    },
+    // a small picture of the page at this row for the book map: from copy 1, otherwise copy 2; resolves to { url, copy } or { none: true } / { err }
+    thumb: function (i) {
+      var cs = [copyById(S.pair[0]), copyById(S.pair[1])];
+      for (var k = 0; k < 2; k++) {
+        var c = cs[k], key = c && c.cells[i];
+        if (key) return thumbPromise(c, key).then(function (r) { return r && r.url ? { url: r.url, copy: this.name } : { err: (r && r.msg) || 'Not available' }; }.bind(c));
+      }
+      return Promise.resolve({ none: true });
     },
     setRow: function (i) { if (i < 0 || i >= rows()) return; S.sel = { ci: S.sel.ci != null && S.copies[S.sel.ci] ? S.sel.ci : 0, row: i }; touch(); },
     setCopy: function (slot, id) {                                     // slot 0 = copy 1, slot 1 = copy 2; choosing the other one's copy swaps them

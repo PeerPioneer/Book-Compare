@@ -205,8 +205,11 @@ def scenario(p, kind):
     pg.locator('#ws .ws-cell[data-c="0"][data-r="1"]').click(); pg.wait_for_timeout(300)
     pg.click('#ws-compare'); pg.wait_for_timeout(2500)
     assert pg.evaluate("document.getElementById('ws').hidden") and pg.is_visible('.ct-top'), 'the Compare tab should be showing'
+    pg.click('#ct_flag'); pg.wait_for_timeout(1800)                                          # a flag is saved with the project (by itself)
+    assert project_json().get('flags') == {'1': 0}, project_json().get('flags')
     pg.click('#back'); pg.wait_for_timeout(700)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'back to the pages'
+    assert pg.locator('#ws .ws-lbl[data-r="1"] svg.ws-flag').count() == 1, 'the flag shows in the grid'
     # --- a scan folder was moved: one choice of the folder that holds it is enough -----------------------------------------
     moved = os.path.join(BOOKS, 'Archiv'); os.makedirs(moved)
     shutil.move(os.path.join(BOOKS, 'Copy-B ä'), os.path.join(moved, 'Copy-B ä'))
@@ -214,6 +217,7 @@ def scenario(p, kind):
     pg.click('#ws .ws-empty [data-act=continue]'); pg.wait_for_timeout(2000)
     assert not pg.evaluate("document.getElementById('ws-banner').hidden") and pg.locator('#ws-banner [data-act=reconnect]').count() == 1, 'the missing folder should be reported'
     assert pg.locator('#ws .ws-hmeta.lost').count() == 1
+    assert pg.locator('#ws .ws-lbl[data-r="1"] svg.ws-flag').count() == 1, 'the flag was kept in the project file'
     push_pick(BOOKS); pg.click('#ws-banner [data-act=reconnect]')
     for _ in range(60):
         pg.wait_for_timeout(500)

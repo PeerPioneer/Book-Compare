@@ -70,6 +70,7 @@
 .ws-row.skipped .ws-lbl small { font-style: italic; }
 .ws-row.numstart .ws-cell, .ws-row.numstart .ws-lbl { box-shadow: inset 0 3px 0 var(--ws-teal); }
 .ws-lbl { flex: 0 0 var(--ws-lblw, 96px); width: var(--ws-lblw, 96px); position: sticky; left: 0; z-index: 2; background: var(--ws-surface); border-right: 2px solid var(--ws-line); border-bottom: 1px solid var(--ws-line-soft); padding: 0 8px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; line-height: 1.15; }
+.ws-flag { position: absolute; right: 5px; top: 5px; filter: drop-shadow(0 0 1px rgba(0,0,0,.45)); }
 .ws-lbl b { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-lbl small { font-size: 10.5px; color: var(--ws-muted); white-space: nowrap; }
 .ws-lbl input { width: 100%; font: inherit; font-size: 13px; border: 1px solid var(--ws-teal); border-radius: 3px; padding: 1px 3px; background: var(--ws-surface); color: var(--ws-fg); }

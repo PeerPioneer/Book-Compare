@@ -143,11 +143,14 @@ with sync_playwright() as p:
     pg2.evaluate("window.__picks.push(window.__h.proj)"); pg2.click('#ws-banner [data-act=reconnect]'); pg2.wait_for_timeout(900)
     assert not hid(pg2, '#ws-banner'), 'a folder without the scans must not be accepted'
     # large project: only a few rows exist in the page at any time (project written by the first version, with no folder information)
-    big = {'format': 'book-compare-project', 'version': 1, 'projectId': 'big', 'nextCopy': 21, 'ns': 0, 'folio': False, 'labels': {}, 'skip': {}, 'pair': [1, 2], 'sel': {'ci': 0, 'row': 0}, 'tray': [{'cid': 1, 'key': 'img_000.jpg'}],
+    big = {'format': 'book-compare-project', 'version': 1, 'projectId': 'big', 'nextCopy': 21, 'ns': 0, 'folio': False, 'labels': {}, 'skip': {}, 'flags': {'0': 2, '5': 4, 'x': 1, '3': 9, '7': 'a', '8': -1, '9': 1.5}, 'pair': [1, 2], 'sel': {'ci': 0, 'row': 0}, 'tray': [{'cid': 1, 'key': 'img_000.jpg'}],
            'copies': [{'id': i + 1, 'name': 'Copy-%02d' % (i + 1), 'folder': 'Copy-%02d' % (i + 1), 'keys': [], 'cells': [('img_%03d.jpg' % r) if (r + i * 7) % 53 > 3 else None for r in range(544)]} for i in range(20)]}
     pg2.evaluate("async(j)=>{ const r = await navigator.storage.getDirectory(); const bd = await r.getDirectoryHandle('bigproj',{create:true}); const fh = await bd.getFileHandle('book-compare-project.json',{create:true}); const w = await fh.createWritable(); await w.write(j); await w.close(); window.__h.big = bd; }", json.dumps(big))
     pg2.evaluate("window.__picks.push(window.__h.big)"); pg2.click('#ws-more'); pg2.click('[data-m=open]'); pg2.wait_for_timeout(1500)
     assert pg2.locator('#ws .ws-hname').count() == 20 and pg2.locator('#ws .ws-row').count() < 40
+    # flags in a project file: only real row numbers with a colour 0-5 are taken over, nothing else (and they show in the grid)
+    assert pg2.evaluate("[0, 3, 5, 7, 8, 9].map(i => BookWorkspace.tab.rowInfo(i).flag)") == [2, None, 4, None, None, None]
+    assert pg2.locator('#ws .ws-lbl[data-r="0"] svg.ws-flag').count() == 1 and pg2.locator('#ws .ws-lbl[data-r="3"] svg.ws-flag').count() == 0
     # the scan folders were only read
     assert before == snapshot(pg2), 'scan folders must be unchanged'
     assert not errs, errs
