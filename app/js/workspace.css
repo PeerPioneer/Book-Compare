@@ -162,3 +162,15 @@
   .ws-compare { padding: 12px 22px; font-size: 17px; }
 }
 @media (prefers-reduced-motion: reduce) { .ws * { transition: none !important; animation: none !important; } }
+
+/* speed test (js/speedtest.js) */
+.ws-dlg h4 { margin: 4px 0 0; font-size: 14px; font-weight: 500; }
+.ws-dlg label.chk { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--ws-fg); font-size: 13.5px; }
+.sp-scroll { overflow-x: auto; flex: none; }
+.sp-tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
+.sp-tbl th, .sp-tbl td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--ws-line-soft); white-space: nowrap; }
+.sp-tbl th { color: var(--ws-muted); font-weight: 500; font-size: 12px; white-space: normal; }
+.sp-tbl tr.bad td { color: var(--ws-bad); white-space: normal; }
+.sp-text { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, Consolas, monospace; border: 1px solid var(--ws-line); border-radius: 4px; padding: 6px; background: var(--ws-surface); color: var(--ws-fg); }
+.ws-dlg details summary { cursor: pointer; font-size: 13px; color: var(--ws-muted); }
+.sp-tbl tr.bad td:first-child { white-space: nowrap; }

@@ -22,6 +22,7 @@ Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the ap
 `tests/windows/windows-checks.ps1` tests the Windows-only parts (folder window, shortcuts, hidden start, icon near the clock). It runs by itself on GitHub (`.github/workflows/windows-test.yml`, on a real Windows machine) after every push; see the "Actions" tab of the repository.
 
 `test_compare_tab.py` checks the Compare tab with the **real alignment engine** (sample pictures of the app in three made-up copies, one of them incomplete), through the helper, in Chromium and Firefox: COMPARE opens the tab and aligns, next/previous page, keys, copy menus and swap, page list and search, skipping pages a copy lacks, the PAGES tab and Back, flags (button, colours, key F, filter, grid, undo) the book map (opens near the pointer, picture, jump, grey ticks, pin) and annotations (drawn, moved, resized, commented, coloured, deleted, hidden with the mouse; kept per page, shown for another pair, undo) and focus mode (what is hidden, keys, Esc and the Leave button). It takes a few minutes.
+`test_compare_tab.py` also runs the **speed test** (menu, table with a scan the browser cannot open, the three alignment types, copy button, Stop, closing in the middle, nothing in the project changed).
 
     PWSH=pwsh python3 tests/workspace/test_compare_tab.py   # prints ALL COMPARE TAB TESTS PASSED
 

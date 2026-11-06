@@ -474,6 +474,7 @@
     enter: enter,
     leave: toPages,
     isOpen: function () { return st.on; },
-    inFocus: function () { return st.on && st.focus; }
+    inFocus: function () { return st.on && st.focus; },
+    transform: function () { return st.transform; }                                          // the alignment type chosen in the left panel (the speed test uses it)
   };
 })();

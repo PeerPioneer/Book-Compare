@@ -998,6 +998,7 @@
     <script defer src="js/samples.js"></script>
     <script defer src="js/workspace.js"></script>
     <script defer src="js/compare-annot.js"></script>
+    <script defer src="js/speedtest.js"></script>
     <script defer src="js/compare-tab.js"></script>
   </head>
   <body class="mdc-typography">
@@ -2603,6 +2604,7 @@
           });
           // "COMPARE" in the workspace opens the Compare tab (js/compare-tab.js), which aligns the two pages by itself.
           CompareTab.init({ compare, result, action_bar, go_to_screen });
+          SpeedTest.init({ compare, result });
           BookWorkspace.onCompare((d) => {
             CompareTab.enter(d);
           });

@@ -5,7 +5,8 @@ It uses the helper (launcher/serve.ps1) with REAL folders on disk and the sample
 Checked, in Chromium and Firefox:
   COMPARE opens the Compare tab and aligns the pair by itself; next/previous page, keys, copy menus, swap, the page list and its
   search, skipping pages that a copy lacks, PAGES tab and back, flags (button, colours, key F, list filter, shown in the Pages grid,
-  undo), the book map (opens near the pointer, picture of the page, click to jump, grey ticks, pin), focus mode (hides everything but the pictures, keys work, Esc/Leave button), and that the scan folders are never changed.
+  undo), the book map (opens near the pointer, picture of the page, click to jump, grey ticks, pin), focus mode (hides everything but the pictures, keys work, Esc/Leave button),
+  the speed test (More > Measure speed on this computer: times each copy, copes with a scan that cannot be opened, Stop, closing the window, changes nothing in the project), and that the scan folders are never changed.
 
 Run:  PWSH=pwsh python3 tests/workspace/test_compare_tab.py
 """
@@ -34,6 +35,8 @@ for ci, name in ((0, 'Copy-A'), (1, 'Copy-B')):
     for i, pr in enumerate(PAIRS): shutil.copy(os.path.join(U, pr[ci]), os.path.join(BOOKS, name, 'p%d.jpg' % (i + 1)))
 os.makedirs(os.path.join(BOOKS, 'Copy-C'))
 for i in (0, 1): shutil.copy(os.path.join(U, PAIRS[i][1]), os.path.join(BOOKS, 'Copy-C', 'p%d.jpg' % (i + 1)))
+os.makedirs(os.path.join(BOOKS, 'Copy-D'))                                                        # a "scan" the browser cannot open (for the speed test)
+open(os.path.join(BOOKS, 'Copy-D', 'p1.jpg'), 'wb').write(b'this is not a picture' * 50)
 errs = []
 SHOTS = os.environ.get('BOOKCOMPARE_SHOTS', '')
 
@@ -296,6 +299,37 @@ def scenario(p, kind):
     assert pg.is_visible('.ct-top') and not pg.is_visible('.ct-busy'), 'same pair and row: shown at once'
     # the Back button of the teal bar also returns to the pages
     pg.click('#back'); pg.wait_for_timeout(500); assert not pg.evaluate("document.getElementById('ws').hidden")
+    # ---------------------------------------------------------------- speed test
+    add_copy(pg, 'Copy-D', 'D-Broken')
+    pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300)
+    state0 = pg.evaluate("JSON.stringify(BookWorkspace.tab.state())")
+    def open_speed():
+        pg.click('#ws-more'); assert pg.is_visible('#ws-menu [data-m="speed"]'), 'the menu offers the speed test'
+        pg.click('#ws-menu [data-m="speed"]'); pg.wait_for_selector('#ws-scrim .ws-dlg')
+    open_speed()
+    dlg = pg.inner_text('#ws-scrim .ws-dlg'); assert 'Measure speed' in dlg and 'Page 1' in dlg and '3 other copies' in dlg and 'A-Test' in dlg, dlg
+    pg.check('#sp-types'); pg.click('#sp-go')
+    pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=240000)
+    rows_ = pg.locator('#ws-scrim tr[data-copy]'); assert rows_.count() == 3, rows_.count()
+    bad = pg.locator('#ws-scrim tr.bad'); assert bad.count() == 1 and 'D-Broken' in bad.inner_text() and 'could not open' in bad.inner_text(), bad.all_inner_texts()
+    res = pg.evaluate("SpeedTest.last.stats"); assert res['n'] == 2 and res['failed'] == 1 and res['mean'] > 0 and res['find'] > 0, res
+    txt = pg.inner_text('#ws-scrim .ws-dlg')
+    assert 'on average' in txt and 'Your project has' in txt and 'comparisons' in txt and 'freezes' in txt, txt
+    assert pg.locator('#ws-scrim h4').count() == 1 and pg.locator('#ws-scrim h4 + table tbody tr').count() == 3, 'the three alignment types are compared'
+    assert pg.evaluate("SpeedTest.last.text").startswith('Book Compare speed test') and 'D-Broken | FAILED' in pg.evaluate("SpeedTest.last.text")
+    pg.click('#sp-copy'); pg.wait_for_function("document.getElementById('sp-msg').textContent.length > 0", timeout=5000)
+    assert pg.evaluate("document.querySelector('.sp-text').value") == pg.evaluate("SpeedTest.last.text"), 'the numbers are also shown as text'
+    assert pg.evaluate("JSON.stringify(BookWorkspace.tab.state())") == state0, 'the speed test changes nothing in the project'
+    # Stop: the test ends early and says so
+    pg.click('[data-close]'); open_speed(); pg.click('#sp-go'); pg.click('#sp-stop')
+    pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=240000)
+    assert 'Stopped early' in pg.inner_text('#ws-scrim .ws-dlg'), pg.inner_text('#ws-scrim .ws-dlg')
+    # closing the window in the middle ends the test without trouble, and a new one can be started afterwards
+    pg.click('[data-close]'); pg.evaluate("SpeedTest.last = null"); open_speed(); pg.click('#sp-go'); pg.keyboard.press('Escape')
+    pg.wait_for_function("SpeedTest.last !== null", timeout=240000); assert pg.locator('#ws-scrim').count() == 0, 'the window stays closed'
+    open_speed(); assert pg.is_visible('#sp-go'); pg.click('[data-close]')
+    pg.click('#ws-more'); pg.click('#ws-menu [data-m="help"]'); assert 'Measure speed' in pg.inner_text('#ws-scrim .ws-dlg'); pg.click('[data-close]')
+    assert pg.evaluate("JSON.stringify(BookWorkspace.tab.state())") == state0
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

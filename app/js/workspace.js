@@ -964,7 +964,8 @@
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
       '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>COMPARE</b>: they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The <b>Pages</b> tab or <b>Back</b> there brings you here again.</li>' +
       '<li>When you reopen a saved project the browser asks once for permission to read your scans again. Click <b>Allow access to scans</b>; you do not have to pick the folders again.</li>' +
-      '<li>Ctrl+Z undoes the last change. Arrow keys move the selection.</li></ul>' +
+      '<li>Ctrl+Z undoes the last change. Arrow keys move the selection.</li>' +
+      '<li><b>More › Measure speed on this computer</b> aligns a few real pages one after the other and shows how long each step takes here. It only reads your scans.</li></ul>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
   }
 
@@ -1176,7 +1177,8 @@
       '<button data-m="open"><span class="tick"></span>Open saved project …</button>' +
       '<button data-m="reconnect"' + (lost ? '' : ' disabled') + '><span class="tick"></span>Choose scan folder again …</button><hr>' +
       '<button data-m="folio"><span class="tick"></span>' + (S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') + '</button>' +
-      '<button data-m="help"><span class="tick"></span>How this screen works</button><hr>' +
+      '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
+      '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
       '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
       (HELPER ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');
   }
@@ -1275,6 +1277,39 @@
       }
       return Promise.resolve({ none: true });
     },
+    // ---- for the speed test (js/speedtest.js): it reads scans and changes nothing in the project
+    modal: modal, closeModal: closeModal,
+    // Which page to time: the selected row if copy 1 and another copy have a page there, otherwise the row that most copies share with copy 1.
+    // Also counts the comparisons a whole book would need (every copy against copy 1, and every copy against every other).
+    speedPlan: function () {
+      ensurePair();
+      var ref = copyById(S.pair[0]), n = rows(), i;
+      if (!ref || S.copies.length < 2) return { ok: false, msg: 'The speed test needs a project with at least two copies. Add the copies in the Pages view first.' };
+      function count(r) { var k = 0; S.copies.forEach(function (c) { if (c.cells[r]) k++; }); return k; }
+      var pairsRef = 0, rowsRef = 0, pairsAll = 0, row = -1, best = 1;
+      for (i = 0; i < n; i++) {
+        if (S.skip[i]) continue;
+        var k = count(i); pairsAll += k * (k - 1) / 2;
+        if (ref.cells[i]) { rowsRef++; pairsRef += k - 1; if (k > best) { best = k; row = i; } }
+      }
+      if (S.sel.row >= 0 && S.sel.row < n && !S.skip[S.sel.row] && ref.cells[S.sel.row] && count(S.sel.row) >= 2) row = S.sel.row;
+      if (row < 0) return { ok: false, msg: 'Copy 1 (' + ref.name + ') shares no page with another copy. Choose another copy as copy 1 or another row, then try again.' };
+      var items = [], locked = [];
+      function checkLock(c) {
+        var sk = splitKey(c.cells[row]), l = c.locs && c.locs[sk.n], r = l && rootById(l.root);
+        if (r && !rootReady(r) && locked.indexOf(r.name) < 0) locked.push(r.name);
+      }
+      checkLock(ref);
+      S.copies.forEach(function (c) { if (c.id !== ref.id && c.cells[row]) { items.push({ id: c.id, name: c.name }); checkLock(c); } });
+      return { ok: true, ref: { id: ref.id, name: ref.name }, row: row, rowLabel: rowLabel(row), items: items, locked: locked, pairsRef: pairsRef, rowsRef: rowsRef, pairsAll: pairsAll, rows: n, copies: S.copies.length };
+    },
+    // the scan (a File) of a copy in a row; throws an Error whose message can be shown as it is
+    speedFile: async function (id, row) {
+      var c = copyById(id), key = c && c.cells[row];
+      if (!key) throw refusal('This copy has no page in this row.');
+      try { return await getScan(c, key); }
+      catch (e) { throw refusal(e && e.name === 'Lost' ? e.message : 'Could not open the scan: ' + niceError(e)); }
+    },
     setRow: function (i) { if (i < 0 || i >= rows()) return; S.sel = { ci: S.sel.ci != null && S.copies[S.sel.ci] ? S.sel.ci : 0, row: i }; touch(); },
     setCopy: function (slot, id) {                                     // slot 0 = copy 1, slot 1 = copy 2; choosing the other one's copy swaps them
       var c = null; S.copies.forEach(function (x) { if (String(x.id) === String(id)) c = x; });      // (a menu hands over the id as text)
@@ -1313,6 +1348,7 @@
       else if (m === 'reconnect') reconnectScans();
       else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
       else if (m === 'help') helpDialog();
+      else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
       else if (m === 'new') newProject();
       else if (m === 'quit') quitHelper();
       return;
