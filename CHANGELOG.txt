@@ -4,6 +4,7 @@
 - Safety: the helper only answers Book Compare in a browser on the same computer (other web sites, other host names and requests without the Book Compare header are refused), only reads pictures inside folders you chose, never writes in scan folders, and writes nothing but book-compare-project.json in the project folder
 - The project folder may now lie next to the copy folders (or in a folder that holds them). Only a folder that holds scans of the project is refused as a project folder (before: the whole scan folder tree)
 - More menu: "Quit the Book Compare helper"
+- Folder names with letters like a-umlaut work with the Windows PowerShell that comes with Windows 10/11 (found by the Windows test)
 - tests: test_helper.py (real folders, Chromium and Firefox), tests/windows/windows-checks.ps1 and .github/workflows/windows-test.yml (GitHub tests the helper on a real Windows machine)
 
 ## [Book Compare launcher] - 2026-11-06
