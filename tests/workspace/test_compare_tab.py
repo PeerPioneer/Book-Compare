@@ -5,7 +5,7 @@ It uses the helper (launcher/serve.ps1) with REAL folders on disk and the sample
 Checked, in Chromium and Firefox:
   COMPARE opens the Compare tab and aligns the pair by itself; next/previous page, keys, copy menus, swap, the page list and its
   search, skipping pages that a copy lacks, PAGES tab and back, flags (button, colours, key F, list filter, shown in the Pages grid,
-  undo), the book map (opens near the pointer, picture of the page, click to jump, grey ticks, pin), and that the scan folders are never changed.
+  undo), the book map (opens near the pointer, picture of the page, click to jump, grey ticks, pin), focus mode (hides everything but the pictures, keys work, Esc/Leave button), and that the scan folders are never changed.
 
 Run:  PWSH=pwsh python3 tests/workspace/test_compare_tab.py
 """
@@ -264,6 +264,30 @@ def scenario(p, kind):
     pg.keyboard.press('Control+Shift+z'); pg.wait_for_timeout(300); assert len(anns()) == 2
     pg.locator('#ws .ws-lbl[data-r="1"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'annotations: back from the pages')
     assert pg.locator('#pane_main .ct-ann svg [data-id]').count() == 2
+    # ---------------------------------------------------------------- focus mode
+    def row_now(): return pg.evaluate("BookWorkspace.tab.state().row")
+    wait_aligned(pg, 'focus mode start'); assert row_now() == 1
+    h0 = pg.locator('#pane_main').bounding_box()
+    assert pg.is_visible('#ct_focusbtn') and pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#back')
+    pg.click('#ct_focusbtn'); pg.wait_for_timeout(500)
+    for sel in ('.ct-top', '#ct_list', '#ct_prev', '#ct_flag', '#ct_map', '#back', '.ct-side'):
+        assert not pg.is_visible(sel), 'focus mode hides ' + sel
+    assert pg.is_visible('.ct-leave') and pg.is_visible('#pane_main') and pg.is_visible('#pane_o1') and pg.is_visible('#pane_o2') and pg.is_visible('.ct-atools'), 'the pictures and the annotation tools stay'
+    h1 = pg.locator('#pane_main').bounding_box(); assert h1['height'] > h0['height'] + 60 and h1['x'] < 5 and h1['y'] < 5, (h0, h1)      # the pictures got the room
+    assert pg.is_visible('.ct-toast') and 'Focus mode' in pg.inner_text('.ct-toast')
+    pg.keyboard.press('ArrowRight'); wait_aligned(pg, 'focus: key right'); assert row_now() == 2
+    assert 'Page 3' in pg.inner_text('.ct-toast'), pg.inner_text('.ct-toast')
+    pg.keyboard.press('f'); assert pg.evaluate("BookWorkspace.tab.rowInfo(2).flag") == 0 and 'flagged' in pg.inner_text('.ct-toast'), pg.inner_text('.ct-toast')
+    pg.keyboard.press('f'); assert pg.evaluate("BookWorkspace.tab.rowInfo(2).flag") is None
+    pg.keyboard.press('ArrowLeft'); wait_aligned(pg, 'focus: key left'); assert row_now() == 1 and 'Page 2' in pg.inner_text('.ct-toast') and 'flagged' in pg.inner_text('.ct-toast')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(500)
+    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#back') and not pg.is_visible('.ct-leave'), 'Esc brings everything back'
+    h2 = pg.locator('#pane_main').bounding_box(); assert abs(h2['height'] - h0['height']) < 3, (h0, h2)
+    pg.click('#ct_focusbtn'); pg.wait_for_timeout(300); pg.click('.ct-leave'); pg.wait_for_timeout(400); assert pg.is_visible('.ct-top') and not pg.is_visible('.ct-leave'), 'the Leave button works too'
+    pg.click('#ct_focusbtn'); pg.wait_for_timeout(300); pg.evaluate("CompareTab.leave()"); pg.wait_for_timeout(400)       # leaving the tab ends focus mode
+    assert not pg.evaluate("document.getElementById('ws').hidden")
+    pg.locator('#ws .ws-lbl[data-r="1"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'focus: back from the pages')
+    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#back'), 'Compare opens normally again'
     # the Pages tab and back: the same pair and row are shown again without aligning anew
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'Pages layer visible'

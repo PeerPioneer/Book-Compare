@@ -9,6 +9,8 @@
    - flags: a colour mark on a page (button "Flag page" or the key F; six colours); flagged pages show in the page list, which can be
      filtered to the flagged ones, and in the book map. Flags belong to the page of the book, not to a pair of copies, and are saved in the project.
    - annotations (circle, rectangle, text note with a comment, in the six flag colours) on the superimposed picture: see js/compare-annot.js
+   - focus mode (button at the top right, Esc leaves it): everything except the pictures is hidden; the keys keep working and a short
+     message at the bottom says which page you are on and what a key did
    - the book map: a thin strip at the bottom edge that opens when the pointer comes near; one tick per page of the book (grey = a copy lacks
      the page, colour = flag), a mark for the page on screen, a click jumps there, and a small picture of the page appears while you hover.
 
@@ -24,6 +26,7 @@
     on: false, token: 0, timer: 0, skip: true, q: '', side: true, transform: 'perspective',
     shown: null,                        // which pair and row the pictures on screen belong to
     stale: false,
+    focus: false,                       // focus mode: only the pictures are shown
     shownRow: null, shownPair: null,    // the row and the two copies of the picture on screen (annotations belong to this row)
     filter: 'all', fcol: null,          // page list: all pages / flagged pages, and one flag colour only
     pin: false                          // the book map stays open
@@ -47,7 +50,9 @@
       '<button class="ct-iconbtn" id="ct_sidebtn" title="Show or hide the left panel" aria-label="Show or hide the left panel">&#9776;</button>' +
       '<div class="ct-brand">Book Compare</div><div class="ct-proj" id="ct_proj"></div><div class="ct-sp"></div>' +
       '<div class="ct-tabs" role="tablist"><button class="ct-tab" role="tab" aria-selected="true" id="ct_tab_compare">Compare</button>' +
-      '<button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages">Pages</button></div>';
+      '<button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages">Pages</button></div>' +
+      '<button class="ct-iconbtn" id="ct_focusbtn" title="Focus mode: hide everything except the pictures (Esc leaves it)" aria-label="Focus mode: hide everything except the pictures">' +
+      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"/></svg></button>';
 
     ui.side = el('aside', 'ct-side');
     ui.side.innerHTML =
@@ -89,7 +94,9 @@
       '<button class="ct-pin" id="ct_pin" aria-pressed="false" aria-label="Keep the book map open" title="Keep the book map open"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg></button></div>' +
       '<div class="ct-map-hov" id="ct_maphov"></div><div class="ct-tip" id="ct_tip" hidden></div>';
 
-    rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.busy);
+    ui.leave = el('button', 'ct-leave', 'Leave focus mode'); ui.leave.hidden = true; ui.leave.title = 'Bring back the panel, tabs and bars (Esc)';
+    ui.toast = el('div', 'ct-toast'); ui.toast.hidden = true; ui.toast.setAttribute('role', 'status');
+    rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.busy); rc.appendChild(ui.leave); rc.appendChild(ui.toast);
     footer.insertBefore(ui.bar, footer.querySelector('.bar'));
     footer.insertBefore(ui.map, ui.bar);
     ui.rc = rc;
@@ -109,6 +116,8 @@
     });
 
     $('ct_sidebtn').onclick = function () { st.side = !st.side; layout(); };
+    $('ct_focusbtn').onclick = function () { setFocus(true); };
+    ui.leave.onclick = function () { setFocus(false); };
     $('ct_tab_pages').onclick = toPages;
     $('ct_swap').onclick = function () { W().swap(); afterCopies(); };
     ui.c1.onchange = function () { W().setCopy(0, ui.c1.value); afterCopies(); };
@@ -171,7 +180,10 @@
   function layout() {
     ui.rc.classList.toggle('ct-on', st.on);
     ui.rc.classList.toggle('ct-noside', st.on && !st.side);
-    ui.top.hidden = !st.on; ui.side.hidden = !st.on || !st.side; ui.bar.hidden = !st.on; ui.map.hidden = !st.on;
+    var f = st.on && st.focus;                                                               // focus mode: only the pictures
+    ui.rc.classList.toggle('ct-focus', f); document.body.classList.toggle('ct-focus', f);
+    ui.top.hidden = !st.on || f; ui.side.hidden = !st.on || !st.side || f; ui.bar.hidden = !st.on; ui.map.hidden = !st.on; ui.leave.hidden = !f;
+    if (!f) ui.toast.hidden = true;
     ui.map.style.setProperty('--ct-map-left', (st.on && st.side ? 300 : 0) + 'px');           // the opened map does not cover the left panel
     document.body.classList.toggle('ct-active', st.on);
     renderPin();
@@ -324,7 +336,21 @@
     ui.hov.style.display = 'block'; ui.hov.style.left = x + 'px';
   }
   function hideTip() { tipRow = -1; tipTok++; clearTimeout(tipTimer); ui.tip.hidden = true; ui.hov.style.display = 'none'; }
-  function note(msg) { ui.note.textContent = msg || ''; clearTimeout(note.t); if (msg) note.t = setTimeout(function () { ui.note.textContent = ''; }, 3500); }
+  function note(msg) { ui.note.textContent = msg || ''; clearTimeout(note.t); if (msg) { note.t = setTimeout(function () { ui.note.textContent = ''; }, 3500); toast(msg); } }
+  // in focus mode the bar with the notes is hidden: the same words appear for a moment at the bottom of the pictures
+  function toast(msg) {
+    if (!st.focus || !msg) return;
+    ui.toast.textContent = msg; ui.toast.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(function () { ui.toast.hidden = true; }, 2600);
+  }
+  function setFocus(on) {
+    on = !!on; if (st.focus === on || !st.on) return;
+    st.focus = on; closePalette(); hideTip();
+    layout();
+    window.requestAnimationFrame(function () { window.dispatchEvent(new Event('resize')); });   // the pictures got more (or less) room
+    if (on) { ui.leave.focus(); toast('Focus mode. Press Esc to leave it.'); }
+    else document.getElementById('ct_focusbtn').focus();
+  }
   function setBusy(msg, bad, acts) {
     ui.busy.hidden = !msg;
     document.getElementById('ct_busytxt').textContent = msg || '';
@@ -342,6 +368,7 @@
     var s = W().state();
     if (i === s.row && !st.stale) return;
     closePalette(); W().setRow(i); markCurrent(); renderBar(); markStale(); schedule(350);
+    if (st.focus) { var r = W().rowInfo(i); toast(r.label + ' · position ' + (i + 1) + ' of ' + s.rows + (r.flag != null ? ' · flagged' : '')); }
   }
   function stepPage(dir) {
     var s = W().state(), i = s.row + dir;
@@ -368,6 +395,7 @@
     var t = e.target, tag = t && t.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
     if (window.CompareAnnot && CompareAnnot.key(e)) { e.preventDefault(); return; }
+    if (e.key === 'Escape' && st.focus) { setFocus(false); e.preventDefault(); return; }
     if (e.key === 'f' || e.key === 'F') { if (e.shiftKey) return; closePalette(); toggleFlag(); }
     else if (e.key === 'ArrowRight') stepPage(1);
     else if (e.key === 'ArrowLeft') stepPage(-1);
@@ -437,7 +465,7 @@
   }
   function toPages() {
     st.token++; clearTimeout(st.timer); setBusy(null); closePalette(); hideTip();
-    st.on = false; layout();
+    st.focus = false; st.on = false; layout();
     W().showPages();
   }
 
@@ -445,6 +473,7 @@
     init: function (parts) { E = parts; build(); },
     enter: enter,
     leave: toPages,
-    isOpen: function () { return st.on; }
+    isOpen: function () { return st.on; },
+    inFocus: function () { return st.on && st.focus; }
   };
 })();
