@@ -231,7 +231,10 @@ def scenario(p, kind):
         pg.wait_for_timeout(500)
         if pg.locator('#ws-thumbs img').count() >= 1: break
     assert pg.locator('#ws-thumbs img').count() >= 1, 'pages seen before stay visible: ' + pg.inner_text('#ws-thumbs') + ' | errors: ' + str(errs)
-    pg.locator('#ws .ws-lbl[data-r="7"]').first.click(); pg.wait_for_timeout(1500)
+    pg.locator('#ws .ws-lbl[data-r="7"]').first.click()
+    for _ in range(60):                                                   # (Windows needs a few seconds to find out that nothing answers)
+        pg.wait_for_timeout(500)
+        if 'helper is not running' in pg.inner_text('#ws-thumbs'): break
     assert 'helper is not running' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
     c.close(); stop_helper()
     print('  %s: ok' % kind)
