@@ -30,3 +30,5 @@ Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the ap
 
 `common.py` holds the helpers (making test scans, faking the folder picker with private-storage folders).
 Not covered by these scripts: how the real Windows folder window looks and feels and the permission prompts of Edge/Chrome; these must be tried by hand.
+
+The test of the Photoshop script lives in `tests/photoshop/` (`node tests/photoshop/test_split_script.js`; needs Node, Python and Pillow). It uses a stand-in for Photoshop, so it checks the script's own logic, not Photoshop itself.
