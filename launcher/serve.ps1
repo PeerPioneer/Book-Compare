@@ -415,12 +415,21 @@ function Handle-Api($ctx, [string]$path) {
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { Send-Err $res 404 'not-found' 'File not found.'; return $false }
     $fi = New-Object System.IO.FileInfo($full)
     $ct = $types[$fi.Extension.ToLowerInvariant()]; if (-not $ct) { $ct = 'application/octet-stream' }
+    $fs = $null
+    if ($method -eq 'GET') {
+      # The file is opened BEFORE the answer is started, and so that other programs may keep it open (Dropbox, a virus scanner, Photoshop).
+      # If it still cannot be opened, the browser gets a clear "busy" answer. (If the answer had been started first, the browser would only see a
+      # connection that breaks in the middle and show "Failed to fetch".)
+      try { $fs = New-Object System.IO.FileStream($full, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete), 65536) }
+      catch { Write-Log ('file busy: ' + (Split-Path -Leaf $full) + ': ' + $_.Exception.Message); Send-Err $res 423 'busy' 'Another program is using this file right now.'; return $false }
+    }
     $res.Headers.Add('Cache-Control', 'no-store')
     $res.Headers.Add('X-Mtime-Ms', [string](Get-Ms $fi.LastWriteTimeUtc))
-    $res.StatusCode = 200; $res.ContentType = $ct; $res.ContentLength64 = $fi.Length
-    if ($method -eq 'GET') {
-      $fs = [System.IO.File]::OpenRead($full)
-      try { $fs.CopyTo($res.OutputStream, 1048576) } finally { $fs.Dispose() }
+    $res.StatusCode = 200; $res.ContentType = $ct; $res.ContentLength64 = $(if ($fs) { $fs.Length } else { $fi.Length })
+    if ($fs) {
+      try { $fs.CopyTo($res.OutputStream, 1048576) }
+      catch { Write-Log ('file interrupted: ' + (Split-Path -Leaf $full) + ': ' + $_.Exception.Message); throw }
+      finally { $fs.Dispose() }
     }
     return $false
   }

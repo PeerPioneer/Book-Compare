@@ -51,13 +51,23 @@
 .ws-hrow { position: sticky; top: 0; z-index: 4; display: flex; background: var(--ws-surface); border-bottom: 2px solid var(--ws-line); height: 74px; }
 .ws-hcell, .ws-corner, .ws-addcell { flex: 0 0 var(--ws-colw, 172px); width: var(--ws-colw, 172px); border-right: 1px solid var(--ws-line-soft); padding: 8px 10px; position: relative; display: flex; flex-direction: column; justify-content: center; background: var(--ws-surface); }
 .ws-corner { flex-basis: var(--ws-lblw, 96px); width: var(--ws-lblw, 96px); position: sticky; left: 0; z-index: 5; color: var(--ws-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; justify-content: flex-end; }
+.ws-hcell { cursor: grab; }
+.ws-hcell:active { cursor: grabbing; }
+/* the edge of a heading that can be dragged to change the width of the column */
+.ws-rz { position: absolute; top: 0; right: -4px; width: 9px; height: 100%; cursor: col-resize; z-index: 3; touch-action: none; }
+.ws-rz::after { content: ""; position: absolute; top: 18%; bottom: 18%; left: 4px; width: 2px; border-radius: 1px; background: var(--ws-line); transition: background .12s; }
+.ws-hcell:hover .ws-rz::after, .ws-rz:hover::after, .ws.rzing .ws-rz::after { background: var(--ws-teal); }
+.ws.rzing, .ws.rzing * { cursor: col-resize !important; user-select: none; }
+.ws-hcell.dl::before, .ws-hcell.dr::before, .ws-addcell.dl::before { content: ""; position: absolute; top: 0; bottom: 0; width: 4px; background: var(--ws-teal); z-index: 6; }
+.ws-hcell.dl::before, .ws-addcell.dl::before { left: -2px; }
+.ws-hcell.dr::before { right: -2px; }
 .ws-hcell.k1 { box-shadow: inset 0 4px 0 var(--ws-c1); }
 .ws-hcell.k2 { box-shadow: inset 0 4px 0 var(--ws-c2); }
 .ws-hname { font-size: 16px; font-weight: 500; cursor: text; border-radius: 3px; padding: 1px 3px; margin-left: -3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-hname:hover { background: var(--ws-band); }
 .ws-hmeta { font-size: 12px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-hmeta.lost { color: var(--ws-warn); }
-.ws-hcell .x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: 1px solid var(--ws-line); background: var(--ws-surface); border-radius: 3px; cursor: pointer; line-height: 1; padding: 0; color: var(--ws-muted); }
+.ws-hcell .x { position: absolute; top: 4px; right: 10px; width: 22px; height: 22px; border: 1px solid var(--ws-line); background: var(--ws-surface); border-radius: 3px; cursor: pointer; line-height: 1; padding: 0; color: var(--ws-muted); }
 .ws-hcell .x:hover { color: var(--ws-bad); border-color: var(--ws-bad); }
 .ws-hcell input { font: inherit; font-size: 16px; width: 100%; padding: 1px 3px; border: 1px solid var(--ws-teal); border-radius: 3px; background: var(--ws-surface); color: var(--ws-fg); }
 .ws-addcell { align-items: center; border-right: 0; }
@@ -76,6 +86,8 @@
 .ws-lbl input { width: 100%; font: inherit; font-size: 13px; border: 1px solid var(--ws-teal); border-radius: 3px; padding: 1px 3px; background: var(--ws-surface); color: var(--ws-fg); }
 .ws-cell { flex: 0 0 var(--ws-colw, 172px); width: var(--ws-colw, 172px); border-right: 1px solid var(--ws-line-soft); border-bottom: 1px solid var(--ws-line-soft); padding: 4px 8px; display: flex; align-items: center; gap: 7px; cursor: pointer; background: var(--ws-surface); position: relative; min-width: 0; }
 .ws-cell.empty { background: repeating-linear-gradient(135deg, var(--ws-hatch) 0 6px, var(--ws-surface) 6px 12px); color: var(--ws-muted); }
+.ws-cell { user-select: none; -webkit-user-select: none; }
+.ws-row .ws-cell.rng { background: var(--ws-sel); outline: 1px solid var(--ws-teal); outline-offset: -1px; }
 .ws-cell.sel { outline: 2px solid var(--ws-teal); outline-offset: -2px; background: var(--ws-sel); }
 .ws-cell.dropok { outline: 2px dashed var(--ws-teal); outline-offset: -2px; }
 .ws-cell .ico { flex: 0 0 14px; height: 18px; border-radius: 2px; border: 1px solid var(--ws-line); background: var(--ws-line); }
@@ -174,3 +186,5 @@
 .sp-text { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, Consolas, monospace; border: 1px solid var(--ws-line); border-radius: 4px; padding: 6px; background: var(--ws-surface); color: var(--ws-fg); }
 .ws-dlg details summary { cursor: pointer; font-size: 13px; color: var(--ws-muted); }
 .sp-tbl tr.bad td:first-child { white-space: nowrap; }
+.ws-rl { display: block; margin: 6px auto 2px; font: inherit; font-size: 11.5px; padding: 3px 10px; border: 1px solid var(--ws-teal); background: var(--ws-surface); color: var(--ws-teal); border-radius: 4px; cursor: pointer; }
+.ws-rl:hover { background: var(--ws-teal); color: #fff; }

@@ -51,6 +51,8 @@ with sync_playwright() as p:
     assert 'Saved in folder' in pg.inner_text('#ws-save')
     d = read_project(pg); assert [c['name'] for c in d['copies']] == ['A-Test', 'B-Test', 'C-Test'] and d['labels'] == {'2': 'Index'} and d['folio'] is True
     assert d['version'] == 2 and len(d['roots']) == 3 and all(len(c['locs']) == 1 for c in d['copies']) and 'tray' not in d
+    # column width, moving a copy, deleting a range of files with Shift (the grid is left as it was)
+    import gridchecks; gridchecks.run(pg, col, lambda: read_project(pg))
     # deleting a file: gone from the workspace, no "set aside" tray, the scan itself is untouched
     assert pg.locator('#ws-tray').count() == 0 and 'Set aside' not in pg.inner_text('#ws')
     cell(2, 0).click(); assert pg.inner_text('[data-act=del]') == 'Delete file'; pg.click('[data-act=del]'); pg.wait_for_timeout(1500)     # automatic saving

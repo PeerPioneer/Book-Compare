@@ -14,6 +14,8 @@ It uses made-up scans created inside the browser's private storage, so none of y
 
 Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the app opened from a file path instead of the local server.
 
+`gridchecks.py` holds the checks of the grid editing (column width, moving copies, deleting a range with Shift); it is run by `test_workspace.py` and `test_helper.py`, not on its own.
+
 `test_helper.py` checks the Book Compare helper (`launcher/serve.ps1`) with real folders on disk, in Chromium and in Firefox: the helper's safety rules (other web sites and other host names are refused, scan folders are read-only, only `book-compare-project.json` can be written), choosing folders, saving and reopening a project, and a simulated restart of the browser (no permission question, because the helper holds the folder access). It needs PowerShell (on Windows the built-in one; elsewhere `pwsh`):
 
     pip install playwright && playwright install chromium firefox

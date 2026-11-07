@@ -46,6 +46,8 @@
     var n = e && e.name, m = e && e.message ? e.message : String(e);
     if (n === 'NotAllowedError' || n === 'SecurityError') return 'The browser did not allow access to that folder or file.';
     if (n === 'NotFoundError') return 'A file or folder was not found. It may have been moved or renamed.';
+    if (e && e.busy) return 'Another program is using this file right now.';
+    if (n === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(m)) return 'The connection to the Book Compare helper was interrupted.';
     return m;
   }
   function refusal(msg) { var e = new Error(msg); e.name = 'Refused'; return e; }
@@ -114,11 +116,11 @@
   }
   function helperError(status, j) {
     var code = j && j.error, e = new Error((j && j.message) || 'The Book Compare helper refused the request.');
-    e.code = code;
+    e.code = code; e.busy = (code === 'busy');
     e.name = status === 404 ? 'NotFoundError' : status === 403 ? 'NotAllowedError' : 'Error';
     return e;
   }
-  function helperLost() { var e = new Error('The Book Compare helper is not running. Start it with “Start Book Compare”.'); e.name = 'Lost'; return e; }
+  function helperLost() { var e = new Error('The Book Compare helper is not running. Start it with “Start Book Compare”.'); e.name = 'Lost'; e.net = true; return e; }
   async function hrequest(method, url, body) {
     var resp;
     try { resp = await fetch(url, { method: method, headers: { 'X-BookCompare': '1' }, body: body, cache: 'no-store' }); }
@@ -195,11 +197,24 @@
   HDir.prototype.queryPermission = async function () { try { await this._stat(''); return 'granted'; } catch (e) { return 'denied'; } };
   HDir.prototype.requestPermission = async function () { await this._stat(''); return 'granted'; };
   function HFile(dir, name) { this.kind = 'file'; this.isHelper = true; this.dir = dir; this.name = name; this._info = null; }
+  // A picture can fail for a moment: another program (Dropbox, a virus scanner) has the file open, or the connection breaks while it is sent.
+  // That is tried again twice, a little later, before it is reported.
   HFile.prototype.getFile = async function () {
-    var resp = await hcall(this.dir.ref, 'GET', '/api/file', joinPath(this.dir.rel, this.name));
-    var blob = await resp.blob();
-    var m = parseInt(resp.headers.get('X-Mtime-Ms'), 10) || (this._info && this._info.mtime) || Date.now();
-    return new File([blob], this.name, { type: blob.type, lastModified: m });
+    var waits = [0, 450, 1300], last = null;
+    for (var k = 0; k < waits.length; k++) {
+      if (waits[k]) await new Promise(function (r) { setTimeout(r, waits[k]); });
+      try {
+        var resp = await hcall(this.dir.ref, 'GET', '/api/file', joinPath(this.dir.rel, this.name));
+        var blob = await resp.blob();                                    // rejects with a TypeError when the connection broke in the middle
+        var m = parseInt(resp.headers.get('X-Mtime-Ms'), 10) || (this._info && this._info.mtime) || Date.now();
+        return new File([blob], this.name, { type: blob.type, lastModified: m });
+      } catch (e) {
+        if (e && e.name === 'TypeError') { var broken = new Error('The connection to the Book Compare helper was interrupted while the picture was being sent.'); broken.net = true; e = broken; }
+        last = e;
+        if (!(e && (e.net || e.busy))) throw e;
+      }
+    }
+    throw last;
   };
   HFile.prototype.createWritable = async function () {
     var self = this, parts = [];
@@ -233,6 +248,20 @@
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
   function copyById(id) { for (var i = 0; i < S.copies.length; i++) if (S.copies[i].id === id) return S.copies[i]; return null; }
+  // Column widths: every copy has its own width (c.w, in pixels; empty = standard). Drag the right edge of a heading to change it.
+  var MIN_W = 80, MAX_W = 700;
+  function limitW(w) { return Math.min(MAX_W, Math.max(MIN_W, Math.round(+w) || MIN_W)); }
+  function clampW(w) { w = Math.round(+w); return isFinite(w) && w > 0 ? limitW(w) : 0; }                    // from a project file: 0 = standard width
+  function cw(c) { return c.w || COL_W; }
+  function gridW() { var w = LBL_W + COL_W; S.copies.forEach(function (c) { w += cw(c); }); return w; }
+  function colLeft(ci) { var x = LBL_W; for (var i = 0; i < ci; i++) x += cw(S.copies[i]); return x; }
+  // A range of rows marked with Shift in ONE column (not saved with the project): from the row where Shift began to the active row S.sel.row.
+  var anchor = null;
+  function range() {
+    var s = S.sel;
+    if (!anchor || s.ci == null || anchor.ci !== s.ci || anchor.row === s.row || !S.copies[s.ci]) return null;
+    return { ci: s.ci, lo: Math.min(anchor.row, s.row), hi: Math.max(anchor.row, s.row) };
+  }
   function rowLabel(i) {
     if (S.labels[i] != null) return S.labels[i];
     var j = i - S.ns;
@@ -304,6 +333,7 @@
     S.copies = o.c.map(function (r) { var c = REG[r.id]; c.name = r.name; c.cells = r.cells; return c; });
     S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.sel = o.s; S.pair = o.p;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
+    anchor = null;
   }
   function commit() { hist.undo.push(snap()); if (hist.undo.length > 60) hist.undo.shift(); hist.redo = []; }
   function undo() { if (!hist.undo.length) return toast('Nothing to undo.'); hist.redo.push(snap()); restore(hist.undo.pop()); changed(); toast('Undone.'); }
@@ -534,12 +564,14 @@
   }
 
   /* ---------------------------------------------------------------- thumbnails (small copies made in the browser; the scans are not changed) */
-  var thumbMem = new Map(), thumbQueue = [], thumbActive = 0, THUMB_W = 260;
+  var thumbMem = new Map(), thumbQueue = [], thumbActive = 0, THUMB_W = 260, thumbFail = {};
   function thumbPromise(copy, key) {
     var mk = copy.id + '|' + key;
     if (thumbMem.has(mk)) return thumbMem.get(mk);
-    var p = new Promise(function (resolve) { thumbQueue.push({ copy: copy, key: key, resolve: resolve }); pumpThumbs(); });
+    var p = new Promise(function (resolve) { thumbQueue.push({ copy: copy, key: key, resolve: resolve, mk: mk }); pumpThumbs(); });
     thumbMem.set(mk, p);
+    // a picture that could not be loaded is not remembered for long: the next look (or "Reload") tries again
+    p.then(function (r) { if (r && r.err) { thumbFail[mk] = true; setTimeout(function () { if (thumbMem.get(mk) === p) { thumbMem.delete(mk); delete thumbFail[mk]; } }, 4000); } else delete thumbFail[mk]; });
     if (thumbMem.size > 700) { var first = thumbMem.keys().next().value; var old = thumbMem.get(first); thumbMem.delete(first); old.then(function (r) { if (r && r.url) URL.revokeObjectURL(r.url); }); }
     return p;
   }
@@ -547,7 +579,10 @@
     while (thumbActive < 3 && thumbQueue.length) {
       var job = thumbQueue.pop();                      // newest request first: what you look at now loads first
       thumbActive++;
-      makeThumb(job.copy, job.key).then(job.resolve, function (e) { job.resolve({ err: e && e.name === 'Lost' ? 'lost' : 'missing', msg: niceError(e) }); }).then(function () { thumbActive--; pumpThumbs(); });
+      makeThumb(job.copy, job.key).then(job.resolve, function (e) {
+        if (e && (e.busy || (e.net && e.name !== 'Lost')) && !job.again) { job.again = true; setTimeout(function () { thumbQueue.push(job); pumpThumbs(); }, 1500); return; }      // once more, a moment later
+        job.resolve({ err: e && e.name === 'Lost' ? 'lost' : 'missing', msg: niceError(e) });
+      }).then(function () { thumbActive--; pumpThumbs(); });
     }
   }
   // A small picture is kept in the browser for every page you have looked at. It is shown even while the browser has the
@@ -577,6 +612,14 @@
   }
 
   /* ---------------------------------------------------------------- saving and opening projects */
+  // "Reload": every picture of the selected row that failed is tried again (the ones that are shown stay as they are)
+  function reloadThumb(ci) {
+    S.copies.forEach(function (c) {
+      var key = c.cells[S.sel.row], mk = key ? c.id + '|' + key : null;
+      if (mk && thumbFail[mk]) { thumbMem.delete(mk); delete thumbFail[mk]; }
+    });
+    renderPreview();
+  }
   function serialize() {
     var used = {};
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
@@ -587,7 +630,7 @@
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
       }),
-      copies: S.copies.map(function (c) { return { id: c.id, name: c.name, folder: c.folder, locs: c.locs, keys: c.keys, cells: c.cells }; })
+      copies: S.copies.map(function (c) { var o = { id: c.id, name: c.name, folder: c.folder, locs: c.locs, keys: c.keys, cells: c.cells }; if (c.w) o.w = c.w; return o; })
     };
   }
   function touch() { dirty = true; if (proj.handle) { proj.state = 'dirty'; clearTimeout(proj.timer); proj.timer = setTimeout(saveNow, 700); } renderSave(); }
@@ -671,7 +714,7 @@
   }
   async function adopt(json, handle) {
     if (!json || json.format !== 'book-compare-project' || !Array.isArray(json.copies)) { toast('This is not a Book Compare project file.'); return false; }
-    S = blank(); REG = {};
+    S = blank(); REG = {}; anchor = null;
     S.projectId = json.projectId || uid();
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
     S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1);
@@ -680,7 +723,7 @@
     (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
     var maxId = 0, legacy = [];
     for (var i = 0; i < json.copies.length; i++) {
-      var r = json.copies[i], c = { id: r.id, name: r.name, folder: r.folder, keys: r.keys || [], cells: r.cells || [], locs: (r.locs || []).map(function (l) { return { root: l.root, path: l.path || '' }; }) };
+      var r = json.copies[i], c = { id: r.id, name: r.name, folder: r.folder, w: clampW(r.w) || 0, keys: r.keys || [], cells: r.cells || [], locs: (r.locs || []).map(function (l) { return { root: l.root, path: l.path || '' }; }) };
       REG[c.id] = c; S.copies.push(c); if (c.id > maxId) maxId = c.id;
       if (!c.locs.length) legacy.push(c);
     }
@@ -802,14 +845,18 @@
   /* ---------------------------------------------------------------- rendering */
   function renderToolbar() {
     var s = selected(), tb = $('#ws-toolbar'), n = tb.querySelector('#gapN') ? tb.querySelector('#gapN').value : '1';
-    var where = s ? '<b>' + esc(s.c.name) + '</b> · ' + esc(rowLabel(s.row)) : 'Select a cell';
+    var rg = range(), nrg = 0;
+    if (rg) for (var q = rg.lo; q <= rg.hi; q++) if (s.c.cells[q]) nrg++;
+    var where = s ? '<b>' + esc(s.c.name) + '</b> · ' + (rg ? esc(rowLabel(rg.lo)) + ' to ' + esc(rowLabel(rg.hi)) + ' (' + (rg.hi - rg.lo + 1) + ' rows)' : esc(rowLabel(s.row))) : 'Select a cell';
     tb.innerHTML = '<div class="sel">' + where + '</div>' +
       '<button class="ws-tb" data-act="addfiles"' + (s ? '' : ' disabled') + ' title="Add pictures to this copy: ones you deleted, or pages that are stored in another folder">Add files to this copy …</button>' +
+      '<button class="ws-tb" data-act="mvl"' + (s && s.ci > 0 ? '' : ' disabled') + ' title="Moves the whole column of this copy one place to the left (you can also drag the heading of a column)">&#9664; Move copy</button>' +
+      '<button class="ws-tb" data-act="mvr"' + (s && s.ci < S.copies.length - 1 ? '' : ' disabled') + ' title="Moves the whole column of this copy one place to the right">Move copy &#9654;</button>' +
       '<span class="ws-vsep"></span>' +
       '<span class="ws-numwrap">Pages <input type="number" id="gapN" min="1" max="999" value="' + esc(n) + '" aria-label="Number of pages"></span>' +
       '<button class="ws-tb" data-act="gap"' + (s ? '' : ' disabled') + ' title="Pushes this cell and everything below it down">Insert gap here</button>' +
       '<button class="ws-tb" data-act="closegap"' + (s && !s.key ? '' : ' disabled') + ' title="Pulls everything below up again">Close gap</button>' +
-      '<button class="ws-tb" data-act="del"' + (s && s.key ? '' : ' disabled') + ' title="Removes this file from the workspace (for covers, flyleaves, duplicates). The scan file on your disk is not touched. Undo brings it back.">Delete file</button>' +
+      '<button class="ws-tb" data-act="del"' + ((rg ? nrg : s && s.key) ? '' : ' disabled') + ' title="' + (rg ? 'Removes all the marked rows of this column from the workspace; the pages below move up.' : 'Removes this file from the workspace (for covers, flyleaves, duplicates). Hold Shift and click another cell (or press Shift + arrow) to mark several in one go.') + ' The scan files on your disk are not touched. Undo brings them back.">' + (rg ? 'Delete ' + nrg + ' file' + (nrg === 1 ? '' : 's') : 'Delete file') + '</button>' +
       '<span class="ws-vsep"></span>' +
       '<button class="ws-tb" data-act="startnum"' + (s ? '' : ' disabled') + ' title="Rows above become front matter (Front 1, Front 2 …). This row becomes the first numbered page. You choose pagination or foliation.">Start numbering at this row</button>' +
       '<button class="ws-tb" data-act="skiprow"' + (s ? '' : ' disabled') + ' title="Keeps the row in the grid but leaves it out of the comparison">' + (s && S.skip[s.row] ? 'Compare this row again' : 'Don’t compare this row') + '</button>' +
@@ -841,13 +888,13 @@
         (lastProject ? '<button class="ws-tb" data-act="continue" style="padding:10px 18px;font-size:15px">Continue “' + esc(lastProject.name) + '”</button>' : '') + '</div></div>';
       return;
     }
-    var w = LBL_W + COL_W * (S.copies.length + 1);
+    var w = gridW();
     var h = '<div class="ws-vp" id="ws-vp" tabindex="0" aria-label="Page grid. Arrow keys move the selection."><div class="ws-inner" id="ws-inner" style="width:' + w + 'px;height:' + (HEAD_H + rows() * ROW_H) + 'px">';
     h += '<div class="ws-hrow" style="width:' + w + 'px"><div class="ws-corner">Page</div>';
     S.copies.forEach(function (c, i) {
       var cnt = 0; c.cells.forEach(function (x) { if (x) cnt++; });
       var k = c.id === S.pair[0] ? ' k1' : c.id === S.pair[1] ? ' k2' : '', lost = copyLost(c);
-      h += '<div class="ws-hcell' + k + '"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button></div>';
+      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
     });
     h += '<div class="ws-addcell"><button class="ws-addbtn" data-act="add"><span class="plus">+</span><small>Add new copy</small></button></div></div><div id="ws-rowshost"></div></div></div>';
     gb.innerHTML = h;
@@ -861,14 +908,14 @@
     var vp = $('#ws-vp'), host = $('#ws-rowshost'); if (!vp || !host) return;
     var N = rows(), top = vp.scrollTop, vh = vp.clientHeight;
     var a = Math.max(0, Math.floor((top - HEAD_H) / ROW_H) - OVERSCAN), b = Math.min(N - 1, Math.ceil((top + vh) / ROW_H) + OVERSCAN), h = '';
-    var lostC = S.copies.map(copyLost);
+    var lostC = S.copies.map(copyLost), rg = range();
     for (var i = a; i <= b; i++) {
       var n = 0, cells = '';
       S.copies.forEach(function (c, ci) {
-        var key = c.cells[i] || null, sel = (S.sel.ci === ci && S.sel.row === i) ? ' sel' : '';
+        var key = c.cells[i] || null, sel = (S.sel.ci === ci && S.sel.row === i) ? ' sel' : (rg && rg.ci === ci && i >= rg.lo && i <= rg.hi ? ' rng' : ''), wst = ' style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px"';
         var pm = c.id === S.pair[0] ? '<b class="pm m1">1</b>' : c.id === S.pair[1] ? '<b class="pm m2">2</b>' : '';
-        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"><i class="ico"></i><span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + pm + '</div>'; }
-        else cells += '<div class="ws-cell empty' + sel + '" data-c="' + ci + '" data-r="' + i + '"><span class="gap">no page</span></div>';
+        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '><i class="ico"></i><span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + pm + '</div>'; }
+        else cells += '<div class="ws-cell empty' + sel + '" data-c="' + ci + '" data-r="' + i + '"' + wst + '><span class="gap">no page</span></div>';
       });
       var sk = !!S.skip[i], small = sk ? 'not compared' : (i === S.ns && S.ns > 0 ? 'starts here' : n + ' of ' + S.copies.length + ' copies');
       h += '<div class="ws-row' + (S.sel.row === i ? ' selrow' : '') + (sk ? ' skipped' : '') + (i === S.ns && S.ns > 0 ? ' numstart' : '') + '" style="top:' + (HEAD_H + i * ROW_H) + 'px" data-r="' + i + '"><div class="ws-lbl" data-act="lbl" data-r="' + i + '"><b>' + esc(rowLabel(i)) + '</b><small>' + small + '</small>' + flagMark(i) + '</div>' + cells + '</div>';
@@ -896,7 +943,8 @@
         thumbPromise(c, key).then(function (r) {
           if (tok !== pvTok || !pg || !pg.isConnected) return;
           if (r && r.url) pg.innerHTML = '<img alt="" src="' + r.url + '">';
-          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? (HELPER ? 'The Book Compare helper is not running' : 'Not seen before: needs access to the scans') : esc((r && r.msg) || 'Not available')) + '</span>';
+          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? (HELPER ? 'The Book Compare helper is not running' : 'Not seen before: needs access to the scans') : esc((r && r.msg) || 'Not available')) + '</span>' +
+            '<button class="ws-rl" data-act="reload" data-ci="' + ci + '" title="Try to load this picture again">Reload</button>';
         });
       })(S.copies[ci], ci);
     }
@@ -920,7 +968,20 @@
     var a = document.activeElement;
     if (!a || a === document.body || !root.contains(a)) { var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); }
   }
-  function selectCell(ci, row) { S.sel = { ci: ci, row: row }; renderToolbar(); renderRows(); renderPreview(); renderBar(); keepFocus(); }
+  function selectCell(ci, row) { anchor = null; S.sel = { ci: ci, row: row }; renderToolbar(); renderRows(); renderPreview(); renderBar(); keepFocus(); }
+  // Shift + click / Shift + arrow: mark everything from where Shift began down (or up) to this row, in one column
+  function extendTo(ci, row) {
+    if (S.sel.ci == null || ci !== S.sel.ci) return selectCell(ci, row);
+    if (!anchor || anchor.ci !== ci) anchor = { ci: ci, row: S.sel.row };
+    S.sel = { ci: ci, row: row };
+    renderToolbar(); renderRows(); renderPreview(); renderBar(); keepFocus();
+  }
+  function ensureColVisible(ci) {
+    var vp = $('#ws-vp'), c = S.copies[ci]; if (!vp || !c) return;
+    var l = colLeft(ci), r = l + cw(c);
+    if (l < vp.scrollLeft + LBL_W) vp.scrollLeft = Math.max(0, l - LBL_W);
+    else if (r > vp.scrollLeft + vp.clientWidth) vp.scrollLeft = r - vp.clientWidth;
+  }
   function ensureVisible(row) {
     var vp = $('#ws-vp'); if (!vp) return;
     var t = HEAD_H + row * ROW_H;
@@ -964,7 +1025,10 @@
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
       '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>COMPARE</b>: they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The <b>Pages</b> tab or <b>Back</b> there brings you here again.</li>' +
       '<li>When you reopen a saved project the browser asks once for permission to read your scans again. Click <b>Allow access to scans</b>; you do not have to pick the folders again.</li>' +
-      '<li>Ctrl+Z undoes the last change. Arrow keys move the selection.</li>' +
+      '<li><b>Delete several files at once:</b> click the first cell, hold <b>Shift</b> and click the last one (or press Shift + the up/down arrow). The whole range is marked; <b>Delete</b> removes it and the pages below move up.</li>' +
+      '<li><b>Column width:</b> drag the right edge of a column heading; a double-click fits the longest file name. <b>More › Standard width for all columns</b> resets them.</li>' +
+      '<li><b>Moving a copy:</b> drag its heading to another place, or use <b>Move copy</b> in the toolbar. Undo works for this too.</li>' +
+      '<li>If a preview says it could not be loaded, press <b>Reload</b> under it. Ctrl+Z undoes the last change. Arrow keys move the selection.</li>' +
       '<li><b>More › Measure speed on this computer</b> aligns a few real pages one after the other and shows how long each step takes here. It only reads your scans.</li></ul>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
   }
@@ -1177,6 +1241,7 @@
       '<button data-m="open"><span class="tick"></span>Open saved project …</button>' +
       '<button data-m="reconnect"' + (lost ? '' : ' disabled') + '><span class="tick"></span>Choose scan folder again …</button><hr>' +
       '<button data-m="folio"><span class="tick"></span>' + (S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') + '</button>' +
+      '<button data-m="colw"><span class="tick"></span>Standard width for all columns</button>' +
       '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
       '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
       '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
@@ -1325,18 +1390,73 @@
 
   /* ---------------------------------------------------------------- events */
   function startRename(el, getVal, setVal) {
-    var inp = document.createElement('input'); inp.value = getVal(); el.replaceWith(inp); inp.focus(); inp.select();
+    var inp = document.createElement('input'); inp.value = getVal(); el.replaceWith(inp);
+    var hc = inp.closest && inp.closest('.ws-hcell'); if (hc) hc.draggable = false;                  // so the text can be selected with the mouse
+    inp.focus(); inp.select();
     var done = false;
     function fin(save) { if (done) return; done = true; var v = inp.value.trim(); if (save && v && v !== getVal()) { commit(); setVal(v); changed(); } else renderAll(); }
     inp.addEventListener('keydown', function (ev) { ev.stopPropagation(); if (ev.key === 'Enter') fin(true); if (ev.key === 'Escape') fin(false); });
     inp.addEventListener('blur', function () { fin(true); });
   }
   function deleteSelected() {
-    var s = selected();
+    var s = selected(), rg = range();
+    if (rg) {
+      var c = S.copies[rg.ci], n = 0;
+      for (var i = rg.lo; i <= rg.hi; i++) if (c.cells[i]) n++;
+      if (!n) return toast('There is no file in the marked rows.');
+      commit(); c.cells.splice(rg.lo, rg.hi - rg.lo + 1); trim(c);                    // the whole block goes, the pages below move up
+      S.sel = { ci: rg.ci, row: rg.lo }; anchor = null; changed();
+      toast('Deleted ' + n + ' file' + (n === 1 ? '' : 's') + ' from the workspace. The scan files on your disk are untouched.', true);
+      return;
+    }
     if (!s || !s.key) return;
     commit(); deleteCell(s.c, s.row); trim(s.c); changed();
     toast('Deleted from the workspace. The scan file on your disk is untouched.', true);
   }
+  // Moving a whole column (a copy) to another place; the files in it, its name and its width go with it.
+  function moveCopy(from, to) {
+    var n = S.copies.length;
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return false;
+    var selId = S.sel.ci != null && S.copies[S.sel.ci] ? S.copies[S.sel.ci].id : null;
+    commit(); var c = S.copies.splice(from, 1)[0]; S.copies.splice(to, 0, c);
+    if (selId != null) for (var i = 0; i < S.copies.length; i++) if (S.copies[i].id === selId) S.sel.ci = i;
+    anchor = null; changed(); ensureColVisible(to);
+    return true;
+  }
+  // Column width by dragging the right edge of the heading; a double-click fits the longest file name.
+  var rz = null;
+  function applyWidths() {
+    var inner = $('#ws-inner'), hr = root.querySelector('.ws-hrow'); if (!inner || !hr) return;
+    var w = gridW() + 'px'; inner.style.width = w; hr.style.width = w;
+    Array.prototype.forEach.call(hr.querySelectorAll('.ws-hcell'), function (h) { var c = S.copies[+h.dataset.c]; if (c) { h.style.width = cw(c) + 'px'; h.style.flexBasis = cw(c) + 'px'; } });
+    renderRows();
+  }
+  function fitWidth(ci) {
+    var c = S.copies[ci]; if (!c) return;
+    var ctx = document.createElement('canvas').getContext('2d'), fam = (getComputedStyle(root).getPropertyValue('--ws-mono') || '').trim() || 'Consolas, monospace', best = 0;
+    ctx.font = '12.5px ' + fam;
+    c.cells.forEach(function (k) { if (k) best = Math.max(best, ctx.measureText(baseName(k)).width); });
+    c.w = clampW(best + 74) || 0; applyWidths(); touch();
+  }
+  function onPointerDown(e) {
+    var h = e.target.closest && e.target.closest('.ws-rz'); if (!h || e.button) return;
+    var c = S.copies[+h.dataset.c]; if (!c) return;
+    e.preventDefault(); e.stopPropagation();
+    rz = { ci: +h.dataset.c, x: e.clientX, w: cw(c), moved: false };
+    try { h.setPointerCapture(e.pointerId); } catch (_) {}
+    root.classList.add('rzing');
+  }
+  function onPointerMove(e) {
+    if (!rz) return;
+    var c = S.copies[rz.ci]; if (!c) return;
+    rz.moved = true; c.w = limitW(rz.w + e.clientX - rz.x); applyWidths();
+  }
+  function onPointerUp() {
+    if (!rz) return;
+    var was = rz; rz = null; root.classList.remove('rzing');
+    if (was.moved) touch();
+  }
+  function resetWidths() { S.copies.forEach(function (c) { c.w = 0; }); applyWidths(); touch(); toast('All columns have the standard width again.'); }
   function onClick(e) {
     var t = e.target, el;
     if (t.closest('[data-close]')) return closeModal();
@@ -1348,13 +1468,14 @@
       else if (m === 'reconnect') reconnectScans();
       else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
       else if (m === 'help') helpDialog();
+      else if (m === 'colw') resetWidths();
       else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
       else if (m === 'new') newProject();
       else if (m === 'quit') quitHelper();
       return;
     }
     var cell = t.closest('.ws-cell');
-    if (cell && !t.closest('[data-act]')) { selectCell(+cell.dataset.c, +cell.dataset.r); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); return; }
+    if (cell && !t.closest('[data-act]')) { if (e.shiftKey) extendTo(+cell.dataset.c, +cell.dataset.r); else selectCell(+cell.dataset.c, +cell.dataset.r); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); return; }
     var a = t.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, s = selected();
     switch (act) {
@@ -1374,6 +1495,9 @@
       case 'swap': S.pair = [S.pair[1], S.pair[0]]; touch(); renderAll(); return;
       case 'pick': var cp = S.copies[+a.dataset.ci], slot = +a.dataset.slot; if (cp) { var o = 1 - slot; if (S.pair[o] === cp.id) S.pair[o] = S.pair[slot]; S.pair[slot] = cp.id; touch(); renderAll(); } return;
       case 'selcell': selectCell(+a.dataset.ci, S.sel.row); return;
+      case 'reload': reloadThumb(+a.dataset.ci); return;
+      case 'mvl': if (s && s.ci > 0) moveCopy(s.ci, s.ci - 1); return;
+      case 'mvr': if (s && s.ci < S.copies.length - 1) moveCopy(s.ci, s.ci + 1); return;
       case 'startnum': if (s) numberingDialog(s); return;
       case 'skiprow': if (s) { commit(); if (S.skip[s.row]) delete S.skip[s.row]; else S.skip[s.row] = true; changed(); toast(S.skip[s.row] ? 'This row will not be compared.' : 'This row will be compared again.', true); } return;
       case 'gap': if (s) { var n = Math.max(1, parseInt($('#gapN').value, 10) || 1); commit(); insertGap(s.c, s.row, n); changed(); toast('Inserted ' + n + ' empty page' + (n > 1 ? 's' : '') + '.', true); } return;
@@ -1385,10 +1509,11 @@
         changed(); toast('Removed ' + nm + ' from the project. Your scan files were not touched.', true); return;
       case 'rename': var ci2 = +a.dataset.c, cc = S.copies[ci2]; startRename(a, function () { return cc.name; }, function (v) {
         if (S.copies.some(function (x) { return x !== cc && x.name.toLowerCase() === v.toLowerCase(); })) { toast('A copy with this name already exists.'); return; } cc.name = v; }); return;
-      case 'lbl': var r = +a.dataset.r; if (S.sel.row === r) return; S.sel.row = r; if (S.sel.ci == null && S.copies.length) S.sel.ci = 0; renderToolbar(); renderRows(); renderPreview(); renderBar(); return;
+      case 'lbl': var r = +a.dataset.r; if (S.sel.row === r) return; anchor = null; S.sel.row = r; if (S.sel.ci == null && S.copies.length) S.sel.ci = 0; renderToolbar(); renderRows(); renderPreview(); renderBar(); return;
     }
   }
   function onDblClick(e) {
+    var z = e.target.closest && e.target.closest('.ws-rz'); if (z) { fitWidth(+z.dataset.c); return; }
     var l0 = e.target.closest('.ws-lbl'); if (!l0) return;
     var r = +l0.dataset.r, l = root.querySelector('.ws-lbl[data-r="' + r + '"]'), b = l && l.querySelector('b');
     if (!b) return;
@@ -1402,27 +1527,48 @@
     if (!$('#ws-vp') || e.target.tagName === 'INPUT') return;
     var s = S.sel; if (s.ci == null) return;
     var N = rows(), nc = S.copies.length;
-    if (e.key === 'ArrowDown') s.row = Math.min(N - 1, s.row + 1);
-    else if (e.key === 'ArrowUp') s.row = Math.max(0, s.row - 1);
-    else if (e.key === 'ArrowRight') s.ci = Math.min(nc - 1, s.ci + 1);
-    else if (e.key === 'ArrowLeft') s.ci = Math.max(0, s.ci - 1);
+    if (e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {         // Shift + up/down: mark a range in this column
+      if (!anchor || anchor.ci !== s.ci) anchor = { ci: s.ci, row: s.row };
+      s.row = e.key === 'ArrowDown' ? Math.min(N - 1, s.row + 1) : Math.max(0, s.row - 1);
+      e.preventDefault(); renderToolbar(); renderRows(); renderPreview(); renderBar(); ensureVisible(s.row); return;
+    }
+    if (e.key === 'ArrowDown') { s.row = Math.min(N - 1, s.row + 1); anchor = null; }
+    else if (e.key === 'ArrowUp') { s.row = Math.max(0, s.row - 1); anchor = null; }
+    else if (e.key === 'ArrowRight') { s.ci = Math.min(nc - 1, s.ci + 1); anchor = null; }
+    else if (e.key === 'ArrowLeft') { s.ci = Math.max(0, s.ci - 1); anchor = null; }
     else if (e.key === 'Delete') { deleteSelected(); return; }
     else if (e.key === '1' || e.key === '2') { var cp = S.copies[s.ci], slot = +e.key - 1, o = 1 - slot; if (cp) { if (S.pair[o] === cp.id) S.pair[o] = S.pair[slot]; S.pair[slot] = cp.id; touch(); renderAll(); } e.preventDefault(); return; }
     else return;
-    e.preventDefault(); renderToolbar(); renderRows(); renderPreview(); renderBar(); ensureVisible(s.row);
+    e.preventDefault(); renderToolbar(); renderRows(); renderPreview(); renderBar(); ensureVisible(s.row); ensureColVisible(s.ci);
   }
-  var drag = null;
+  var drag = null, hdrag = null;
   function onDragStart(e) {
+    if (rz) { e.preventDefault(); return; }                          // the edge of a heading is being dragged, not the heading
+    var hc = e.target.closest && e.target.closest('.ws-hcell');
+    if (hc) { hdrag = { ci: +hc.dataset.c }; e.dataTransfer.setData('text/plain', 'column'); e.dataTransfer.effectAllowed = 'move'; return; }
     var c = e.target.closest && e.target.closest('.ws-cell.filled');
     if (c) { drag = { ci: +c.dataset.c, row: +c.dataset.r }; e.dataTransfer.setData('text/plain', 'x'); e.dataTransfer.effectAllowed = 'move'; }
   }
-  function clearDrop() { Array.prototype.forEach.call(root.querySelectorAll('.ws-cell.dropok'), function (x) { x.classList.remove('dropok'); }); }
+  function clearDrop() { Array.prototype.forEach.call(root.querySelectorAll('.ws-cell.dropok, .ws-hcell.dl, .ws-hcell.dr, .ws-addcell.dl'), function (x) { x.classList.remove('dropok', 'dl', 'dr'); }); }
+  // where a dragged heading would land: before or after the heading under the pointer (or at the end, over the "+" cell)
+  function headTarget(e) {
+    var h = e.target.closest && e.target.closest('.ws-hcell, .ws-addcell'); if (!h) return null;
+    if (h.classList.contains('ws-addcell')) return { el: h, idx: S.copies.length, cls: 'dl' };
+    var r = h.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+    return { el: h, idx: +h.dataset.c + (after ? 1 : 0), cls: after ? 'dr' : 'dl' };
+  }
   function onDragOver(e) {
+    if (hdrag) { clearDrop(); var t = headTarget(e); if (t) { e.preventDefault(); t.el.classList.add(t.cls); } return; }
     var c = e.target.closest && e.target.closest('.ws-cell'); clearDrop();
     if (!c || !drag) return;
     if (+c.dataset.c === drag.ci) { e.preventDefault(); c.classList.add('dropok'); }
   }
   function onDrop(e) {
+    if (hdrag) {
+      var t = headTarget(e), from = hdrag.ci; clearDrop(); hdrag = null;
+      if (t) { e.preventDefault(); moveCopy(from, t.idx > from ? t.idx - 1 : t.idx); }
+      return;
+    }
     var c = e.target.closest && e.target.closest('.ws-cell'); clearDrop();
     if (!c || !drag) return;
     e.preventDefault();
@@ -1437,7 +1583,7 @@
   }
   async function newProject() {
     if (S.copies.length && dirty && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
-    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); proj.handle = null; proj.state = 'none'; proj.name = ''; dirty = false;
+    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.handle = null; proj.state = 'none'; proj.name = ''; dirty = false;
     renderAll();
   }
 
@@ -1461,7 +1607,11 @@
     root.addEventListener('dragstart', onDragStart);
     root.addEventListener('dragover', onDragOver);
     root.addEventListener('drop', onDrop);
-    root.addEventListener('dragend', function () { drag = null; clearDrop(); });
+    root.addEventListener('dragend', function () { drag = null; hdrag = null; clearDrop(); });
+    root.addEventListener('pointerdown', onPointerDown);
+    root.addEventListener('pointermove', onPointerMove);
+    root.addEventListener('pointerup', onPointerUp);
+    root.addEventListener('pointercancel', onPointerUp);
     $('#ws-jsoninput').onchange = function () {
       var f = this.files && this.files[0]; if (!f) return;
       f.text().then(function (t) { adopt(JSON.parse(t), null); }).catch(function () { toast('That file could not be read as a project.'); });

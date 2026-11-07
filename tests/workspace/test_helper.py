@@ -11,7 +11,7 @@ Needs PowerShell: pwsh (Linux/Mac) or powershell (Windows), or set PWSH. The Win
 (the helper hands out folder paths from a list instead, see -TestPickFile).
 Run:  python3 tests/workspace/test_helper.py
 """
-import hashlib, json, os, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
+import hashlib, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -110,6 +110,23 @@ def api_tests():
     # a picture is delivered unchanged
     st, body, hd = call('GET', '/api/file' + q(sc, 'Gesamtes Buch/scan_001.jpg'))
     assert st == 200 and body == open(os.path.join(BOOKS, 'Copy-A', 'Gesamtes Buch', 'scan_001.jpg'), 'rb').read() and hd.get('X-Mtime-Ms')
+    # a picture that another program holds open (Dropbox, a virus scanner ...): a clear answer "busy" instead of a broken connection
+    held = os.path.join(BOOKS, 'Copy-A', 'Gesamtes Buch', 'scan_002.jpg')
+    if os.name == 'nt':
+        import ctypes; k32 = ctypes.windll.kernel32; k32.CreateFileW.restype = ctypes.c_void_p
+        hold = k32.CreateFileW(held, 0x80000000, 0, None, 3, 0x80, None)                  # open for reading, sharing with nobody
+        release = lambda: k32.CloseHandle(ctypes.c_void_p(hold))
+    else:
+        import fcntl; fh = open(held, 'rb'); fcntl.flock(fh, fcntl.LOCK_EX)
+        release = lambda: fh.close()
+    try:
+        st, body, hd = call('GET', '/api/file' + q(sc, 'Gesamtes Buch/scan_002.jpg'))
+        if st == 200 and os.name != 'nt': print('  (this system does not lock files: the "busy" check is skipped)')
+        else:
+            assert st == 423 and json.loads(body)['error'] == 'busy', (st, body[:200])
+            assert call('GET', '/api/ping')[0] == 200, 'the helper must keep running'
+    finally: release()
+    st, body, hd = call('GET', '/api/file' + q(sc, 'Gesamtes Buch/scan_002.jpg')); assert st == 200 and len(body) > 1000, 'readable again when the other program lets go'
     # refused: not a picture, leaving the folder, other folders, unknown folder, writing into a scan folder
     for p in ('notes.txt', '../Copy-C/JPG-1/x_1.jpg', 'Gesamtes Buch/../../Copy-C/JPG-1/x_1.jpg', '..%2fCopy-C', 'Gesamtes Buch\\scan_001.jpg', 'scan_001.jpg:stream', '/etc/passwd', 'C:/Windows/win.ini'):
         st, _, _ = call('GET', '/api/file?root=%s&path=%s' % (sc['id'], p if '%' in p else urllib.request.quote(p)))
@@ -201,6 +218,33 @@ def scenario(p, kind):
     assert pg.locator('#ws .ws-hname').count() == 3 and pg.inner_text('#ws .ws-hname >> nth=0') == 'A-Renamed'
     assert pg.evaluate("document.getElementById('ws-banner').hidden"), 'no question, no banner: ' + pg.inner_text('#ws-banner')
     assert pg.locator('#ws .ws-hmeta.lost').count() == 0 and pg.locator('#ws-thumbs img').count() >= 2
+    # a picture that fails for a moment is loaded again by itself; one that keeps failing says why and offers "Reload"
+    hits = {'n': 0, 'mode': 'once'}
+    def flaky(route):
+        hits['n'] += 1
+        if hits['mode'] == 'once' and hits['n'] == 1: return route.abort()
+        if hits['mode'] == 'busy': return route.fulfill(status=423, content_type='application/json', body='{"error":"busy","message":"Another program is using this file right now."}')
+        if hits['mode'] == 'down': return route.abort()
+        route.continue_()
+    pg.route(re.compile(r'/api/file\?'), flaky)
+    pg.locator('#ws .ws-lbl[data-r="6"]').first.click()
+    for _ in range(30):
+        pg.wait_for_timeout(300)
+        if pg.locator('#ws-thumbs img').count() >= 2: break
+    assert pg.locator('#ws-thumbs img').count() >= 2 and hits['n'] >= 2, ('retry: ' + pg.inner_text('#ws-thumbs'), hits)
+    hits['mode'] = 'busy'; pg.locator('#ws .ws-lbl[data-r="5"]').first.click()                    # (row 7 stays unseen: the last check below needs a page that was never loaded)
+    for _ in range(40):
+        pg.wait_for_timeout(500)
+        if pg.locator('#ws-thumbs .ws-rl').count() >= 1: break
+    assert pg.locator('#ws-thumbs .ws-rl').count() >= 1 and 'using this file' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
+    hits['mode'] = 'pass'; pg.locator('#ws-thumbs .ws-rl').first.click()                         # the files are fine: Reload shows them
+    for _ in range(30):
+        pg.wait_for_timeout(300)
+        if pg.locator('#ws-thumbs img').count() >= 1 and pg.locator('#ws-thumbs .ws-rl').count() == 0: break
+    assert pg.locator('#ws-thumbs img').count() >= 1 and pg.locator('#ws-thumbs .ws-rl').count() == 0, pg.inner_text('#ws-thumbs')
+    pg.unroute(re.compile(r'/api/file\?'), flaky)
+    # width of the columns, moving a copy and deleting several files with Shift (everything is put back afterwards)
+    import gridchecks; gridchecks.run(pg, col, project_json)
     # compare a pair of pages: the two-image screen gets the scans
     pg.locator('#ws .ws-cell[data-c="0"][data-r="1"]').click(); pg.wait_for_timeout(300)
     pg.click('#ws-compare'); pg.wait_for_timeout(2500)
@@ -242,7 +286,7 @@ def scenario(p, kind):
         if pg.locator('#ws-thumbs img').count() >= 1: break
     assert pg.locator('#ws-thumbs img').count() >= 1, 'pages seen before stay visible: ' + pg.inner_text('#ws-thumbs') + ' | errors: ' + str(errs)
     pg.locator('#ws .ws-lbl[data-r="7"]').first.click()
-    for _ in range(60):                                                   # (Windows needs a few seconds to find out that nothing answers)
+    for _ in range(120):                                                  # (Windows needs a few seconds to find out that nothing answers, and each picture is tried three times)
         pg.wait_for_timeout(500)
         if 'helper is not running' in pg.inner_text('#ws-thumbs'): break
     assert 'helper is not running' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
