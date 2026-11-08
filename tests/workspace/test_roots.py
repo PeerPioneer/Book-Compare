@@ -32,7 +32,7 @@ with sync_playwright() as p:
     assert 'already used by Lib-A' in pg.inner_text('#ac-groups') and 'already used by Lib-B' in pg.inner_text('#ac-groups')
     pg.fill('#ac-name', 'Lib-C'); pg.check('#ac-groups input[data-g="2"]'); pg.check('#ac-groups input[data-g="3"]'); pg.click('#ac-ok'); pg.wait_for_timeout(500)
     assert picker_calls(pg) == 1, 'the folder was chosen once; the other copies came from the list'
-    assert pg.locator('#ws .ws-hname').count() == 3 and col(pg, 1)[0] == 'img_1.JPG' and col(pg, 2)[:2] == ['x_1.jpg', 'x_3.jpg'] and pg.locator('#ws-thumbs img').count() >= 2
+    assert pg.locator('#ws .ws-hname').count() == 3 and col(pg, 1)[0] == 'img_1.JPG' and col(pg, 2)[:2] == ['x_1.jpg', 'x_3.jpg'] and thumbs(pg, 2)
     # a name has to be typed: it is never filled in from the folder
     pg.click('#ws .ws-addbtn'); pg.wait_for_timeout(150); pg.select_option('#ac-known', index=1); pg.wait_for_timeout(500); assert pg.input_value('#ac-name') == ''; pg.click('[data-close]')
     # a folder inside the known root joins that root (no second permission needed)
@@ -45,7 +45,7 @@ with sync_playwright() as p:
     pg2 = reopen(ctx); lock(pg2, 'scans')
     pg2.click('#books_btn'); pg2.wait_for_timeout(600); pg2.click('#ws .ws-empty [data-act=continue]'); pg2.wait_for_timeout(1500)
     # previews of pages seen before appear at once, without any permission; COMPARE then asks for the one folder it needs
-    assert not hid(pg2, '#ws-banner') and pg2.locator('#ws-thumbs img').count() >= 2 and prompts(pg2) == [], prompts(pg2)
+    assert not hid(pg2, '#ws-banner') and thumbs(pg2, 2) and prompts(pg2) == [], prompts(pg2)
     assert pg2.evaluate("(window.__lastOpts||[]).length") == 0, 'no folder picker was needed'
     pg2.click('#ws-compare'); pg2.wait_for_timeout(1500)
     assert pg2.evaluate("document.getElementById('ws').hidden") and prompts(pg2) == ['scans'], prompts(pg2)
@@ -74,7 +74,7 @@ with sync_playwright() as p:
     assert pg3.locator('#ws-banner [data-act=allow]').count() == 1 and pg3.locator('#ws-banner [data-act=reconnect]').count() == 1, pg3.inner_html('#ws-banner')
     # ... one choice of the folder that holds both merges them into a single remembered folder
     pg3.evaluate("window.__noact = false; window.__picks.push(window.__h.scans)"); pg3.click('#ws-banner [data-act=reconnect]'); pg3.wait_for_timeout(1500)
-    assert hid(pg3, '#ws-banner') and pg3.locator('#ws-thumbs img').count() >= 2 and prompts(pg3) == []
+    assert hid(pg3, '#ws-banner') and thumbs(pg3, 2) and prompts(pg3) == []
     pg3.locator('#ws .ws-hname').first.click(); pg3.keyboard.type('Renamed-A'); pg3.keyboard.press('Enter'); pg3.wait_for_timeout(1500)
     d = read_project(pg3, 'legacy'); assert d['version'] == 2 and len(d['roots']) == 1 and d['roots'][0]['name'] == 'scans', d['roots']
     assert [c['locs'][0]['path'] for c in d['copies']] == ['Copy-A', 'Copy-B'] and d['copies'][0]['name'] == 'Renamed-A'
@@ -89,7 +89,7 @@ with sync_playwright() as p:
     clicks = 0
     while not hid(pg4, '#ws-banner') and clicks < 4:
         pg4.click('#ws-banner [data-act=allow]'); clicks += 1; pg4.wait_for_timeout(700)
-    assert hid(pg4, '#ws-banner') and pg4.locator('#ws-thumbs img').count() >= 2, clicks
+    assert hid(pg4, '#ws-banner') and thumbs(pg4, 2), clicks
     assert before == snapshot(pg4), 'scan folders must be unchanged'
     # the project folder may lie NEXT TO the copy folders (inside the folder that holds them) - that is where many people keep it
     pg.evaluate("(async()=>{ window.__h.P = await __h.scans.getDirectoryHandle('Project',{create:true}); })()")

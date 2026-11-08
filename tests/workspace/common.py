@@ -71,6 +71,12 @@ def add_copy(pg, key, name, start=None, ticks=()):
     if start: pg.fill('#ac-start', str(start))
     for i in ticks: pg.check('#ac-groups input[data-g="%d"]'%i)
     pg.click('#ac-ok'); pg.wait_for_timeout(600)
+def thumbs(pg, n=1, seconds=20):
+    # True as soon as at least n preview pictures are shown (making them takes a moment, longer on a slow computer)
+    for _ in range(seconds * 5):
+        if pg.locator('#ws-thumbs img').count() >= n: return True
+        pg.wait_for_timeout(200)
+    return False
 def col(pg, ci): return pg.evaluate("(ci)=>[...document.querySelectorAll('#ws .ws-cell[data-c=\"'+ci+'\"]')].map(e=>e.classList.contains('empty')?'-':e.querySelector('.fn').textContent)",ci)
 def snapshot(pg): return pg.evaluate("async()=>{const r=await navigator.storage.getDirectory(); return await snapshot(await r.getDirectoryHandle('scans'));}")
 def setup3(p):

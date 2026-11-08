@@ -21,7 +21,7 @@ with sync_playwright() as p:
     assert col(pg, 0)[:2] == ['scan_001.jpg', 'scan_002.jpg']
     assert col(pg, 1) == ['-', 'img_1.JPG', 'img_2.JPG', 'img_3.JPG', 'img_10.JPG', 'img_11.JPG', 'img_12.JPG', '-']
     assert col(pg, 2)[:6] == ['x_1.jpg', 'x_3.jpg', 'x_5.jpg', 'x_2.jpg', 'x_4.jpg', 'x_6.jpg']
-    assert pg.locator('#ws-thumbs img').count() >= 2, 'thumbnails should load'
+    assert thumbs(pg, 2), 'thumbnails should load'
     # editing and undo/redo (also by keyboard)
     cell(1, 4).click(); pg.fill('#gapN', '2'); pg.click('[data-act=gap]'); pg.wait_for_timeout(150)
     assert col(pg, 1)[4:6] == ['-', '-']
@@ -76,7 +76,7 @@ with sync_playwright() as p:
     assert a[8:14] == ['img_1.JPG', 'img_2.JPG', 'img_3.JPG', 'img_10.JPG', 'img_11.JPG', 'img_12.JPG'], a
     pg.wait_for_timeout(1300); dd = read_project(pg); assert len(dd['copies'][0]['locs']) == 2 and any(k.startswith('@1/') for k in dd['copies'][0]['cells'] if k), dd['copies'][0]['cells']
     assert len(dd['roots']) == 3, 'Copy-B is already a known folder: no new root'
-    cell(0, 9).click(); pg.wait_for_timeout(900); assert pg.locator('#ws-thumbs img').count() >= 1       # previews of the files from the second folder
+    cell(0, 9).click(); pg.wait_for_timeout(900); assert thumbs(pg, 1)       # previews of the files from the second folder
     # an empty cell is filled first ...
     cell(1, 0).click(); pg.click('[data-act=addfiles]'); pg.wait_for_timeout(500)
     assert pg.is_checked('input[name=af-where][value=row]') and pg.input_value('#af-row') == '1'
@@ -109,7 +109,7 @@ with sync_playwright() as p:
     assert pg2.locator('#ws .ws-hname').count() == 3
     assert not hid(pg2, '#ws-banner') and pg2.locator('#ws-banner [data-act=allow]').count() == 1 and pg2.locator('#ws-banner [data-act=reconnect]').count() <= 1
     assert pg2.locator('#ws .ws-hmeta.lost').count() == 3 and 'permission needed' in pg2.inner_text('#ws .ws-hmeta.lost')
-    assert pg2.locator('#ws-thumbs img').count() >= 2 and prompts(pg2) == [], 'pages seen before are shown from memory, no permission asked yet'
+    assert thumbs(pg2, 2) and prompts(pg2) == [], 'pages seen before are shown from memory, no permission asked yet'
     # COMPARE asks for the folders it needs (the test browser allows one folder per click, the worst case)
     pg2.locator('#ws .ws-cell[data-c="0"][data-r="2"]').click(); pg2.wait_for_timeout(300)
     pg2.click('#ws-compare'); pg2.wait_for_timeout(1000)
@@ -120,7 +120,7 @@ with sync_playwright() as p:
     clicks = 0
     while not hid(pg2, '#ws-banner') and clicks < 6:
         pg2.click('#ws-banner [data-act=allow]'); clicks += 1; pg2.wait_for_timeout(700)
-    assert hid(pg2, '#ws-banner') and pg2.locator('#ws .ws-hmeta.lost').count() == 0 and pg2.locator('#ws-thumbs img').count() >= 2
+    assert hid(pg2, '#ws-banner') and pg2.locator('#ws .ws-hmeta.lost').count() == 0 and thumbs(pg2, 2)
     assert sorted(prompts(pg2)) == ['Copy-A', 'Copy-B', 'Copy-C'], prompts(pg2)       # three separate folders = three permissions, never a folder picker
     assert pg2.evaluate("window.__picks.length") == 0
     d2 = read_project(pg2); assert d2['labels'] == {'2': 'Index'} and d2['copies'][0]['cells'][8] == '@1/img_1.JPG'
@@ -135,7 +135,7 @@ with sync_playwright() as p:
     pg2.evaluate("window.__picks.push(window.__h.proj)"); pg2.click('#ws-more'); pg2.click('[data-m=open]'); pg2.wait_for_timeout(1200)
     assert not hid(pg2, '#ws-banner') and pg2.locator('#ws-banner [data-act=reconnect]').count() == 1
     pg2.evaluate("window.__picks.push(window.__h.scans)"); pg2.click('#ws-banner [data-act=reconnect]'); pg2.wait_for_timeout(1500)
-    assert hid(pg2, '#ws-banner') and pg2.locator('#ws-thumbs img').count() >= 2
+    assert hid(pg2, '#ws-banner') and thumbs(pg2, 2)
     pg2.wait_for_timeout(1200)
     d3 = read_project(pg2); assert len(d3['roots']) == 1 and d3['roots'][0]['name'] == 'scans', d3['roots']       # all copies now share one folder
     # a wrong folder is not accepted
