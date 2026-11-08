@@ -105,7 +105,7 @@
     if (!/^https?:$/.test(location.protocol) || !window.fetch) return false;
     try {
       var ctl = window.AbortController ? new AbortController() : null, t = ctl ? setTimeout(function () { ctl.abort(); }, 2500) : 0;
-      var r = await fetch('/api/ping', { cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+      var r = await fetch('api/ping', { cache: 'no-store', signal: ctl ? ctl.signal : undefined });
       if (t) clearTimeout(t);
       if (!r.ok) return false;
       var j = await r.json();

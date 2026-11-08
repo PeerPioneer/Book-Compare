@@ -1,14 +1,18 @@
-# Tests the Book Compare helper on a real Windows machine (Windows PowerShell 5.1 and a Windows folder window),
-# which is the one thing that can not be tested on the machine where the code is written.
-name: Windows test of the helper
+# 1. "helper": tests the Book Compare helper on a real Windows machine (Windows PowerShell 5.1 and a Windows folder window),
+#    which is the one thing that can not be tested on the machine where the code is written.
+# 2. "quick": the workspace and library-folder tests (Chromium) and the test of the Photoshop script.
+# 3. "publish": ONLY when both passed (and only for main): puts the folder "app" on the website (GitHub Pages).
+#    A failed test therefore never reaches the website; the last good version stays online.
+#    The website can also be refreshed by hand: Actions > this workflow > Run workflow (the tests run first).
+name: Tests, then website
 on:
   push:
     branches: [main]
     paths:
       - 'launcher/**'
-      - 'app/js/**'
-      - 'app/index.html'
+      - 'app/**'
       - 'tests/**'
+      - 'tools/**'
       - '*.bat'
       - '.github/workflows/windows-test.yml'
   workflow_dispatch:
@@ -71,3 +75,48 @@ jobs:
         if: steps.checks.outcome == 'failure'
         shell: cmd
         run: exit /b 1
+
+  quick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the browser and helpers used by the tests
+        run: |
+          pip install playwright pillow
+          python -m playwright install --with-deps chromium
+          npm install --no-save acorn
+      - name: Workspace and library-folder tests (Chromium)
+        run: |
+          python -m http.server 8765 --directory app > /dev/null 2>&1 &
+          sleep 2
+          python tests/workspace/test_workspace.py
+          python tests/workspace/test_roots.py
+      - name: Photoshop script (with a stand-in for Photoshop)
+        run: node tests/photoshop/test_split_script.js
+
+  publish:
+    needs: [helper, quick]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: app
+      - id: deployment
+        uses: actions/deploy-pages@v4
