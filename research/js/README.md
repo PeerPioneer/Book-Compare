@@ -44,6 +44,16 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
 * Time for one additional copy on Claude's computer (2 cores, Node.js): about 0.3 s ink map + 3 s rough + 4-5 s tiles
   (+ about 0.6 s to decode the JPEG): 7 to 9 s. Not yet measured: in the browser, on the owner's PC.
 
+## Check against known differences (first case done)
+
+* `check_known_differences.js "<Example pages folder>"`: Melopoiae contents page, reference B-Br against D-Mu, A-Wn1, CH-Bu (group A)
+  and D-Mbs (group B), regions chosen from `Differences.pdf` ("Pair 02"). Result: 16 of 16 checks pass. The table matches in every copy
+  (0.3-3.2 % of the ink unmatched); poem lines 5, 9 and 13 match for the group A copies (0-3.4 %) and stay clearly different for D-Mbs
+  (85-99 %), exactly as Differences.pdf describes (group B sets them much further right).
+* Limits: only one page type so far. The thin white fracture lines of the Concert of Gods woodcut (pair 19) could not be located reliably
+  without exact positions; the Folio 19v music table needs the other copies. Thresholds were set after looking at the measured values.
+* `align_chain.js` holds the whole chain for one pair and is shared by the run and check scripts.
+
 ## How to run
 
     cd research/js
@@ -51,6 +61,7 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
     node test_rectmorph.js
     node run_printed_area.js scan1.jpg scan2.jpg ...      # prints box and times per scan
     node run_rough.js reference.jpg other.jpg 4 fast       # rough alignment, refinement at a quarter size
-    node run_full.js reference.jpg other.jpg out/name      # the whole chain, with a picture of the result
+    node run_full.js reference.jpg other.jpg out/name      # the whole chain, with a picture of the result (reference red, other copy blue, agreement dark)
+    node check_known_differences.js "<Example pages folder>"   # the known-differences check
 
 The scans themselves are never committed (they stay on the owner's computer).

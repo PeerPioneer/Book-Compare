@@ -138,6 +138,11 @@ The owner's list of differences (`Differences.odt` in "Example pages", and
 A handful of these become automatic checks: after alignment, the known difference must still
 be visible, and the alignment must stay within a few pixels where nothing differs.
 
+**Status (14 November 2026):** the first check exists (`research/js/check_known_differences.js`,
+Melopoiae table of contents, copies of both variant groups): 16 of 16 pass. The displaced poem lines
+of group B stay visible after alignment, the rest of the page matches. The woodcut fracture lines
+and the music table (Folio 19v) are still to do.
+
 This was planned for after version 1; it moves here because it is how the experiment is
 judged. Speed alone means nothing if the faster version no longer shows the variants. Later,
 the same checks protect against something quietly breaking whenever the code changes. The
