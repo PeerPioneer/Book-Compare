@@ -3,6 +3,9 @@ Do you work with books? Do you want to compare them? Boy, do I have good news fo
 Book compare is based on Image Compare but has a few added features and modifications that makes it more suitable for comparing entire books with each other.
 This is still very much a work in progress.
 
+## Try it in your browser
+**https://peerpioneer.github.io/Book-Compare/** — the current state of Book Compare, always up to date with this repository (the website is only renewed after all automatic tests have passed). Nothing is uploaded: your scans stay on your computer and are only ever read. In Edge or Chrome you can choose your scan folders and save a project folder as usual. Firefox cannot hand a folder to a web page, so there you pick the files of a folder instead and keep the project as a downloaded file. For full comfort in Firefox, and for automatic saving, use the download below.
+
 ## How to use it on your own computer (Windows)
 Download the ZIP, unzip the whole folder, double-click `Start Book Compare.bat`. A small helper starts quietly in the background (icon near the clock) and Book Compare opens in your default browser (Edge, Chrome or Firefox). The helper reads your scan folders itself, so the browser never asks for permission to each folder, and folders are remembered across restarts. Nothing is uploaded; scans are only ever read. Details in `START-HERE.txt`. Opening `app/index.html` directly still works (two-image screen; the workspace then uses the browser's own folder permissions, Edge/Chrome only).
 
