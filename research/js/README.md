@@ -16,11 +16,25 @@ the Python prototype differ by at most 1 px in 21 scans, by 4 px in 2 scans and 
 working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box plus about 0.6 s to decode the JPEG
 (slower than the Python prototype's 1 s, far inside the 10 s budget; the browser's own JPEG decoder is faster).
 
+## Step 2: rough alignment (done)
+
+* `rough_align.js`: scale/position search by template matching, then ECC refinement and two refinements that look only
+  at places where both copies agree; ported from `rough_align.py`. `run_rough.js ref.jpg other.jpg [q] [fast]` runs it.
+* The faithful port (q = 1) gives the same result as the Python prototype (pair f4r A-Wn / D-B: matrix
+  0.9129 0.0198 -16.10 / -0.0256 0.9154 112.21 against 0.9129 0.0198 -16.11 / -0.0256 0.9154 112.23; unmatched ink 22.0 % in both).
+* The refinement is the slow part (about 48 s at full size here). Run on pictures 4 times smaller (q = 4) it takes about 3 s
+  and the result is practically the same (22.9 % unmatched instead of 22.0 %); q = 2 takes 11 s (22.1 %).
+  On the pair f158v A-Wn / F-Pm the small version was even better than the full-size one (25.9 % against 47.6 %).
+* `fast` (scale search on one pre-shrunk picture) saves another second with the same matrix.
+* Note: in OpenCV.js the constants for ECC's stop criteria are `cv.TermCriteria_EPS` / `cv.TermCriteria_COUNT`
+  (the names used in Python and C++ do not exist there and silently give nothing).
+
 ## How to run
 
     cd research/js
     npm install
     node test_rectmorph.js
     node run_printed_area.js scan1.jpg scan2.jpg ...      # prints box and times per scan
+    node run_rough.js reference.jpg other.jpg 4 fast       # rough alignment, refinement at a quarter size
 
 The scans themselves are never committed (they stay on the owner's computer).

@@ -152,4 +152,4 @@ function printedBox(cv, r) {
   return box;
 }
 
-module.exports = { H0, redScaled, inkMap, printedBox };
+module.exports = { H0, redScaled, inkMap, printedBox, smoothBlur };
