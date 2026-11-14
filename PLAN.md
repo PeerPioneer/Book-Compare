@@ -1,6 +1,6 @@
 # Book Compare — the plan
 
-Last revised: 14 November 2026.
+Last revised: 14 November 2026 (second revision, same day).
 
 This file is the plan for Book Compare, written in plain language. It exists so that the
 plan lives next to the code instead of only in someone's memory: the owner of the project
@@ -40,9 +40,9 @@ The owner uses it on an ordinary Windows PC — deliberately, because the people
 use Book Compare are humanities scholars who will not own powerful machines either. Speed
 must therefore be **measured on ordinary computers, not assumed**.
 
-Getting started has to be easy enough for someone with no technical background. That is why
-Book Compare stays a web page started by a small local helper (`Start Book Compare.bat`),
-rather than an installed program, and why it must work in Firefox as well as Edge.
+Ease of access and use is crucial to Book Compare's success. Most users will not be very
+technical, so starting it, saving work and reopening it must work the way it does in any
+ordinary program: install it, double-click, and it is ready.
 
 ---
 
@@ -51,12 +51,17 @@ rather than an installed program, and why it must work in Firefox as well as Edg
 Version 1 is the point at which Book Compare is finished enough to be used for real
 research, published, and cited by other people. It contains:
 
-1. **The whole-book workspace** — the grid of copies and pages, with its project folder and
-   automatic saving.
+1. **The whole-book workspace** — the grid of copies and pages, which largely exists.
 2. **Automatic detection of the printed area** of each scan, with manual correction.
 3. **Tile-based alignment** — the fine, piecewise registration, usable throughout.
 4. **Difference view**, as it already works.
-5. **The website**, kept up to date automatically.
+5. **A proper desktop program** — an installer, a project saved in one file, double-click to
+   open (§4.8).
+6. **The website**, kept up to date automatically, as the place to try Book Compare without
+   installing anything and to download the program.
+
+**Not in version 1:** automatic page matching (§5.4). Copies usually lack only a few pages
+or none, so matching pages by hand is not much to ask of the user.
 
 Everything else waits. The reason for drawing the line here is that this list is already a
 complete, useful tool; without a line, the project has no point at which it can be released,
@@ -64,61 +69,173 @@ cited, or handed to anyone else.
 
 ## 4. The order of work, and why
 
-### 4.1 Unblock the website (small, and already overdue)
+### 4.1 Unblock the website — done (14 November 2026)
 
-The repository is still marked on GitHub as a copy of the original Image Compare project,
-and GitHub refuses to publish Pages from such a repository. The automatic tests already
-pass; only the publishing step fails. The fix is to leave the fork network in the
-repository's settings, then switch Pages on and re-run the failed job.
+Live at **https://peerpioneer.github.io/Book-Compare/**. The repository left the fork network
+of VGG's Image Compare (permanent; history kept), Pages was switched on, and the site is
+renewed automatically after every change, but only once all automatic tests pass.
 
-Leaving the fork network is permanent. It keeps the whole history. It costs the ability to
-send changes back to VGG — which will never happen, since the projects have diverged
-completely — and any issues and stars, of which there are none.
+### 4.2 Small jobs, now
 
-### 4.2 Try tile-based alignment in the browser, before building anything on top of it
+- Remove the "Slide" mode.
+- Add the "how to cite" file (`CITATION.cff`, which gives the repository a "Cite this
+  repository" button on GitHub), naming VGG's Image Compare as the basis.
+- Update the four outdated building blocks of the automatic tests (GitHub's Node.js 20
+  warning).
 
-**This is the largest risk in the project and therefore comes first after the website.**
+### 4.3 The alignment experiment — the most important open question
 
-Everything in version 1 rests on the tile-based alignment, and it does not exist in Book
-Compare yet. It exists only as a prototype in Python on the owner's PC, where it took about
-8 seconds per copy. The browser is a slower place for that kind of arithmetic, and it
-freezes the window while it works. Nobody yet knows whether it is fast enough, and the
-whole-book workflow is being designed on the assumption that it is.
+*In plain words:* the alignment method was worked out as a trial version (a "prototype")
+written in Python, a programming language that runs on Claude's computer in the cloud but
+not inside a web browser. The browser only understands another language, JavaScript. The
+experiment rewrites the trial version in the browser's language (programmers call this
+"porting") and measures whether it is fast enough and still as good.
 
-So: port **only** the tile alignment into the browser, for a single page pair, with no
-interface at all, and measure it on f.158v and f.4r.
+Why it comes first: everything in version 1 rests on the alignment, and nobody yet knows
+how fast it is outside Python.
 
-- If it is fast enough, build the workspace on top of it with confidence.
-- If it is too slow, there is a fallback that costs the user nothing: the local helper that
-  already starts the app could do the computation itself, outside the browser, at
-  Python-like speed. That is a real change to the shape of the program, and far cheaper to
-  decide now than after the workspace is built on the other assumption.
+The prototype has three steps that run one after the other. They are built **in this order**,
+and each is checked before the next is started:
 
-Afterwards, fold the tile timing into the built-in speed test, so that it can be measured
-again at any time and on other people's computers.
+1. **Find the printed area** on each scan. This cuts the work roughly in half for the steps
+   after it, and is useful on its own (it is in version 1 anyway).
+2. **Rough alignment** — put the two pages roughly on top of each other. In the prototype this
+   is the slowest step.
+3. **Fine (tile) alignment** — correct the remaining small distortions piece by piece.
 
-### 4.3 The speed test
+The rewrite uses the browser version of OpenCV, the image-processing library the Python
+prototype borrows about a dozen operations from. That keeps the rewrite close to the tested
+prototype and nearly as fast. It costs a download of roughly 10 MB, made once. Before relying
+on it: check that the browser version contains every operation the prototype uses.
 
-Already built (Compare tab). It measures, per copy: opening the scan (reading, decoding,
-getting at the pixels), finding the alignment, drawing the result; and extrapolates to a
-whole book.
+**The target:** a page pair that has not been aligned yet is ready in **under 10 seconds** on
+the owner's ordinary PC.
 
-Two things to keep in mind when reading its numbers:
+**Where it is measured:** first on Claude's computer, then in the browser on the owner's
+tablet (the worst case: an old machine, with scans on an external drive), then on the owner's
+usual PC (the real benchmark, because it stands in for the average user).
+
+**Test pages:** in the owner's Dropbox folder "Example pages" — f.158v (19 copies), f.4r
+(20 copies), the dedication page, the woodcuts — which Claude can reach from the owner's
+tablet.
+
+### 4.4 A check against known differences — alongside the experiment
+
+*In plain words:* the speed test answers "how fast is it?". This answers "is it still right?".
+
+The owner's list of differences (`Differences.odt` in "Example pages", and
+`Dissertation_Verlag.pdf`) says, for named pages and copies, exactly what differs and where.
+A handful of these become automatic checks: after alignment, the known difference must still
+be visible, and the alignment must stay within a few pixels where nothing differs.
+
+This was planned for after version 1; it moves here because it is how the experiment is
+judged. Speed alone means nothing if the faster version no longer shows the variants. Later,
+the same checks protect against something quietly breaking whenever the code changes. The
+code is written by an assistant across many sessions and the owner cannot read it, which
+makes this the strongest protection available.
+
+### 4.5 The speed test
+
+Already built (Compare tab → Pages view, menu More). It measures, per copy: opening the scan
+(reading, decoding, getting at the pixels), finding the alignment, drawing the result; and
+extrapolates to a whole book. To be run by the owner on his usual PC.
+
+When reading its numbers:
 
 - It measures the alignment Book Compare has **today**, not the tile method. The app says so
-  itself. Until 4.2 is done, its alignment figures are the optimistic case.
-- The "opening the scan" figures do **not** change when the alignment method changes. A
-  40-megapixel scan takes as long to open either way. That half of the numbers is permanent
-  knowledge.
+  itself. Once the experiment (§4.3) works, its timing is added to the speed test so that it
+  can be measured again at any time and on other people's computers.
+- The "opening the scan" figures do **not** change when the alignment method changes. That
+  half of the numbers is permanent knowledge. An external drive affects only this column.
 
-The reference measurement is the owner's usual PC, because it stands in for the average
-user. A run on a weaker machine, or with the scans on an external drive, is still useful as
-a lower bound — and the external drive shows up only in the "opening the scan" column.
+### 4.6 How the computing is organised — decided
 
-### 4.4 The whole-book workspace, with project files
+The prototype needs about 13 seconds per copy and page — a figure that **already includes**
+the saving from cutting each scan to its printed area (without it: about 29 seconds). For
+the *Liber selectarum cantionum* that means roughly **2 hours per copy**, and about 37 hours
+for all 19 copies against one reference. So the work is split up:
 
-Design already decided (see §6). Project saving to a single file (`.bookcompare`) is folded
-in here rather than built separately, while old folder projects keep opening.
+- **On demand:** a page pair that has not been aligned yet is aligned the moment the user
+  opens it (target: under 10 seconds), and the next pages are prepared in the background
+  while the user is still looking at the current one.
+- **Background alignment, one copy at a time:** the user may switch it on and choose which
+  copy to align. It runs while the user carries on working.
+- **A progress bar with the estimated time left** for every longer computation.
+- **Results are saved**, so nothing is ever computed twice.
+
+Ideas to make it faster on top of that, each to be tested, none promised:
+
+- *Do the rough alignment on a much smaller version of the page.* It only has to get within
+  a few pixels — the fine step corrects the rest at full detail. This is the slowest step, so
+  it is probably where the largest saving lies.
+- *Use several processor cores at once.* Most PCs have four to eight. Aligning several pages
+  at the same time multiplies the background speed accordingly (it does not shorten the wait
+  for a single pair).
+- *Prepare each scan only once* (printed area, ink preparation) and reuse it for every pair
+  it belongs to.
+- *Perhaps later, the graphics card.* Powerful but complicated; only if the above is not
+  enough.
+
+### 4.7 The reference copy — proposal, to be confirmed by the owner
+
+Every copy is aligned to one reference copy; any two copies can then be shown against each
+other by going via the reference. The reference is like a central station: every copy has a
+line to it, and every trip between two copies passes through it. It need not be the most
+important copy in a scholarly sense, only a reliable one.
+
+- **Choosing it.** Book Compare proposes a reference from what it can measure — fewest
+  missing pages, highest resolution, least skew, printed area found on most pages — and the
+  user confirms or picks another. The owner's own criteria for a good reference copy were:
+  complete, high resolution and little skew, freely accessible online, good condition, few
+  manual alterations, good print quality.
+- **Per page where needed.** Where the reference copy lacks a page, another copy stands in as
+  the reference for that page.
+- **A better copy added later.** Book Compare never switches the reference by itself. It may
+  point out that a newly added copy looks like a better reference, saying what switching would
+  cost ("about N hours of computing"). If the user switches, the old results stay in use until
+  the new ones are ready.
+- **Open:** pairs worked out via the reference may be slightly less exact than a pair aligned
+  directly. If the check against known differences (§4.4) shows that this matters, the pair on
+  screen can be aligned directly on demand.
+
+### 4.8 The desktop program — after the experiment
+
+Book Compare becomes an ordinary Windows program, built from the same web pages it consists
+of now. It brings its own browser engine — the same one Edge uses — so everything that exists
+keeps working. VS Code and Obsidian are built the same way.
+
+What the user gets:
+
+- an installer, a Start-menu entry, its own window;
+- **a project saved in one file**, with Save and Save As, like LibreOffice. Double-clicking
+  the file opens Book Compare with the project loaded. The file remembers where the scans are,
+  and Book Compare reads them from there itself — no permission clicks. If a scan folder has
+  moved, it asks once and relinks;
+- no `.bat` file, no black window, no helper running in the background;
+- the same behaviour on every computer, whatever browser the user has, so the question of
+  Firefox disappears;
+- heavy computing in the background without freezing the window, and access to faster
+  image-processing tools than a web page may use.
+
+This does **not** depend on the result of the experiment — it suits every outcome. It comes
+second only because the experiment is the smaller job and answers the most important
+question first. It replaces the helper and `Start Book Compare.bat`, and the single project
+file is built as part of it, while old folder projects keep opening.
+
+All file access in the app already sits in one place (`workspace.js`), behind one interface.
+The desktop program plugs in a third way of reading files behind that same interface: it is
+not a rewrite.
+
+Costs, honestly: the download is about 80–100 MB. Without a paid code-signing certificate,
+Windows shows "unknown publisher" on first install, and the user clicks "More info" →
+"Run anyway"; whether to buy a certificate (low hundreds of euros a year) is decided at
+release. A Mac version is possible from the same code later, if colleagues ask. The installer
+is built automatically on GitHub, so the owner never has to build anything himself.
+
+### 4.9 Finishing the whole-book workspace
+
+What is left of version 1 once alignment and the desktop program are in place. The design is
+already decided (see §6).
 
 ---
 
@@ -173,35 +290,34 @@ built:
 line of text identifying page, copies, group and note. Over a whole project: a table of
 page / spot / group / copies — which is the raw material of the difference lists.
 
-### 5.2 A test set built from differences already known
+### 5.2 Citation: a DOI on release
 
-The dissertation lists differences for named pages and copies. Turning half a dozen of them
-into automatic checks — on f.158v, copies X and Y, this known difference must still be
-visible; the alignment error must stay below N pixels — means every future change is verified
-without re-checking by eye.
+The "how to cite" file comes now (§4.2). On release, a DOI through Zenodo. In the humanities
+a DOI is what makes software citable at all — without one, other scholars have nothing to put
+in a footnote.
 
-This matters more than it sounds. The code is written by an assistant across many sessions
-and the owner cannot read it. A test set built from known answers is the strongest
-protection against something quietly breaking. The automatic tests on GitHub already provide
-the place to put it.
-
-### 5.3 Citation infrastructure
-
-The owner wants to take the citation duty towards VGG seriously, and the same machinery
-serves his own work:
-
-- a `CITATION.cff` file, so GitHub shows a "Cite this repository" button;
-- a short "How to cite Book Compare" section naming VGG's Image Compare as the basis;
-- on release, a DOI through Zenodo. In the humanities a DOI is what makes software citable
-  at all — without one, other scholars have nothing to put in a footnote.
-
-### 5.4 One other person installing it, once
+### 5.3 One other person installing it, once
 
 Book Compare is designed for a humanities user with no technical background, and so far only
 its owner has ever installed it. One afternoon with someone else — ideally a colleague
 without a coding background — catches what cannot be seen from the inside.
 
-### 5.5 Further out
+### 5.4 Automatic page matching — optional, and only if cheap
+
+Not in version 1 (§3). A tested prototype exists (`research/page_matching.py`: 193 of 216
+page correspondences found across four *Melopoiae* copies without using file names). The
+computing itself is cheap, since it compares small thumbnails, but building it into the app
+with a good way to check and correct its suggestions is a medium-sized job. If it is built,
+the user decides whether to use it.
+
+### 5.5 Splitting double-page scans inside Book Compare
+
+Many libraries scan two pages in one picture. For now the owner splits them with a Photoshop
+script (`tools/photoshop/Split-double-pages.jsx`), which is a stopgap for his own work and
+**not part of Book Compare**. Later Book Compare should do this itself. The grid was already
+designed for it: a cell can be a region of a file rather than a whole file.
+
+### 5.6 Further out
 
 - Other visualization modes, where they prove useful. The candidate is a mode with offset
   arrows, and it only makes sense once alignment is settled.
@@ -217,13 +333,14 @@ Empty cells for missing pages; a row preview across all copies; insertion and re
 ranges; undo; renamable rows (e.g. "Index", "Mons Parnassus Woodcut"); "Start numbering at
 this row", so that rows above become front matter; "Don't compare this row". Rows are
 positions, not tied to any copy, because the first copy may be incomplete or begin with
-cover and flyleaf scans. A project folder with automatic saving. Any copy may serve as copy
-1 or copy 2.
+cover and flyleaf scans. Any copy may serve as copy 1 or copy 2.
 
 **The copy-name field is left empty.** No pre-filling, ever.
 
 **No placing files by numbers in their file names.** File names are inconsistent across
 copies and scans often begin with a cover or flyleaf.
+
+**Pages are matched by hand in version 1** (§5.4).
 
 **Contrast and black-and-white are gone entirely** — both before alignment and as display
 settings. The alignment tests showed no benefit, and the results were considered clear.
@@ -235,9 +352,13 @@ annotation and flag colours are the palette listed in §5.1.
 
 **Alignment is computed once per pair and reused** for every display variant.
 
-**One reference copy, not every pair.** Each copy is aligned with one reference and the
-other pairs are derived; comparing every copy with every other would be an order of
-magnitude more work, as the speed test shows.
+**One reference copy, not every pair** (§4.7). Comparing every copy with every other would
+be an order of magnitude more work, as the speed test shows.
+
+**Speed target:** a page pair not yet aligned is ready in under 10 seconds on an ordinary PC.
+
+**Computing:** on demand for the pair on screen, plus optional background alignment of one
+chosen copy at a time, with a progress bar showing the time left, and saved results (§4.6).
 
 **The printed area.** An automatic proposal per scan, drawn as an outline that stays
 visible; manual correction by dragging edges and corners on either scan; a "back to
@@ -282,14 +403,13 @@ the answer turns out to be yes.
 material. Keep it until the tile method works, because it is the honest comparison point,
 then take it out of the interface.
 
-**Slide mode.** A presentation gimmick for this purpose; remove it with that clean-up.
+**Slide mode.** A presentation gimmick for this purpose; removed now (§4.2).
 **Toggle stays** — the blink between two states is how Aruspix's superimposition worked, and
 some differences show up that way which do not in a colour difference.
 
 **Hover and Overlay** are already out of the interface, with the code left dormant.
 
-**PDF import**, and **a true installed desktop program**. Deferred; Book Compare stays a
-browser-based tool.
+**PDF import.** Deferred.
 
 **Noise reduction beyond thickness-equalising**, and **comparing by segmented letters or
 words** instead of fixed windows. Both too complicated for now; not on the list.
@@ -315,8 +435,8 @@ alignment that the tile method supersedes, and `action.js` is the two-image resu
 the Compare tab takes over. **The separation from the original therefore happens by itself
 as the work proceeds**, and there is no reason to spend time on a rewrite. The question of
 decoupling can be revisited when that share is near nothing, at which point it will be a
-formality. Leaving the fork network on GitHub (§4.1) is a separate, purely practical matter
-and changes nothing about the licence or the credit.
+formality. Leaving the fork network on GitHub (§4.1) was a separate, purely practical matter
+and changed nothing about the licence or the credit.
 
 The credit line stays:
 *Book Compare is based on Image Compare, developed by VGG, Oxford | Modifications by Torge
@@ -327,7 +447,9 @@ Schiefelbein.*
 ## 9. How the work is organised
 
 - The plan is decided with Claude Opus; the code is written by Claude Sonnet, following
-  Anthropic's "plan with Opus, execute with Sonnet" advice.
+  Anthropic's "plan with Opus, execute with Sonnet" advice. **Before any coding starts,
+  Claude asks the owner, in one short question, whether he has switched to Sonnet, and waits
+  for the answer.**
 - Changes are pushed straight to `main`.
 - Tests run automatically on GitHub for Windows and Linux; the website publishes only after
   they pass.
@@ -336,16 +458,19 @@ Schiefelbein.*
 
 ## 10. Test material
 
+All in the owner's Dropbox folder "Example pages", reachable from his tablet and his PC:
+
 - *Liber selectarum cantionum* f.158v — 19 copies; the first music test page, three versions
   in the superius (system 2, notes 13–14).
 - *Liber selectarum cantionum* f.4r — 20 copies, many differences of several kinds.
-- The dedication page, f.1r — 9 copies; group A with the "Helvetio" addition, group B
-  without. Aruspix could not superimpose it.
+- The dedication page — 9 copies; group A with the "Helvetio" addition, group B without.
+  Aruspix could not superimpose it.
 - The coat-of-arms woodcut — 5 copies in black and white (unframed; the D-Mbs copy is
   incomplete), and 8 copies in colour. Outline alignment is enough; colour comparison is not
   wanted.
 - *Melopoiae* p. 4 ("Prima facies"), and the *Melopoiae* title page, which is the first
   printed page in every copy.
+- `Differences.odt` / `Differences.pdf` — the owner's list of known differences.
 - Copies that are difficult to align: F-Pm, A-Wn, D-ARk, D-SHk.
 
 Music pages matter most and should be tested hardest, starting with a page that has few
