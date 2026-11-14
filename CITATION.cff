@@ -10,6 +10,7 @@ abstract: >-
 authors:
   - family-names: Schiefelbein
     given-names: Torge
+    orcid: "https://orcid.org/0009-0000-6720-740X"
 repository-code: "https://github.com/PeerPioneer/Book-Compare"
 url: "https://peerpioneer.github.io/Book-Compare/"
 license: BSD-2-Clause
