@@ -1,3 +1,8 @@
+## [Tile-based alignment in the speed test] - 2026-11-14
+- New: the alignment method from the experiment (printed area, rough step, tile step) now runs in the app inside a background worker (js/align-worker.js, built from research/js by "node research/js/build_worker.js"; js/align-engine.js is the page side). It uses OpenCV.js 5.0.0 (Apache-2.0, about 13 MB, deps/opencv/, licence noted in licenses.txt). The Compare tab itself does not use it yet. Service worker cache v18
+- Changed: the speed test (Compare tab, More > Measure speed on this computer) has a new option, on by default, that also times the new method for every copy: a "Tile-based (new)" column, the steps in the plain-text report, an estimate for the whole project and how well the ink lines up after each step
+- New test: tests/workspace/test_align_worker.py (Chromium); test_compare_tab.py also runs the tile option once. The "quick" job on GitHub also checks that align-worker.js is up to date with its sources
+
 ## [Slide mode removed, citation file, newer building blocks] - 2026-11-14
 - Removed: the "Slide" visualization (the bar you dragged across the picture, its Horizontal/Vertical switch and all the code behind it). It was a presentation gimmick, not a tool for finding differences. Difference, Toggle, Top and bottom, Left and right, Only image 1 and Only image 2 remain. Service worker cache v17 (the page files changed)
 - New: CITATION.cff, so that GitHub shows a "Cite this repository" button (APA and BibTeX). It names Image Compare (Sridhar, Dutta and Zisserman, VGG Oxford) as the basis. A "How to cite" section in README.md says the same in words. No version number, year or DOI yet: they come with the first release

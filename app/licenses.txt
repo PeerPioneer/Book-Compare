@@ -528,3 +528,9 @@ loss of use, data, or profits; or business interruption) however caused
 and on any theory of liability, whether in contract, strict liability,
 or tort (including negligence or otherwise) arising in any way out of
 the use of this software, even if advised of the possibility of such damage.
+
+
+====================================================================
+OpenCV.js 5.0.0 (deps/opencv/opencv.js), used by the tile-based alignment
+Licence: Apache License 2.0 - the full text is in deps/opencv/LICENSE.txt.
+Built from OpenCV (https://opencv.org); packaged by the npm package @techstark/opencv-js.

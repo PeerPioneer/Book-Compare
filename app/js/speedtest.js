@@ -68,13 +68,24 @@
     rec.find = t1 - t0; rec.draw = t3 - t2; rec.hn = H.length;
   }
 
-  async function runTest(plan, mode, withTypes, ui) {
-    var res = { when: new Date(), plan: plan, mode: mode, ref: { name: plan.ref.name }, copies: [], types: null, stopped: false };
-    var refPix = null, keep = null;
+  async function runTest(plan, mode, withTypes, withTiles, ui) {
+    var res = { when: new Date(), plan: plan, mode: mode, ref: { name: plan.ref.name }, copies: [], types: null, stopped: false, withTiles: !!withTiles, tile: null };
+    var refPix = null, keep = null, engine = null;
     ui.status('Opening the first copy (' + plan.ref.name + ') …', 0);
     await frame();
     try { refPix = await openScan(plan.ref.id, plan.row, res.ref); }
     catch (e) { res.fatal = e.message || String(e); return res; }
+    if (withTiles) {                       // the new tile-based method, in a worker (the page does not freeze for it)
+      res.tile = { ok: false };
+      try {
+        ui.status('Loading the tile-based alignment (OpenCV, about 13 MB the first time) …', 0.02); await frame();
+        engine = window.AlignEngine.create();
+        res.tile.init = await engine.init();
+        ui.status('Preparing the first copy (' + plan.ref.name + ') for the tile-based alignment …', 0.04); await frame();
+        res.tile.ref = await engine.reference(await W().speedFile(plan.ref.id, plan.row));
+        res.tile.ok = true;
+      } catch (e) { res.tile.err = (e && e.message) || String(e); if (engine) { engine.terminate(); engine = null; } }
+    }
     var items = spread(plan.items, MAX_COPIES);
     for (var i = 0; i < items.length; i++) {
       if (ui.stopped()) { res.stopped = true; break; }
@@ -91,8 +102,14 @@
       catch (e) { rec.err = 'The alignment failed for this pair (' + ((e && e.message) || e) + ').'; }
       if (rec.ok && !keep) keep = pix;
       pix = null;
+      if (engine && !ui.stopped()) {
+        ui.status('Copy ' + (i + 1) + ' of ' + items.length + ': ' + it.name + ' – tile-based alignment …', (i + 0.8) / items.length);
+        try { rec.tile = await engine.align(await W().speedFile(it.id, plan.row), true); }
+        catch (e) { rec.tileErr = (e && e.message) || String(e); }
+      }
       ui.line(rec);
     }
+    if (engine) engine.terminate();
     if (withTypes && keep && !res.stopped) {
       res.types = [];
       for (var k = 0; k < TYPES.length; k++) {
@@ -122,6 +139,18 @@
     s.freeze = s.find + s.draw + sum(ok.map(function (r) { return r.pixels; })) / ok.length;   // what the page does without letting go
     s.maxFreeze = Math.max.apply(null, ok.map(function (r) { return r.find + r.draw + r.pixels; }));
     s.maxPx = Math.max.apply(null, ok.map(function (r) { return r.w * r.h; }));
+    return s;
+  }
+  function tileStats(res) {            // the new method, in seconds
+    var t = res.copies.filter(function (r) { return r.tile; }).map(function (r) { return r.tile; });
+    var s = { n: t.length, failed: res.copies.filter(function (r) { return r.tileErr; }).length };
+    if (!t.length) return s;
+    var tot = t.map(function (x) { return x.total_s; });
+    s.mean = sum(tot) / t.length; s.median = median(tot); s.max = Math.max.apply(null, tot); s.min = Math.min.apply(null, tot);
+    ['decode_s', 'ink_s', 'rough_s', 'tiles_s'].forEach(function (k) { s[k] = sum(t.map(function (x) { return x[k]; })) / t.length; });
+    var u0 = t.filter(function (x) { return x.unmatched_rough != null; });
+    if (u0.length) { s.uRough = 100 * sum(u0.map(function (x) { return x.unmatched_rough; })) / u0.length; s.uTiles = 100 * sum(u0.map(function (x) { return x.unmatched_tiles; })) / u0.length; }
+    s.late = t.filter(function (x) { return x.total_s > 10; }).length;
     return s;
   }
   function machine() {
@@ -154,6 +183,15 @@
         (e.refNoDraw < e.ref * 0.97 ? ' (' + dur(e.refNoDraw) + ' if only the alignment numbers were kept and the pictures were not drawn)' : '') + '.');
       if (res.plan.pairsAll > e.pairs * 1.5) out.push('Comparing <i>every</i> copy with <i>every other</i> copy would be ' + num(res.plan.pairsAll) + ' comparisons (' + dur(e.all) + '). That is why the plan is to align each copy with one reference copy and work out the other pairs from those.');
     }
+    var ts = tileStats(res);
+    if (res.tile && !res.tile.ok) out.push('<b>Tile-based alignment (new):</b> it could not be measured (' + esc(res.tile.err || 'unknown problem') + ').');
+    else if (ts.n) {
+      out.push('<b>Tile-based alignment (new, runs in the background, the page does not freeze):</b> aligning one more copy took <b>' + s1(ts.mean * 1000) + '</b> on average (median ' + s1(ts.median * 1000) + ', slowest ' + s1(ts.max * 1000) + '). ' +
+        (ts.late ? ts.late + ' of ' + ts.n + ' copies took longer than the target of 10 seconds.' : 'All ' + ts.n + ' were under the target of 10 seconds.') +
+        ' Of the average, opening the scan takes ' + s1(ts.decode_s * 1000) + ', the rough alignment ' + s1(ts.rough_s * 1000) + ' and the fine tile alignment ' + s1(ts.tiles_s * 1000) + '. Loading the engine took ' + s1(res.tile.init.load_s * 1000) + ' (only the first time).');
+      if (res.plan.pairsRef > 0) out.push('Aligning all ' + num(res.plan.pairsRef) + ' comparisons of your project with ' + esc(res.plan.ref.name) + ' this way, one after the other, would take about <b>' + dur(ts.mean * res.plan.pairsRef) + '</b> (it would run in the background; a pair you open before it is done is aligned on the spot).');
+      if (ts.uRough != null) out.push('How well the ink lines up (share of ink without a partner, lower is better): ' + ts.uRough.toFixed(1) + ' % after the rough step, <b>' + ts.uTiles.toFixed(1) + ' %</b> after the tiles.');
+    }
     return out;
   }
   function reportText(res, st) {
@@ -169,6 +207,16 @@
       if (!r.ok) { L.push(r.name + ' | FAILED: ' + r.err); return; }
       L.push(r.name + ' | ' + r.w + 'x' + r.h + ' | ' + r.mb.toFixed(1) + ' | ' + Math.round(r.read) + ' | ' + Math.round(r.decode) + ' | ' + Math.round(r.pixels) + ' | ' + Math.round(r.find) + ' | ' + Math.round(r.draw) + ' | ' + Math.round(r.read + r.decode + r.pixels + r.find + r.draw));
     });
+    if (res.withTiles) {
+      L.push(''); L.push('Tile-based alignment (worker, OpenCV.js)' + (res.tile && res.tile.ok ? ': engine loaded in ' + Math.round(res.tile.init.load_s * 1000) + ' ms; reference prepared (decode ' + Math.round(res.tile.ref.decode_s * 1000) + ' ms, printed area ' + Math.round(res.tile.ref.box_s * 1000) + ' ms, ink map ' + Math.round(res.tile.ref.ink_s * 1000) + ' ms)' : ': NOT AVAILABLE: ' + ((res.tile && res.tile.err) || '')));
+      L.push('Copy | decode ms | ink ms | rough ms | tiles ms | total ms | unmatched ink after rough % | after tiles %');
+      res.copies.forEach(function (r) {
+        if (r.tile) { var x = r.tile; L.push(r.name + ' | ' + Math.round(x.decode_s * 1000) + ' | ' + Math.round(x.ink_s * 1000) + ' | ' + Math.round(x.rough_s * 1000) + ' | ' + Math.round(x.tiles_s * 1000) + ' | ' + Math.round(x.total_s * 1000) + ' | ' + (x.unmatched_rough != null ? (100 * x.unmatched_rough).toFixed(1) + ' | ' + (100 * x.unmatched_tiles).toFixed(1) : '- | -')); }
+        else if (r.tileErr) L.push(r.name + ' | FAILED: ' + r.tileErr);
+      });
+      var ts = tileStats(res);
+      if (ts.n) L.push('Tile method per copy: mean ' + Math.round(ts.mean * 1000) + ' ms (median ' + Math.round(ts.median * 1000) + ', min ' + Math.round(ts.min * 1000) + ', max ' + Math.round(ts.max * 1000) + '); copies over 10 s: ' + ts.late + ' of ' + ts.n);
+    }
     if (res.types) {
       L.push(''); L.push('Alignment types on the first pair that worked: type | find ms | draw ms');
       res.types.forEach(function (t) { L.push(typeName(t.mode) + ' | ' + (t.ok ? Math.round(t.find) + ' | ' + Math.round(t.draw) : 'FAILED: ' + t.err)); });
@@ -184,14 +232,19 @@
 
   /* ---------------------------------------------------------------- dialog */
   function dlgFrame(sc) { var d = sc.querySelector('.ws-dlg'); d.style.width = 'min(780px, 100%)'; return d; }
+  var tileCol = false;                 // show the column of the new method (set per test)
+  function headHtml() { return '<tr><th>Copy</th><th>Picture size</th><th>Opening the scan</th><th>Finding the alignment</th><th>Drawing the result</th><th>Total</th>' + (tileCol ? '<th>Tile-based (new)</th>' : '') + '</tr>'; }
   function tableHtml(res) {
-    var h = '<table class="sp-tbl"><thead><tr><th>Copy</th><th>Picture size</th><th>Opening the scan</th><th>Finding the alignment</th><th>Drawing the result</th><th>Total</th></tr></thead><tbody>';
+    tileCol = !!res.withTiles;
+    var h = '<table class="sp-tbl"><thead>' + headHtml() + '</thead><tbody>';
     res.copies.forEach(function (r) { h += rowHtml(r); });
     return h + '</tbody></table>';
   }
   function rowHtml(r) {
-    if (!r.ok) return '<tr class="bad" data-copy><td>' + esc(r.name) + '</td><td colspan="5">' + esc(r.err || 'not measured') + '</td></tr>';
-    return '<tr data-copy><td>' + esc(r.name) + '</td><td>' + mp(r.w, r.h) + '</td><td>' + s1(r.read + r.decode + r.pixels) + '</td><td>' + s1(r.find) + '</td><td>' + s1(r.draw) + '</td><td><b>' + s1(r.read + r.decode + r.pixels + r.find + r.draw) + '</b></td></tr>';
+    var tcell = '';
+    if (tileCol) tcell = r.tile ? '<td title="opening ' + s1(r.tile.decode_s * 1000) + ', rough ' + s1(r.tile.rough_s * 1000) + ', tiles ' + s1(r.tile.tiles_s * 1000) + '"><b>' + s1(r.tile.total_s * 1000) + '</b></td>' : '<td>' + (r.tileErr ? '<span class="err">failed</span>' : '–') + '</td>';
+    if (!r.ok) return '<tr class="bad" data-copy><td>' + esc(r.name) + '</td><td colspan="5">' + esc(r.err || 'not measured') + '</td>' + tcell + '</tr>';
+    return '<tr data-copy><td>' + esc(r.name) + '</td><td>' + mp(r.w, r.h) + '</td><td>' + s1(r.read + r.decode + r.pixels) + '</td><td>' + s1(r.find) + '</td><td>' + s1(r.draw) + '</td><td><b>' + s1(r.read + r.decode + r.pixels + r.find + r.draw) + '</b></td>' + tcell + '</tr>';
   }
   function typesHtml(res) {
     if (!res.types) return '';
@@ -212,7 +265,7 @@
       if (!st.n) h += '<p class="err" style="min-height:0">No pair could be measured.</p>';
       h += '<div class="sp-scroll">' + tableHtml(res) + '</div>' + typesHtml(res);
       if (st.failed) h += '<p class="note">' + st.failed + ' of ' + res.copies.length + ' copies could not be measured; see the red lines. Large scans are the usual reason.</p>';
-      h += '<p class="note">This measures the alignment types Book Compare has today. A finer, tile-based alignment is not built into the app yet, so its speed is not part of these numbers. Times will be a little different each run.</p>';
+      h += '<p class="note">' + (res.withTiles ? 'The first numbers measure the alignment types Book Compare uses today inside the page. The last column is the new tile-based alignment, which is not used by the Compare tab yet; it runs in the background and the page does not freeze for it. ' : 'This measures the alignment types Book Compare has today. ') + 'Times will be a little different each run.</p>';
       h += '<details><summary>Show the numbers as plain text</summary><textarea class="sp-text" readonly rows="10"></textarea></details>';
     }
     h += '<div class="acts"><button class="ws-tb" id="sp-copy"' + (res.fatal ? ' disabled' : '') + '>Copy the result</button><button class="ws-tb" id="sp-again">Run again</button><button class="ws-tb primary" data-close>Close</button></div><div class="note" id="sp-msg" role="status"></div>';
@@ -230,11 +283,11 @@
     };
   }
 
-  async function start(sc, plan, withTypes) {
-    busy = true;
+  async function start(sc, plan, withTypes, withTiles) {
+    busy = true; tileCol = !!withTiles;
     var d = dlgFrame(sc), stopped = false, mode = (window.CompareTab && CompareTab.transform && CompareTab.transform()) || 'perspective';
     d.innerHTML = '<h3>Speed test is running …</h3><p id="sp-st">Starting …</p><progress id="sp-pr" max="1" value="0" style="width:100%"></progress>' +
-      '<div class="sp-scroll"><table class="sp-tbl"><thead><tr><th>Copy</th><th>Picture size</th><th>Opening the scan</th><th>Finding the alignment</th><th>Drawing the result</th><th>Total</th></tr></thead><tbody id="sp-rows"></tbody></table></div>' +
+      '<div class="sp-scroll"><table class="sp-tbl"><thead>' + headHtml() + '</thead><tbody id="sp-rows"></tbody></table></div>' +
       '<p class="note">The page freezes for a moment at each alignment. That is normal and part of what is measured. Nothing is saved and no scan is changed.</p>' +
       '<div class="acts"><button class="ws-tb" id="sp-stop">Stop</button></div>';
     d.querySelector('#sp-stop').onclick = function () { stopped = true; this.disabled = true; this.textContent = 'Stopping …'; };
@@ -244,7 +297,7 @@
       line: function (r) { var b = d.querySelector('#sp-rows'); if (b) b.insertAdjacentHTML('beforeend', rowHtml(r)); }
     };
     var res;
-    try { res = await runTest(plan, mode, withTypes, ui); }
+    try { res = await runTest(plan, mode, withTypes, withTiles, ui); }
     catch (e) { res = { when: new Date(), plan: plan, mode: mode, ref: { name: plan.ref.name }, copies: [], fatal: 'The test stopped because of an unexpected problem: ' + ((e && e.message) || e) }; }
     busy = false;
     if (!sc.isConnected) { window.SpeedTest.last = { result: res, stats: stats(res), text: reportText(res, stats(res)) }; return; }   // the window was closed meanwhile
@@ -267,11 +320,12 @@
     h = '<h3>Measure speed on this computer</h3>' +
       '<p>Book Compare will align page <b>' + esc(plan.rowLabel) + '</b> of ' + n + ' other cop' + (n === 1 ? 'y' : 'ies') + ' with the same page of <b>' + esc(plan.ref.name) + '</b> (copy 1), one after the other, and time every step: opening the scan, finding the alignment, drawing the result.</p>' +
       '<p class="note">It takes about ' + (n <= 3 ? 'half a minute' : n <= 6 ? 'a minute' : 'one to two minutes') + ', and the page freezes for a moment at each alignment. It only reads your scans. Nothing is saved and nothing is changed. Alignment type: <b>' + typeName(mode) + '</b> (the one chosen in the Compare tab).</p>' +
+      (window.AlignEngine && window.AlignEngine.supported() ? '<label class="chk"><input type="checkbox" id="sp-tiles" checked> Also measure the new tile-based alignment (it runs in the background; the first time the browser downloads about 13 MB; about 10 seconds more per copy)</label>' : '<p class="note">This browser cannot run the new tile-based alignment (it needs Web Workers and OffscreenCanvas), so only the current alignment is measured.</p>') +
       '<label class="chk"><input type="checkbox" id="sp-types"> Also try the three alignment types on one pair (about 30 seconds more; the thin plate spline is slow)</label>';
     if (plan.locked.length) h += '<p class="err" style="min-height:0">The browser still blocks the scan folder' + (plan.locked.length > 1 ? 's' : '') + ' ' + plan.locked.map(function (x) { return '“' + esc(x) + '”'; }).join(', ') + '. Close this window, click <b>Allow access to scans</b> at the top, and start again.</p>';
     h += '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="sp-go"' + (plan.locked.length ? ' disabled' : '') + '>Start the test</button></div>';
     d.innerHTML = h;
-    d.querySelector('#sp-go').onclick = function () { start(sc, plan, d.querySelector('#sp-types').checked); };
+    d.querySelector('#sp-go').onclick = function () { var tl = d.querySelector('#sp-tiles'); start(sc, plan, d.querySelector('#sp-types').checked, !!(tl && tl.checked)); };
   }
 
   window.SpeedTest = {

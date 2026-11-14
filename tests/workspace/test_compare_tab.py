@@ -316,16 +316,20 @@ def scenario(p, kind):
     txt = pg.inner_text('#ws-scrim .ws-dlg')
     assert 'on average' in txt and 'Your project has' in txt and 'comparisons' in txt and 'freezes' in txt, txt
     assert pg.locator('#ws-scrim h4').count() == 1 and pg.locator('#ws-scrim h4 + table tbody tr').count() == 3, 'the three alignment types are compared'
+    # the new tile-based method (worker + OpenCV.js) ran for the two copies that open: a column in the table, numbers in the text
+    tl = pg.evaluate("SpeedTest.last.result.tile"); assert tl and tl['ok'] and tl['init']['load_s'] > 0, tl
+    assert pg.evaluate("SpeedTest.last.result.copies.filter(c => c.tile || c.tileErr).length") == 2, 'both openable copies were tried with the tile method'
+    assert 'Tile-based (new)' in pg.inner_text('#ws-scrim thead') and 'Tile-based alignment (worker, OpenCV.js)' in pg.evaluate("SpeedTest.last.text")
     assert pg.evaluate("SpeedTest.last.text").startswith('Book Compare speed test') and 'D-Broken | FAILED' in pg.evaluate("SpeedTest.last.text")
     pg.click('#sp-copy'); pg.wait_for_function("document.getElementById('sp-msg').textContent.length > 0", timeout=5000)
     assert pg.evaluate("document.querySelector('.sp-text').value") == pg.evaluate("SpeedTest.last.text"), 'the numbers are also shown as text'
     assert pg.evaluate("JSON.stringify(BookWorkspace.tab.state())") == state0, 'the speed test changes nothing in the project'
     # Stop: the test ends early and says so
-    pg.click('[data-close]'); open_speed(); pg.click('#sp-go'); pg.click('#sp-stop')
+    pg.click('[data-close]'); open_speed(); pg.uncheck('#sp-tiles'); pg.click('#sp-go'); pg.click('#sp-stop')
     pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=240000)
     assert 'Stopped early' in pg.inner_text('#ws-scrim .ws-dlg'), pg.inner_text('#ws-scrim .ws-dlg')
     # closing the window in the middle ends the test without trouble, and a new one can be started afterwards
-    pg.click('[data-close]'); pg.evaluate("SpeedTest.last = null"); open_speed(); pg.click('#sp-go'); pg.keyboard.press('Escape')
+    pg.click('[data-close]'); pg.evaluate("SpeedTest.last = null"); open_speed(); pg.uncheck('#sp-tiles'); pg.click('#sp-go'); pg.keyboard.press('Escape')
     pg.wait_for_function("SpeedTest.last !== null", timeout=240000); assert pg.locator('#ws-scrim').count() == 0, 'the window stays closed'
     open_speed(); assert pg.is_visible('#sp-go'); pg.click('[data-close]')
     pg.click('#ws-more'); pg.click('#ws-menu [data-m="help"]'); assert 'Measure speed' in pg.inner_text('#ws-scrim .ws-dlg'); pg.click('[data-close]')

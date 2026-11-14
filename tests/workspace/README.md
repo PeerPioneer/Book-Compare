@@ -39,3 +39,9 @@ Not covered by these scripts: how the real Windows folder window looks and feels
 The test of the Photoshop script lives in `tests/photoshop/` (`node tests/photoshop/test_split_script.js`; needs Node, Python and Pillow). It uses a stand-in for Photoshop, so it checks the script's own logic, not Photoshop itself.
 
 On GitHub (`.github/workflows/windows-test.yml`) the tests run automatically after every push that changes the program, the launcher, the tests or the tools: the Windows job (`windows-checks.ps1`, `test_helper.py`, `test_compare_tab.py`), a Linux job (`test_workspace.py`, `test_roots.py`, the Photoshop script test) and, only when both passed, the publishing of the folder `app` as the website.
+
+
+## test_align_worker.py
+Loads the two sample scans of the traherne pair in Chromium, runs the tile-based alignment engine (js/align-engine.js, js/align-worker.js, OpenCV.js) on them
+and checks that every step reports a time, that the tile step improves the match, and that a file that is not a picture gives a clear error.
+Same way to run as the others: `python3 -m http.server 8765 -d app`, then `python3 tests/workspace/test_align_worker.py`.

@@ -13,7 +13,8 @@ function redScaled(cv, rgba, w, h) {
   for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j];
   const s = H0 / h;
   const out8 = new cv.Mat();
-  cv.resize(red, out8, new cv.Size(Math.round(w * s), H0), 0, 0, cv.INTER_AREA);
+  if (h === H0) red.copyTo(out8);                       // already at the working height (the browser worker scales while decoding)
+  else cv.resize(red, out8, new cv.Size(Math.round(w * s), H0), 0, 0, cv.INTER_AREA);
   const out = new cv.Mat();
   out8.convertTo(out, cv.CV_32F);
   red.delete(); out8.delete();
