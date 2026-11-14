@@ -1,0 +1,9 @@
+{
+  "name": "book-compare-alignment-experiment",
+  "private": true,
+  "description": "Experiment: the alignment steps from research/*.py, ported to OpenCV.js",
+  "dependencies": {
+    "@techstark/opencv-js": "5.0.0-release.1",
+    "jpeg-js": "0.4.4"
+  }
+}
