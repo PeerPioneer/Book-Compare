@@ -111,6 +111,16 @@ on it: check that the browser version contains every operation the prototype use
 **The target:** a page pair that has not been aligned yet is ready in **under 10 seconds** on
 the owner's ordinary PC.
 
+**Status (14 November 2026):** all three steps are rewritten and checked on Claude's computer
+(two processor cores, Node.js; code in `research/js/`, details in its README). Step 1: the
+printed-area boxes agree with the prototype to within a pixel on 21 of 24 test scans (at most
+14 pixels on the others), about 3 s per scan. Step 2: the same result as the prototype; the slow
+refinement runs on a picture a quarter of the size and takes about 3 s instead of 48 s with
+practically the same result. Step 3: the same result as the prototype (0.4 % of the ink left
+unmatched on the test pair, 22 % after the rough step), about 4–5 s. Together about 7–9 s per
+additional copy of a page on Claude's computer, i.e. close to the target before any further
+speed-up and before the measurement on the owner's PC.
+
 **Where it is measured:** first on Claude's computer, then in the browser on the owner's
 tablet (the worst case: an old machine, with scans on an external drive), then on the owner's
 usual PC (the real benchmark, because it stands in for the average user).

@@ -29,6 +29,21 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
 * Note: in OpenCV.js the constants for ECC's stop criteria are `cv.TermCriteria_EPS` / `cv.TermCriteria_COUNT`
   (the names used in Python and C++ do not exist there and silently give nothing).
 
+## Step 3: tile alignment (done)
+
+* `tile_align.js`: four levels of tiles, search by template matching with sub-pixel peak, repair of empty tiles and
+  outliers by the median of the neighbours, smooth movement field, bending with `remap`; ported from `tile_align.py`
+  (the two helper functions from scipy are rewritten by hand). `run_full.js ref.jpg other.jpg [prefix]` runs the whole
+  chain (printed area, ink maps, rough, tiles) and prints the unmatched ink after each step and the times;
+  with a prefix it also writes a picture of the result (reference red, other copy blue, agreement dark).
+* Same result as the prototype on the test pair (f4r A-Wn / D-B): 22 % unmatched ink after the rough step, 0.4 % after the tiles, in both.
+* More pairs (unmatched ink after rough step -> after tiles): f158v A-Wn / D-B 22.8 -> 0.7 %; Melopoiae contents page B-Br / D-Mu 6.4 -> 0.8 %;
+  Mons Parnassus woodcut B-Br / D-Mu 6.1 -> 2.4 %; contents page DK-Kk / A-Wn2 1.4 -> 0.6 %. The two pairs with copy F-Pm
+  (25.9 -> 5.8 %, 45.1 -> 16.5 %) stay high: the overlay picture shows that the page as a whole is in place but some
+  stems and notes sit slightly differently in that copy; the tile step deliberately moves only a few pixels, so real differences stay visible.
+* Time for one additional copy on Claude's computer (2 cores, Node.js): about 0.3 s ink map + 3 s rough + 4-5 s tiles
+  (+ about 0.6 s to decode the JPEG): 7 to 9 s. Not yet measured: in the browser, on the owner's PC.
+
 ## How to run
 
     cd research/js
@@ -36,5 +51,6 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
     node test_rectmorph.js
     node run_printed_area.js scan1.jpg scan2.jpg ...      # prints box and times per scan
     node run_rough.js reference.jpg other.jpg 4 fast       # rough alignment, refinement at a quarter size
+    node run_full.js reference.jpg other.jpg out/name      # the whole chain, with a picture of the result
 
 The scans themselves are never committed (they stay on the owner's computer).
