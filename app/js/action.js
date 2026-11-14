@@ -17,22 +17,17 @@ class Action {
         this.overlay_slider = this.el['overlay'] ? this.el['overlay'].querySelector('.mdc-slider') : null;
         this.result_container = document.getElementById('result');
         //this.result_parent = this.result_container.parentElement
-        this.image_slider = this.result_container.querySelector('.image_slider');
-        this.dragElement(this.image_slider);
         this.result = result;
 
         // TODO: Infer from document or set the document
         this._MODE = 'diff';
         this._TOGGLE_SPEED = 2;
         this._OVERLAY = 0.5;
-        this._SLIDE = 0.5;
-        this._HORIZONTAL = true;
         this._HOVER = 1;
 
         this.download_el = document.createElement('a');
 
         this.el['toggle'].onclick = this.handle_toggle.bind(this);
-        this.el['slide'].onchange = this.handle_slide.bind(this);
         // Difference mode's Download button is gone (the "Export Current
         // View" item in the "More" menu already covers it) - #diff now just
         // holds the "Red = image 1 / Cyan = Image 2" note, so it no longer
@@ -108,11 +103,6 @@ class Action {
                 this.overlay_slider.MDCSlider.layout();
             });
         }
-        if(val === 'slide') {
-            this.image_slider.classList.remove('hide');
-        } else {
-            this.image_slider.classList.add('hide');
-        }
 
         // Hover
         if (val === 'hover') {
@@ -144,21 +134,6 @@ class Action {
         this.show();
     }
 
-    get SLIDE() {
-        return this._SLIDE;
-    }
-    set SLIDE(val) {
-        this._SLIDE = val;
-        this.show();
-    }
-
-    get HORIZONTAL() {
-        return this._HORIZONTAL;
-    }
-    set HORIZONTAL(val) {
-        this._HORIZONTAL = val;
-        this.show();
-    }
     get HOVER() {
         return this._HOVER;
     }
@@ -181,9 +156,6 @@ class Action {
                 break;
             case 'overlay':
                 this.result.draw_overlay_image(this.OVERLAY);
-                break;
-            case 'slide':
-                this.result.draw_slide_image(this.SLIDE, this.HORIZONTAL);
                 break;
             case 'hover':
                 this.hover_text.textContent = this.HOVER;
@@ -220,8 +192,6 @@ class Action {
         this._MODE = 'diff';
         this._TOGGLE_SPEED = 2;
         this._OVERLAY = 0.5;
-        this._SLIDE = 0.5;
-        this._HORIZONTAL = true;
         this.result.toggle_images(0);
 
         // Hide all
@@ -235,16 +205,6 @@ class Action {
         if (active_btn !== clicked_btn) {
             this.reset_toggle_ui(clicked_btn, active_btn);
         }
-
-        // Reset radio and slider ui
-        document.getElementById('radio-horizontal').checked = this._HORIZONTAL;
-        document.getElementById('radio-vertical').checked = !this._HORIZONTAL;
-        document.querySelectorAll('#slide_seg .seg').forEach((b) => {
-            b.classList.toggle('active', (b.dataset.value === 'horizontal') === this._HORIZONTAL);
-        });
-        this.image_slider.classList.add('horizontal');
-        this.image_slider.style.left = '50%';
-        this.image_slider.style.top = '50%';
 
         // Reset overlay ui (if present - Overlay mode is currently removed)
         if (this.overlay_slider) {
@@ -274,20 +234,6 @@ class Action {
         this.download_el.click();
         this.snack_el.MDCSnackbar.labelText = 'Saved current view as image.';
         this.snack_el.MDCSnackbar.open();
-    }
-
-    handle_slide(e) {
-        if (e.target.checked) {
-            this.HORIZONTAL = e.target.value === 'horizontal';
-        }
-        if (this.HORIZONTAL) {
-            this.image_slider.classList.add('horizontal');
-        } else {
-            this.image_slider.classList.remove('horizontal');
-        }
-        this.image_slider.style.left = '50%';
-        this.image_slider.style.top = '50%';
-        this.SLIDE = 0.5;
     }
 
     handle_zoom() {
@@ -389,123 +335,6 @@ class Action {
             add_listeners,
             remove_listeners
         }
-    }
-
-    dragElement(el) {
-        // Track width and padding are equal
-        let pw = 0;
-        let ph = 0;
-        let m = 0;
-        let M = 0;
-        let padding = 0;
-        let padding_tb = 0;
-        let padding_lr = 0;
-        let timeout = null;
-        const getBounds = () => {
-            padding = (0.25 * parseFloat(getComputedStyle(el.parentElement).fontSize));
-            let { x, y, width, height } = this.result.canvas.getBoundingClientRect();
-            width -= 2*padding;
-            height -= 2*padding;
-
-            const iw = this.result.canvas.width;
-            const ih = this.result.canvas.height;
-
-            let rh = 0;
-            let rw = 0;
-
-            // Aspect ratio
-            const iar = iw / ih;
-            const ar = width / height;
-
-            if (iar < ar) {
-                // Rendered on wider screen
-                rh = height;
-                rw = rh * iar;
-            } else {
-                // Rendered on narrower screen
-                rw = width;
-                rh = rw / iar;
-            }
-            // TODO Get padding programmatically of the canvas element
-            // Now the padding is manually copied from CSS - 2.5% LR and 0.5em TB;
-            // TODO: Include track width.
-            pw = rw + 2*padding;
-            ph = rh + 2*padding;
-
-            padding_lr = (width - rw) / 2;
-            padding_tb = (height - rh) / 2;
-            m = (this.HORIZONTAL ? x : y);
-            M = this.HORIZONTAL ? (pw + padding_lr - padding / 2) : (ph + padding_tb - padding / 2);
-        }
-        window.addEventListener('resize', () => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                getBounds();
-                if (this.MODE === 'slide') {
-                    this.show();
-                }
-            }, 250);
-        });
-        const dragMove = (e) => {
-          e = e || window.event;
-
-          if (
-            e.touches &&
-            (e.touches.length > 1 ||
-              (e.type === "touchend" && e.touches.length > 0))
-          ) {
-            return;
-          }
-          e.preventDefault();
-
-          let _slide_factor = 0.5;
-          if (this.HORIZONTAL) {
-            const cx = (e.clientX || e.changedTouches[0].clientX) - m;
-            _slide_factor = Math.max(padding_lr + padding / 2, Math.min(cx, M));
-            el.style.left = `${_slide_factor}px`;
-          } else {
-            const cy = (e.clientY || e.changedTouches[0].clientY) - m;
-            _slide_factor = Math.max(padding_tb + padding / 2, Math.min(cy, M));
-            el.style.top = `${_slide_factor}px`
-          }
-
-          const _padding = ((this.HORIZONTAL ? padding_lr : padding_tb) + padding / 2);
-
-          // https://stackoverflow.com/questions/11832914/how-to-round-to-at-most-2-decimal-places-if-necessary
-          _slide_factor -= _padding;
-          _slide_factor /= (M - _padding);
-          _slide_factor = +_slide_factor.toFixed(3);
-          this.SLIDE = _slide_factor;
-        };
-
-        const dragEnd = () => {
-          window.onmouseup = null;
-          window.ontouchend = null;
-          this.result_container.ontouchmove = null;
-          this.result_container.onmousemove = null;
-        };
-
-        const dragStart = (e) => {
-          e = e || window.event;
-
-          if (
-            e.touches &&
-            (e.touches.length > 1 ||
-              (e.type === "touchend" && e.touches.length > 0))
-          ) {
-            return;
-          }
-
-          e.preventDefault();
-          getBounds();
-          this.result_container.onmousemove = this.result_container.ontouchmove =
-            dragMove;
-          window.onmouseup = window.ontouchend =
-            dragEnd;
-        };
-
-        el.onmousedown = dragStart;
-        el.ontouchstart = dragStart;
     }
 
     hoverSwitch (el) {

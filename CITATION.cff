@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use Book Compare in your research, please cite it as below, and please also cite Image Compare (listed under references), on which it is based."
+title: "Book Compare"
+type: software
+abstract: >-
+  Book Compare superimposes scans of different copies of the same early printed
+  book, so that a person can see where the copies differ. It is based on Image
+  Compare by the Visual Geometry Group (VGG), University of Oxford, and adds
+  whole-book handling, page-by-page comparison, flags and annotations.
+authors:
+  - family-names: Schiefelbein
+    given-names: Torge
+repository-code: "https://github.com/PeerPioneer/Book-Compare"
+url: "https://peerpioneer.github.io/Book-Compare/"
+license: BSD-2-Clause
+keywords:
+  - digital collation
+  - early printed books
+  - image superimposition
+  - image registration
+  - music printing
+references:
+  - type: software
+    title: "Image Compare"
+    authors:
+      - family-names: Sridhar
+        given-names: Prasanna
+      - family-names: Dutta
+        given-names: Abhishek
+      - family-names: Zisserman
+        given-names: Andrew
+    year: 2021
+    repository-code: "https://github.com/ox-vgg/image-compare"
+    url: "https://www.robots.ox.ac.uk/~vgg/software/image-compare/"
+    license: BSD-2-Clause
+    notes: "Visual Geometry Group (VGG), University of Oxford. Book Compare began as a modification of this software."

@@ -222,13 +222,6 @@
             this.label.style.display = 'block';
         }
 
-        set_locked(locked) {
-            this.locked = locked;
-            [this.zoom_in_btn, this.fit_btn, this.zoom_out_btn].forEach((b) => {
-                b.disabled = locked;
-            });
-        }
-
         update_bars() {
             this.vtrack.update();
             this.htrack.update();
@@ -451,14 +444,14 @@
         workspace_el.style.setProperty('--row1', y + 'px');
     });
 
-    // Slide mode measures the picture once, so it only works unzoomed
+    // Tells the panels to measure their size again after the layout changed
     const remeasure = () =>
         window.requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
 
     // "Top and bottom" / "Left and right" / "Only image 1" / "Only image 2"
     // don't merge the images at all, so they drop the merged-picture panel
     // and show copy 1 and/or copy 2 full-size instead. Switching back to any
-    // of the other modes (Toggle/Difference/Slide) restores the normal
+    // of the other modes (Toggle/Difference) restores the normal
     // three-panel view.
     const WS_CLASSES = ['ws-three', 'ws-stacked', 'ws-sidebyside', 'ws-single1', 'ws-single2'];
     const shape_for_mode = (mode) => {
@@ -498,22 +491,14 @@
 
     document.addEventListener('modechange', (e) => {
         const mode = e.detail;
-        const slide = mode === 'slide';
-        panes.forEach((p) => {
-            p.set_locked(slide);
-            if (slide) p.apply_view({ z: 1, cx: 0.5, cy: 0.5 });
-        });
-
         workspace_el.classList.remove(...WS_CLASSES);
         workspace_el.classList.add(shape_for_mode(mode));
 
         current_mode = mode;
         update_main_label();
 
-        if (slide) remeasure();
         // Panels just changed visibility/size (main hidden, or o1/o2 now
-        // full-width/full-height) - their ResizeObservers pick this up on
-        // their own, but slide mode's own geometry cache needs a nudge too.
+        // full-width/full-height) - give them a nudge to measure again.
         remeasure();
     });
 
@@ -530,7 +515,6 @@
         copy1.set_label('Copy 1' + (names[0] ? ': ' + names[0] : ''));
         copy2.set_label('Copy 2, aligned' + (names[1] ? ': ' + names[1] : ''));
         panes.forEach((p) => {
-            p.set_locked(false);
             p.set_natural(w, h);
         });
         state.last = main;

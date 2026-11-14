@@ -431,7 +431,7 @@
 
       /* #action now lives in the purple footer bar, to the right of the
          Visualization dropdown, instead of its own white bar. Its children
-         (one per mode - toggle/slide/diff/onlyimage1/onlyimage2/the two
+         (one per mode - toggle/diff/onlyimage1/onlyimage2/the two
          empty placeholders for topbottom/leftright) stack on top of each
          other via the grid below; only the current mode's child is ever
          un-hidden, same mechanism as before, just relocated. */
@@ -485,30 +485,6 @@
       }
       #toggle .mdc-tab.active .mdc-tab__text-label.mdc-theme--on-primary {
         color: var(--mdc-theme-primary, #6200ee) !important;
-      }
-      /* Slide mode's Horizontal/Vertical switch: same look as the toggle */
-      .segmented {
-        display: flex;
-        box-shadow: 0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14);
-      }
-      .segmented .seg {
-        height: 48px;
-        padding: 0 24px;
-        border: 0;
-        border-right: 1px solid rgba(255, 255, 255, 0.4);
-        background: var(--mdc-theme-primary, #6200ee);
-        color: #fff;
-        font: 500 14px Roboto, sans-serif;
-        letter-spacing: 0.0892857143em;
-        text-transform: uppercase;
-        cursor: pointer;
-      }
-      .segmented .seg:last-child {
-        border-right: 0;
-      }
-      .segmented .seg.active {
-        background: #fff;
-        color: var(--mdc-theme-primary, #6200ee);
       }
       .diff_note {
         line-height: 1.3;
@@ -564,9 +540,6 @@
         #toggle .mdc-tab {
           padding: 0 12px;
           min-width: 0;
-        }
-        .segmented .seg {
-          padding: 0 14px;
         }
         .bar > * {
           margin: 0.25em;
@@ -862,36 +835,6 @@
       .diff_name { margin-left: 0.5em; font-weight: 500; min-width: 0; white-space: normal; }
       #diff_colors_dialog .mdc-dialog__surface { max-width: 640px; }
       .diff_note { display: block; font-weight: 400; font-size: 0.85em; opacity: 0.75; }
-
-      #result > div.image_slider {
-        width: 100%;
-        height: 0.25em;
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        background-color: var(--mdc-theme-primary, #000);
-        cursor: pointer;
-        z-index: 1;
-      }
-      #result > div.image_slider.horizontal {
-        width: 0.25em;
-        height: 100%;
-      }
-      #result > div.image_slider::after {
-        content: "";
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        border: 4px solid var(--mdc-theme-primary, #000);
-        background-color: #fff;
-        cursor: pointer;
-        z-index: 1;
-      }
 
       #action > .mdc-tab-bar .mdc-tab {
         height: 36px;
@@ -1911,7 +1854,6 @@
             <div class="pane" id="pane_main">
               <div class="pane__vp">
                 <div id="result" class="pane__content">
-                  <div class="image_slider hide horizontal"></div>
                   <canvas> </canvas>
                 </div>
               </div>
@@ -2169,19 +2111,6 @@
                     <li
                       class="mdc-deprecated-list-item"
                       aria-selected="false"
-                      data-value="slide"
-                      role="option"
-                    >
-                      <span class="mdc-deprecated-list-item__ripple"></span>
-                      <span
-                        class="mdc-deprecated-list-item__text mdc-typography--body1"
-                      >
-                        Slide
-                      </span>
-                    </li>
-                    <li
-                      class="mdc-deprecated-list-item"
-                      aria-selected="false"
                       data-value="toggle"
                       role="option"
                     >
@@ -2292,14 +2221,6 @@
                   </div>
                 </div>
               </div>
-            </div>
-            <div id="slide" class="hide">
-              <div class="segmented" id="slide_seg">
-                <button type="button" class="seg active" data-value="horizontal">Horizontal</button>
-                <button type="button" class="seg" data-value="vertical">Vertical</button>
-              </div>
-              <input type="radio" class="gone" id="radio-horizontal" name="radio-slider" value="horizontal" checked />
-              <input type="radio" class="gone" id="radio-vertical" name="radio-slider" value="vertical" />
             </div>
             <!-- The "Red = image 1 / Cyan = Image 2" note now lives in the
                  "Superimposed" panel label itself (see panes.js) instead of
@@ -2575,17 +2496,6 @@
           action_bar = new Action(action_el, result);
           compare = new Compare(compare_el, result, action_bar);
           samples = new Samples(samples_el);
-
-          document.querySelectorAll("#slide_seg .seg").forEach((btn) => {
-            btn.addEventListener("click", () => {
-              const r = document.getElementById("radio-" + btn.dataset.value);
-              r.checked = true;
-              r.dispatchEvent(new Event("change", { bubbles: true }));
-              document
-                .querySelectorAll("#slide_seg .seg")
-                .forEach((b) => b.classList.toggle("active", b === btn));
-            });
-          });
 
           main.c.addEventListener("select_image", (e) => {
             compare.set_image(e.detail.urls);

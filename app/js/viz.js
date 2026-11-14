@@ -341,47 +341,6 @@ class Visualization {
         return this.bctx.getImageData(0, 0, ow, oh);
     }
 
-    draw_slide_image(slide_factor, is_horizontal = false) {
-        const rw = this.canvas.width;
-        const rh = this.canvas.height;
-
-        const iw = this.input_image.naturalWidth || this.input_image.width;
-        const ih = this.input_image.naturalHeight || this.input_image.height;
-
-        const ow = is_horizontal ? slide_factor * rw : rw;
-        const oh = is_horizontal ? rh : slide_factor * rh;
-
-        this.ctx.clearRect(0, 0, rw, rh);
-
-        if (is_horizontal) {
-          this.ctx.drawImage(this.input_image, 0, 0, iw * slide_factor, ih, 0, 0, ow, oh);
-          this.ctx.drawImage(
-            this.aligned,
-            ow,
-            0,
-            rw - ow,
-            oh,
-            ow,
-            0,
-            rw - ow,
-            oh
-          );
-        } else {
-          this.ctx.drawImage(this.input_image, 0, 0, iw, ih * slide_factor, 0, 0, ow, oh);
-          this.ctx.drawImage(
-            this.aligned,
-            0,
-            oh,
-            rw,
-            rh - oh,
-            0,
-            oh,
-            rw,
-            rh - oh
-          );
-        }
-    };
-
     draw() {
         // Zoom
         const { scale, tx, ty } = this._current_transform;

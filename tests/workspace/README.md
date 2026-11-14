@@ -1,5 +1,10 @@
 # Tests for the whole-book workspace
 
+`test_modes.py` checks the Visualization menu of the two-image screen (no helper needed): it loads a sample pair, presses Compare and walks through all six modes twice (Difference, Toggle, Top and bottom, Left and right, Only image 1, Only image 2), checks that the removed Slide mode has left nothing behind and that no script error appears.
+
+    python3 -m http.server 8765 -d app          # in the repository folder, in another window
+    python3 tests/workspace/test_modes.py       # prints MODES OK
+
 `test_workspace.py` drives the workspace (`app/js/workspace.js`) in Chromium with Playwright and checks, among other things,
 that the scan folders are **never changed** (it compares a listing of names, sizes and modification times before and after).
 It uses made-up scans created inside the browser's private storage, so none of your own files are involved.

@@ -1,3 +1,9 @@
+## [Slide mode removed, citation file, newer building blocks] - 2026-11-14
+- Removed: the "Slide" visualization (the bar you dragged across the picture, its Horizontal/Vertical switch and all the code behind it). It was a presentation gimmick, not a tool for finding differences. Difference, Toggle, Top and bottom, Left and right, Only image 1 and Only image 2 remain. Service worker cache v17 (the page files changed)
+- New: CITATION.cff, so that GitHub shows a "Cite this repository" button (APA and BibTeX). It names Image Compare (Sridhar, Dutta and Zisserman, VGG Oxford) as the basis. A "How to cite" section in README.md says the same in words. No version number, year or DOI yet: they come with the first release
+- New test: tests/workspace/test_modes.py walks through every entry of the Visualization menu (checks that the menu offers exactly the six modes, that no Slide leftovers remain and that every mode shows its picture panels without a script error). It also runs in the "quick" job on GitHub
+- Changed: the building blocks of the workflow are newer versions that run on Node.js 24 (checkout v6, setup-python v6, configure-pages v6, upload-pages-artifact v5, deploy-pages v5), which removes GitHub's "Node.js 20 is deprecated" warning
+
 ## [Website on GitHub Pages] - 2026-11-08
 - New: the program (the folder "app") is published as a website on GitHub Pages, automatically, but ONLY when all automatic tests have passed. The workflow .github/workflows/windows-test.yml now has three jobs: "helper" (Windows tests, as before), "quick" (new, on Linux: test_workspace.py, test_roots.py and the test of the Photoshop script) and "publish" (new: runs only after both passed, only for main). A failed test therefore never reaches the website; the last good version stays online. The website can also be refreshed by hand: Actions > "Tests, then website" > Run workflow (the tests run first)
 - Service worker cache v16 (the page file changed)
