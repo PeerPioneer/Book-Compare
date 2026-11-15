@@ -15,7 +15,9 @@ function makeWorld(log) {
     constructor(p) { this.p = path.resolve(decodeURI(String(p))); }
     get name() { return path.basename(this.p); } get fsName() { return this.p; } get exists() { return fs.existsSync(this.p); }
     copy(dest) { fs.copyFileSync(this.p, dest.p); return true; }
-    open(mode) { this.buf = ''; return true; } write(t) { this.buf += t; return true; } close() { fs.writeFileSync(this.p, this.buf); return true; }
+    open(mode) { this.mode = mode; this.buf = ''; if (mode === 'r' && (!this.exists || (log.unreadable && log.unreadable.indexOf(this.name) >= 0))) return false; return true; } write(t) { this.buf += t; return true; }
+    read(n) { return fs.readFileSync(this.p).slice(0, n).toString('latin1'); }
+    close() { if (this.mode === 'w') fs.writeFileSync(this.p, this.buf); return true; }
   }
   class FolderM {
     constructor(p) { this.p = path.resolve(decodeURI(String(p))); }
@@ -167,6 +169,14 @@ log = { inDir: IN, corrupt: ['00001.jpg', '00003.jpg', '00011.png'] }; r = runSc
 assert.strictEqual(res.unreachable, false); assert.strictEqual(res.failed.length, 3); assert.strictEqual(res.split, 3);
 assert.deepStrictEqual(hashAll(IN), BEFORE); fs.rmSync(OUT, { recursive: true });
 console.log('  stop after repeated failures: ok');
+
+// ---------------------------------------------------------------------------------------------- 3d. the failure message says whether it is the drive or Photoshop
+fs.rmSync(OUT, { recursive: true, force: true });
+log = { inDir: IN, corrupt: ['00001.jpg', '00003.jpg'], unreadable: ['00003.jpg'] }; r = runScript(opts(), log); res = r.BC_TEST.result;
+assert.strictEqual(res.failed.length, 2);
+assert(/00001\.jpg: .*CAN be read from the disk/.test(res.failed[0]), res.failed[0]); assert(/00003\.jpg: .*can NOT be read from the disk/.test(res.failed[1]), res.failed[1]);
+assert.deepStrictEqual(hashAll(IN), BEFORE, 'reading a file to diagnose it must not change it'); fs.rmSync(OUT, { recursive: true, force: true });
+console.log('  failure messages name the cause: ok');
 
 // ---------------------------------------------------------------------------------------------- 4. the output folder must not be the scan folder or inside it
 for (const bad of [IN, path.join(IN, 'sub'), path.join(IN, 'Split into single pages'), IN + path.sep]) {

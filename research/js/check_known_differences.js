@@ -15,9 +15,9 @@
    Case 3 (also with the second argument): Melopoiae p. 8 ("Pair 08: Tercia facies"). Reference B-Br (group B). A-Wn1 (group A) differs in the
    wording "me onii" (B, C: "meonii"), has no custos at the end of line 4, and sets "amando" differently; D-Mbs (group B) and CH-Bu, DK-Kk,
    D-Mu (group C) agree with B-Br in these places. Measured: share of the ink in a region without partner after alignment (both directions).
-   Case 4 (first argument only): Liber selectarum cantionum f.19v, "Musical notation" (list of differences, Folio 19v). CH-E (group A1) against D-FUl
-   (group A2) and US-CA (group B). A1 and A2 differ only in details, group B differs in several systems (text and notes). Measured: share of the
-   ink in the whole printed area without partner: A1/A2 < 3 %, A1/B > 5 %. (The list names single notes; those regions are not yet in the check.)
+   Case 4 (first argument only): Liber selectarum cantionum f.19v, "Musical notation". Source: the critical apparatus in the owner's dissertation
+   (Same Same but Different, 2022, 4.6, p. 207): stems of 3:12-14, 3:16, 3:18-20 and 5:15 point down in A1 and A2 but up in B; the semibreve 6:16
+   stands on G in A1 and B but on F in A2. CH-E (A1) against D-FUl (A2) and US-CA (B): whole printed area, those notes, and control systems.
    Two kinds of difference are only REPORTED, not asserted: the title and the kerning are "shifted slightly" in group A. After tile alignment
    they show as 0-3 % unmatched, i.e. the alignment absorbs a shift of a few pixels (an honest limit, see PLAN.md V16). */
 const path = require('path'), fs = require('fs');
@@ -100,14 +100,27 @@ function pair08Case(cv, mel, rows) {
 }
 
 /* ---- Case 4: Liber f.19v ---- */
+/* Source: Schiefelbein, Same Same but Different (2022), 4.6 Kritischer Apparat, p. 207, Folio 19v. Groups A1 (D-Mbs, CH-E, ...), A2 (A-Wn, CZ-Pu, ..., D-FUl, ...),
+   B (GB-Lbl1, US-CA). Known: 3:12-14, 3:16, 3:18-20 stems down in A1 and A2, up in B; 5:15 stem down in A1 and A2, up in B; 6:16 semibreve on G in A1
+   and B, on F in A2 (a press corruption). CH-E (A1) is the reference. Regions in pixels at the working height of 3000 px (reference CH-E). */
+const F19V_REGIONS = { stems_3_12_to_20: [1283, 1050, 1833, 1367], note_5_15: [1533, 1983, 1600, 2250], note_6_16: [1508, 2525, 1592, 2608], system1_control: [520, 230, 1850, 420], system4_control: [520, 1440, 1880, 1620] };
 function folio19vCase(cv, root, rows) {
   const f = c => path.join(root, 'Musical notation. ' + c);
   let cache, total = 0, failed = 0;
-  for (const [copy, file, group, ok_] of [['D-FUl', 'D-FUl.jpg', 'A2', pct => pct < 3], ['US-CA', 'US-CA.jpg', 'B', pct => pct > 5]]) {
+  for (const [copy, file, group] of [['D-FUl', 'D-FUl.jpg', 'A2'], ['US-CA', 'US-CA.jpg', 'B']]) {
     const r = alignPair(cv, f('CH-E.JPG'), f(file), cache); cache = r.cache;
-    const [x0, y0, x1, y1] = r.box, pct = 100 * unmatchedShare(cv, r.ref, r.aligned, [x0, y0, x1, y1]).share, ok = ok_(pct);
-    total++; if (!ok) failed++;
-    rows.push(`${ok ? 'PASS' : 'FAIL'}  f.19v  CH-E (A1) vs ${copy.padEnd(5)} (${group})  whole printed area ${pct.toFixed(1).padStart(5)} % unmatched   expected ${group === 'A2' ? 'nearly matching (< 3 %)' : 'clearly different (> 5 %)'}`);
+    const [x0, y0, x1, y1] = r.box, whole = 100 * unmatchedShare(cv, r.ref, r.aligned, [x0, y0, x1, y1]).share;
+    const wok = group === 'A2' ? whole < 3 : whole > 5; total++; if (!wok) failed++;
+    rows.push(`${wok ? 'PASS' : 'FAIL'}  f.19v  CH-E (A1) vs ${copy.padEnd(5)} (${group})  whole printed area ${whole.toFixed(1).padStart(5)} % unmatched   expected ${group === 'A2' ? 'nearly matching (< 3 %)' : 'clearly different (> 5 %)'}`);
+    for (const [name, box] of Object.entries(F19V_REGIONS)) {
+      const pct = 100 * unmatchedShare(cv, r.ref, r.aligned, box).share;
+      let ok = null, expect = 'only reported (the apparatus says A1 and B agree here)';
+      if (name.startsWith('system')) { ok = pct < 8; expect = 'matching (< 8 %)'; }
+      else if (name === 'note_6_16') { if (group === 'A2') { ok = pct > 15; expect = 'different (> 15 %): F instead of G'; } }
+      else { ok = group === 'A2' ? pct < 3 : pct > 12; expect = group === 'A2' ? 'matching (< 3 %)' : 'different (> 12 %): stems up instead of down'; }
+      if (ok !== null) { total++; if (!ok) failed++; }
+      rows.push(`${ok === null ? 'INFO' : ok ? 'PASS' : 'FAIL'}  f.19v  CH-E (A1) vs ${copy.padEnd(5)} (${group})  ${name.padEnd(17)} ${pct.toFixed(1).padStart(5)} % unmatched   expected ${expect}`);
+    }
   }
   return { total, failed };
 }

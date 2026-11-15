@@ -25,7 +25,7 @@
 
 #target photoshop
 
-var BC_VERSION = '1.2';
+var BC_VERSION = '1.3';
 var MAX_FAILS_IN_A_ROW = 5;                                   // after this many failures in a row the script stops (probably a loose cable or a vanished drive)
 
 /* ------------------------------------------------------------------------------------------------ small helpers (no Photoshop needed) */
@@ -59,6 +59,12 @@ function halfBounds(w, h, percent, extra) {                  // the two crop rec
 function norm(path) { return String(path).replace(/\//g, '\\').toLowerCase().replace(/\\+$/, '') + '\\'; }
 function isInside(childPath, parentPath) { var c = norm(childPath), p = norm(parentPath); return c.indexOf(p) === 0; }   // also true when both are the same folder
 function outName(base, ext, part) { return base + '_' + part + '.' + ext; }          // part = 'L', 'R' or 'single'
+function diagnose(file) {                                    // tells the two usual reasons for "cannot open" apart: the drive, or Photoshop itself
+    var ok = false;
+    try { if (file.exists && file.open('r')) { ok = (file.read(4).length >= 2); file.close(); } } catch (e) { ok = false; }
+    return ok ? ' [the file CAN be read from the disk, so the problem is in Photoshop: close all pictures, restart Photoshop and start again]'
+              : ' [the file can NOT be read from the disk: check the drive, the cable and the folder in the file explorer]';
+}
 function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
 /* ------------------------------------------------------------------------------------------------ the work */
@@ -115,7 +121,7 @@ function runAll(o, progress) {
             try { processOne(files[i], o, st); inARow = 0; }
             catch (e) {
                 if (e && e.number === 8007) { st.stopped = true; break; }                     // Esc pressed: Photoshop's "cancel"
-                st.failed.push(files[i].name + ': ' + (e && e.message ? e.message : e));
+                st.failed.push(files[i].name + ': ' + (e && e.message ? e.message : e) + diagnose(files[i]));
                 inARow++;
                 if (inARow >= MAX_FAILS_IN_A_ROW) { st.unreachable = true; break; }          // not a problem of one file: stop instead of failing 100 more times
             }
