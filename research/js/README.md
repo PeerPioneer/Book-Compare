@@ -62,6 +62,6 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
     node run_printed_area.js scan1.jpg scan2.jpg ...      # prints box and times per scan
     node run_rough.js reference.jpg other.jpg 4 fast       # rough alignment, refinement at a quarter size
     node run_full.js reference.jpg other.jpg out/name      # the whole chain, with a picture of the result (reference red, other copy blue, agreement dark)
-    node check_known_differences.js "<Example pages folder>"   # the known-differences check
+    node check_known_differences.js "<Example pages folder>" "<Melopoiae folder>"   # the known-differences check (50 checks, about 5 minutes)
 
 The scans themselves are never committed (they stay on the owner's computer).
