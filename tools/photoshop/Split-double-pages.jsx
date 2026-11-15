@@ -25,7 +25,8 @@
 
 #target photoshop
 
-var BC_VERSION = '1.1';
+var BC_VERSION = '1.2';
+var MAX_FAILS_IN_A_ROW = 5;                                   // after this many failures in a row the script stops (probably a loose cable or a vanished drive)
 
 /* ------------------------------------------------------------------------------------------------ small helpers (no Photoshop needed) */
 function naturalCompare(a, b) {                               // "p2" before "p10"
@@ -104,16 +105,19 @@ function processOne(file, o, st) {
     }
 }
 function runAll(o, progress) {
-    var files = listPictures(o.inFolder), st = { total: files.length, split: 0, singles: 0, skipped: 0, ignored: 0, files: 0, failed: [], stopped: false };
+    var files = listPictures(o.inFolder), st = { total: files.length, split: 0, singles: 0, skipped: 0, ignored: 0, files: 0, failed: [], stopped: false, unreachable: false };
     var oldUnits = app.preferences.rulerUnits, oldDlg = app.displayDialogs;
     app.preferences.rulerUnits = Units.PIXELS; app.displayDialogs = DialogModes.NO;            // no questions about colour profiles etc.
+    var inARow = 0;
     try {
         for (var i = 0; i < files.length; i++) {
             if (progress) progress(i, files.length, files[i].name);
-            try { processOne(files[i], o, st); }
+            try { processOne(files[i], o, st); inARow = 0; }
             catch (e) {
                 if (e && e.number === 8007) { st.stopped = true; break; }                     // Esc pressed: Photoshop's "cancel"
                 st.failed.push(files[i].name + ': ' + (e && e.message ? e.message : e));
+                inARow++;
+                if (inARow >= MAX_FAILS_IN_A_ROW) { st.unreachable = true; break; }          // not a problem of one file: stop instead of failing 100 more times
             }
         }
     } finally { app.preferences.rulerUnits = oldUnits; app.displayDialogs = oldDlg; }
@@ -128,6 +132,7 @@ function summary(st) {
         'Failed: ' + st.failed.length + '\n';
     for (var i = 0; i < st.failed.length; i++) s += '  - ' + st.failed[i] + '\n';
     if (st.stopped) s += '\nStopped before the end (Esc). Start the script again: finished files are skipped.\n';
+    if (st.unreachable) s += '\nSTOPPED: ' + MAX_FAILS_IN_A_ROW + ' files in a row could not be opened. This is usually not a problem of the files but of the drive (loose cable, drive asleep, network folder gone). Check that the scan folder can be opened in the file explorer, then start the script again: finished files are skipped.\n';
     return s;
 }
 function writeLog(o, st) {

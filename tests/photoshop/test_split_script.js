@@ -154,6 +154,20 @@ for (const pct of [20, 45, 50, 52.3, 80]) for (const ex of [0, 1, 3, 15]) {
 fs.rmSync(OUT, { recursive: true });
 console.log('  extra strip on each side: ok');
 
+// ---------------------------------------------------------------------------------------------- 3c. a vanished drive: many failures in a row stop the run
+fs.rmSync(OUT, { recursive: true, force: true });
+log = { inDir: IN, corrupt: ['00001.jpg', '00002.JPG', '00003.jpg', '00010.jpg', '00011.png', '00012.tif'] }; r = runScript(opts(), log); res = r.BC_TEST.result;
+assert.strictEqual(res.unreachable, true); assert.strictEqual(res.failed.length, 5, 'stops after 5 failures in a row'); assert(/STOPPED: 5 files in a row/.test(r.BC_TEST.summary));
+assert(!fs.existsSync(path.join(OUT, '00012_L.tif')), 'nothing was done after the stop');
+log = { inDir: IN }; r = runScript(opts(), log); res = r.BC_TEST.result;                                // start again: the rest is done, the single is skipped
+assert.strictEqual(res.unreachable, false); assert.deepStrictEqual(fs.readdirSync(OUT).filter(n => n !== 'split-log.txt'), expectOrder);
+// failures that are not in a row do not stop the run
+fs.rmSync(OUT, { recursive: true });
+log = { inDir: IN, corrupt: ['00001.jpg', '00003.jpg', '00011.png'] }; r = runScript(opts(), log); res = r.BC_TEST.result;
+assert.strictEqual(res.unreachable, false); assert.strictEqual(res.failed.length, 3); assert.strictEqual(res.split, 3);
+assert.deepStrictEqual(hashAll(IN), BEFORE); fs.rmSync(OUT, { recursive: true });
+console.log('  stop after repeated failures: ok');
+
 // ---------------------------------------------------------------------------------------------- 4. the output folder must not be the scan folder or inside it
 for (const bad of [IN, path.join(IN, 'sub'), path.join(IN, 'Split into single pages'), IN + path.sep]) {
   const before = fs.readdirSync(IN).sort(); log = { inDir: IN };
