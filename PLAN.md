@@ -490,3 +490,74 @@ All in the owner's Dropbox folder "Example pages", reachable from his tablet and
 
 Music pages matter most and should be tested hardest, starting with a page that has few
 differences and working towards pages with more and with different kinds of alteration.
+
+---
+
+## 11. Register of open items and decisions
+
+Added 15 November 2026, because the plan lived partly in prose and in conversation, and items
+(the desktop program, the reference copy) were dropped from to-do lists. **Rule from now on:**
+every item below has an ID; the status line of this register is updated whenever something is
+done, decided or added, and any "what can we do next" list is taken from this register, never
+from memory. Status: **done** / **next** / **waiting** (needs something first) / **open**
+(design question) / **later** (after version 1).
+
+### 11.1 Version 1 — building
+
+| ID | Item | Status | Depends on / note |
+|----|------|--------|-------------------|
+| V1 | Whole-book workspace (grid of copies × pages, importing, copy names stay empty) | mostly done | §4.9 lists what is left |
+| V2 | Printed-area detection, automatic + manual correction | detection done in experiment (§4.3); **not yet in the Compare tab**; manual correction not built | V2a make Compare tab use it; V2b correction by hand |
+| V3 | Tile-based alignment in the Compare tab | experiment done, runs in the speed test (worker); **not yet in the Compare tab** | needs V2a; Thursday speed test decides nothing about *whether*, only about expectations |
+| V4 | Difference view | done | — |
+| V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a decide framework (Electron vs Tauri) — see D3; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
+| V6 | Website, kept current automatically | done (live) | — |
+| V7 | **Reference copy** (§4.7): proposal from measurable criteria, user confirms, stand-in per page, never switches by itself, old results kept until new ones are ready | **open** — design confirmed in prose only; not built; needs owner confirmation of the last point | V7a scoring of copies; V7b UI to confirm/choose; V7c per-page stand-in; V7d "better copy found" hint with cost |
+| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3 |
+| V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
+| V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
+| V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
+| V12 | Known-differences checks (§4.4): Liber f.19v music table, Melopoiae TOC (done, 16/16), Melopoiae woodcut p.19 (B-Br vs D-Mu fracture lines; his marked files are now found, see 11.3), further pairs from Differences.pdf | partly done | T1–T3 |
+| V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
+| V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
+
+### 11.2 After version 1
+
+| ID | Item | Status |
+|----|------|--------|
+| P1 | Manual recorded grouping of copies and findings export (§5.1) | open design |
+| P2 | DOI via Zenodo on release (§5.2) | later |
+| P3 | One outside tester installs it once (§5.3) | later |
+| P4 | Automatic page matching (§5.4) — only if cheap | later, optional |
+| P5 | Splitting double-page scans inside Book Compare (§5.5) — Photoshop script v1.1 is the stopgap | later |
+| P6 | Other visualization modes, quality dots, wrong-page check, look and feel (§5.6) | later |
+| P7 | Mac version from the same code, if colleagues ask | later |
+
+### 11.3 The owner's own tasks and material
+
+| ID | Item | Status |
+|----|------|--------|
+| T1 | Split double-page copies (CZ-Pu, D-SHk, GB-Lbl1, SK-Mmf) with `Split-double-pages.jsx` v1.1 into a *different* folder (never into the protected scan folders) | his; SK-Mmf partly done with v1.0 |
+| T2 | Run the speed test on his PC, Thursday 19 Nov, and paste the text | his |
+| T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
+| T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |
+
+### 11.4 Decisions still to be taken
+
+| ID | Question | Needed by |
+|----|----------|-----------|
+| D1 | Reference copy: confirm the proposal in §4.7 (including "old results stay until new ones are ready") | before V7 |
+| D2 | Pairs via the reference vs directly aligned on demand (§4.7 "Open") | after V12 results |
+| D3 | Desktop framework (Electron vs Tauri) — to be proposed with reasons in plain language | before V5 |
+| D4 | Code-signing certificate for the installer (low hundreds of euros a year) | at release |
+| D5 | Grouping design (§5.1) | before P1 |
+| D6 | What exactly is stored for aligned results (V10) | before V8 |
+
+### 11.5 Order from here (15 November 2026)
+
+1. Photoshop script v1.1 — **done**.
+2. Known-differences check for the Melopoiae woodcut and more pairs (V12), using T3/T4 — **next**, small.
+3. Thursday 19 Nov: speed test on his PC (V11/T2).
+4. Desktop program (V5), starting with D3.
+5. Compare tab uses printed-area detection and tile alignment (V2a, V3).
+6. Reference copy (V7, D1), then background alignment, progress bar and stored results (V8–V10).
