@@ -1,8 +1,8 @@
 'use strict';
 /* Check against known differences (PLAN.md section 4.4): is the alignment still right, and do the differences that are known
-   from Differences.odt / Differences.pdf stay visible?  Needs the test scans (not part of the repository):
+   from the owner's list (Mein Artikel\List of Differences.odt) stay visible?  Needs the test scans (not part of the repository):
        node check_known_differences.js "<folder 'Example pages'>"
-   Case 1: Melopoiae, table of contents (Differences.pdf, "Pair 02"). Group A: A-Wn1, A-Wn2, B-Br, DK-Kk, CH-Bu, D-Mu.
+   Case 1: Melopoiae, table of contents (List of Differences.odt, "Pair 02"). Group A: A-Wn1, A-Wn2, B-Br, DK-Kk, CH-Bu, D-Mu.
            Group B: A-Z, D-Mbs. Known: in group B the poem lines 5, 9 and 13 stand much further to the right.
    Reference B-Br.  Measured: share of the ink in a region that has no partner within 1 px after alignment.
    Expected: the table (columns 2-4) matches in every copy (< 5 %); the three poem lines match for group A copies (< 10 %)

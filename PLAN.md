@@ -485,7 +485,7 @@ All in the owner's Dropbox folder "Example pages", reachable from his tablet and
   wanted.
 - *Melopoiae* p. 4 ("Prima facies"), and the *Melopoiae* title page, which is the first
   printed page in every copy.
-- `Differences.odt` / `Differences.pdf` — the owner's list of known differences.
+- `Mein Artikel\List of Differences.odt` (in Dropbox\Melopoiae) — the owner's current list of known differences; this is the reference. The older `Differences.odt` / `Differences.pdf` in Example pages is outdated (it wrongly listed a woodcut line for D-Mu).
 - Copies that are difficult to align: F-Pm, A-Wn, D-ARk, D-SHk.
 
 Music pages matter most and should be tested hardest, starting with a page that has few
@@ -517,7 +517,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
-| V12 | Known-differences checks (§4.4): Melopoiae TOC (done, 16/16); Melopoiae woodcut p.19, B-Br vs D-Mu fracture lines (done 15 Nov, 7 of 8 lines assertable; fine Mercury line too thin at working resolution); still to do: Liber f.19v music table, further Melopoiae pairs from Differences.pdf | partly done | T3, T4 |
+| V12 | Known-differences checks (§4.4): Melopoiae TOC (done, 16/16); Melopoiae woodcut p.19, B-Br vs D-Mu fracture lines (done 15 Nov; 7 of 8 lines assertable, the fine Mercury line is too thin at working resolution; the list now agrees with the owner's markings); still to do: Liber f.19v music table, further Melopoiae pairs from Differences.pdf | partly done | T3, T4 |
 | V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
 
@@ -551,7 +551,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | D3 | Desktop framework (Electron vs Tauri) — to be proposed with reasons in plain language | before V5 |
 | D4 | Code-signing certificate for the installer (low hundreds of euros a year) | at release |
 | D5 | Grouping design (§5.1) | before P1 |
-| D7 | Differences.pdf lists the horizontal line above Phoebus' head for B-Br **and** D-Mu, but the owner marked it only in B-Br and the measurement finds ink there in D-Mu: ask which is right | before extending the woodcut check |
+| D7 | ~~Differences.pdf listed the line above Phoebus' head for D-Mu too~~ **Resolved 15 Nov:** the owner says that was an error in the old Differences.pdf; the line is in B-Br only. His current list is `Mein Artikel\List of Differences.odt` (Dropbox\Melopoiae), which already says so. **That file, not Differences.pdf, is the reference for all checks from now on** | done |
 | D6 | What exactly is stored for aligned results (V10) | before V8 |
 
 ### 11.5 Order from here (15 November 2026)

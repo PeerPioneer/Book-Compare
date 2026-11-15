@@ -47,9 +47,9 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
 ## Check against known differences (first case done)
 
 * `check_known_differences.js "<Example pages folder>"`: Melopoiae contents page, reference B-Br against D-Mu, A-Wn1, CH-Bu (group A)
-  and D-Mbs (group B), regions chosen from `Differences.pdf` ("Pair 02"). Result: 16 of 16 checks pass. The table matches in every copy
+  and D-Mbs (group B), regions chosen from `List of Differences.odt` ("Pair 02"). Result: 16 of 16 checks pass. The table matches in every copy
   (0.3-3.2 % of the ink unmatched); poem lines 5, 9 and 13 match for the group A copies (0-3.4 %) and stay clearly different for D-Mbs
-  (85-99 %), exactly as Differences.pdf describes (group B sets them much further right).
+  (85-99 %), exactly as the list of differences describes (group B sets them much further right).
 * Limits: only one page type so far. The thin white fracture lines of the Concert of Gods woodcut (pair 19) could not be located reliably
   without exact positions; the Folio 19v music table needs the other copies. Thresholds were set after looking at the measured values.
 * `align_chain.js` holds the whole chain for one pair and is shared by the run and check scripts.
