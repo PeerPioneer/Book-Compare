@@ -157,7 +157,11 @@ partner within 1 px" after tile alignment.
 - *f.19v (A1 against A2):* CH-E against F-Pm and D-Rs, 0.6 %.
 - *Possible error in the printed lists:* on 9r and 9v D-ARk matches D-FUl and US-CA (0.3–2.2 %) and differs from CH-E, D-Rs
   and F-Pm (14–28 %). The printed lists put D-ARk in group A, those of 10r and 10v put it in B, and the list for 9r has only 19 copies
-  (CH-FF missing). Probably a slip in the lists for 9r/9v. **The owner should check this against his own notes.**
+  (CH-FF missing). **Confirmed by the owner (15 Nov 2026): an error in the critical apparatus.** D-ARk belongs in group B on 9r and 9v;
+  the appendix (p. 368) has it correctly. (CH-FF lacks f.8 and f.9, so it is in neither group there.)
+  **Rule for the future:** when a grouping looks wrong, (1) check the appendix (pp. 365–386), which groups pages by printing sheet,
+  (2) check the suspect copy on the other pages of the same sheet, which normally carry the same grouping (f.9 and f.16 are on one
+  sheet, 2nd quaternion, first sheet).
 - *Test B, artificial shift (8r, one system moved, CH-E against F-Pm):* a shift of 4–32 px (3000 px working height; the distance between two staff lines is 39 px, so 32 px is 0.8 of a line space) is
   fully absorbed: 0.6–2.4 % unmatched after tile alignment (28–63 % without). 48 px (1.2 line spaces): 7–11 %, 64 px (1.6 line spaces): 72 % (visible). So even a line moved by about one whole line space, which would change the pitch of every note, is nearly invisible. Even with only
   the coarsest tile level (384 px tiles) a shift of 16 px is absorbed. So **the owner's fear is justified**. The movement the alignment applied in the band equals the
@@ -287,6 +291,11 @@ already decided (see §6).
 ## 5. After version 1
 
 ### 5.1 Recording findings, and grouping copies — open design question
+
+*Idea added 15 Nov 2026:* pages printed on the same sheet normally share the same grouping of copies (dissertation, appendix
+pp. 365–386). The grouping of the grouping tool could therefore be *proposed* sheet-wise (set a copy's group on one page, offer it
+for the other three pages of the sheet) and *checked* sheet-wise (warn when one page of a sheet disagrees with its sheet partners,
+as happened with D-ARk on 9r/9v). Exceptions exist (e.g. 10v) so it stays a hint, never automatic.
 
 **The gap this closes.** Book Compare helps the owner *see* a difference and then gives him
 nothing to take away. His lists of differences, which are the substance of chapter 4.7 of
