@@ -15,6 +15,8 @@
 //   * The original files are only READ. They are never saved, renamed, moved or deleted (each picture is opened, copied and closed
 //     WITHOUT saving).
 //   * The new files go to a different folder. The script refuses a folder that is the scan folder itself or lies inside it.
+//   * Very large scans can overload Photoshop's memory after some hundred files. The script clears Photoshop's caches after every picture and
+//     stops by itself after 100 files (setting "Stop after"): close Photoshop, open it again, start the script again, it carries on.
 //   * A file that already exists in the new folder is not touched ("skipped"). So you can stop the script (press Esc) and start it
 //     again later: it carries on where it stopped.
 //
@@ -25,7 +27,8 @@
 
 #target photoshop
 
-var BC_VERSION = '1.3';
+var BC_VERSION = '1.4';
+var DEFAULT_MAX_PER_RUN = 100;                                 // Photoshop gets unreliable after very many large scans in one session (found with 41-megapixel scans: it failed after about 190); so a run stops by itself after this many files
 var MAX_FAILS_IN_A_ROW = 5;                                   // after this many failures in a row the script stops (probably a loose cable or a vanished drive)
 
 /* ------------------------------------------------------------------------------------------------ small helpers (no Photoshop needed) */
@@ -94,7 +97,7 @@ function saveHalf(doc, bounds, target, ext, quality) {        // cut a copy of t
 function processOne(file, o, st) {
     var base = baseOf(file.name), ext = extOf(file.name);
     var fl = new File(o.outPath + '/' + outName(base, ext, 'L')), fr = new File(o.outPath + '/' + outName(base, ext, 'R')), fs = new File(o.outPath + '/' + outName(base, ext, 'single'));
-    if ((fl.exists && fr.exists) || fs.exists) { st.skipped++; return; }
+    if ((fl.exists && fr.exists) || fs.exists) { st.skipped++; return false; }
     var doc = app.open(file), w, h, single = false;
     try {
         w = doc.width.as('px'); h = doc.height.as('px');
@@ -109,22 +112,29 @@ function processOne(file, o, st) {
         if (o.copySingles) { if (!file.copy(fs)) throw new Error('could not copy ' + file.name); st.singles++; st.files++; }
         else st.ignored++;
     }
+    return true;                                                   // this file was worked on (not skipped)
 }
+function freeMemory() { try { app.purge(PurgeTarget.ALLCACHES); } catch (e) { /* older Photoshop versions: not important */ } }
 function runAll(o, progress) {
-    var files = listPictures(o.inFolder), st = { total: files.length, split: 0, singles: 0, skipped: 0, ignored: 0, files: 0, failed: [], stopped: false, unreachable: false };
+    var files = listPictures(o.inFolder), st = { total: files.length, split: 0, singles: 0, skipped: 0, ignored: 0, files: 0, worked: 0, failed: [], stopped: false, unreachable: false, limitReached: false };
     var oldUnits = app.preferences.rulerUnits, oldDlg = app.displayDialogs;
     app.preferences.rulerUnits = Units.PIXELS; app.displayDialogs = DialogModes.NO;            // no questions about colour profiles etc.
     var inARow = 0;
     try {
         for (var i = 0; i < files.length; i++) {
             if (progress) progress(i, files.length, files[i].name);
-            try { processOne(files[i], o, st); inARow = 0; }
+            try {
+                if (processOne(files[i], o, st)) { st.worked++; freeMemory(); }       // clear Photoshop's undo history and caches after every picture
+                inARow = 0;
+            }
             catch (e) {
                 if (e && e.number === 8007) { st.stopped = true; break; }                     // Esc pressed: Photoshop's "cancel"
                 st.failed.push(files[i].name + ': ' + (e && e.message ? e.message : e) + diagnose(files[i]));
                 inARow++;
+                freeMemory();
                 if (inARow >= MAX_FAILS_IN_A_ROW) { st.unreachable = true; break; }          // not a problem of one file: stop instead of failing 100 more times
             }
+            if (o.maxPerRun > 0 && st.worked >= o.maxPerRun && i < files.length - 1) { st.limitReached = true; break; }      // planned stop: restart Photoshop, then start again
         }
     } finally { app.preferences.rulerUnits = oldUnits; app.displayDialogs = oldDlg; }
     return st;
@@ -138,13 +148,14 @@ function summary(st) {
         'Failed: ' + st.failed.length + '\n';
     for (var i = 0; i < st.failed.length; i++) s += '  - ' + st.failed[i] + '\n';
     if (st.stopped) s += '\nStopped before the end (Esc). Start the script again: finished files are skipped.\n';
-    if (st.unreachable) s += '\nSTOPPED: ' + MAX_FAILS_IN_A_ROW + ' files in a row could not be opened. This is usually not a problem of the files but of the drive (loose cable, drive asleep, network folder gone). Check that the scan folder can be opened in the file explorer, then start the script again: finished files are skipped.\n';
+    if (st.unreachable) s += '\nSTOPPED: ' + MAX_FAILS_IN_A_ROW + ' files in a row could not be opened. This is not a problem of the files themselves. Read the note after each failed file: it says whether the file can still be read from the disk (then Photoshop is the problem: close Photoshop completely, open it again and start the script again) or not (then check the drive, the cable and the folder in the file explorer). Finished files are skipped when you start again.\n';
+    if (st.limitReached) s += '\nSTOPPED ON PURPOSE after ' + st.worked + ' files (the setting "Stop after"). This keeps Photoshop from getting overloaded by very large scans. Close Photoshop completely, open it again and start the script again with the same folders: finished files are skipped and it carries on.\n';
     return s;
 }
 function writeLog(o, st) {
     try {
         var f = new File(o.outPath + '/split-log.txt'); f.encoding = 'UTF-8'; f.open('w');
-        f.write('Book Compare - Split-double-pages.jsx ' + BC_VERSION + '\nFrom: ' + o.inFolder.fsName + '\nTo:   ' + o.outFolder.fsName + '\nCut at ' + o.percent + ' % from the left, extra ' + o.extra + ' % on each side, JPEG quality ' + o.quality + '\n\n' + summary(st));
+        f.write('Book Compare - Split-double-pages.jsx ' + BC_VERSION + '\nFrom: ' + o.inFolder.fsName + '\nTo:   ' + o.outFolder.fsName + '\nCut at ' + o.percent + ' % from the left, extra ' + o.extra + ' % on each side, JPEG quality ' + o.quality + ', stop after ' + o.maxPerRun + ' files\n\n' + summary(st));
         f.close();
     } catch (e) { /* the log is a courtesy */ }
 }
@@ -156,12 +167,13 @@ function checkOptions(o) {                                    // returns a text 
     if (isInside(o.outFolder.fsName, o.inFolder.fsName)) return 'The new files must go to a DIFFERENT folder, not into the scan folder or a folder inside it. This keeps the original scans untouched.\n\nPlease choose another folder for the new files.';
     if (!(o.percent >= 20 && o.percent <= 80)) return 'The cut position must be a number between 20 and 80 (50 = exactly in the middle).';
     if (!(o.extra >= 0 && o.extra <= 15)) return 'The extra must be a number between 0 and 15 (percent of the picture width; 0 = no extra, cut exactly at the cut position).';
+    if (!(o.maxPerRun >= 0 && o.maxPerRun <= 100000)) return 'The "Stop after" number must be 0 (never stop) or a positive number of files.';
     if (!(o.quality >= 1 && o.quality <= 12)) return 'The JPEG quality must be a number from 1 to 12 (12 = best).';
     return '';
 }
 function askOptions() {
     var inF = null, outF = null;
-    var w = new Window('dialog', 'Split double-page scans into left and right pages');
+    var w = new Window('dialog', 'Split double-page scans into left and right pages  (version ' + BC_VERSION + ')');
     w.orientation = 'column'; w.alignChildren = 'fill'; w.margins = 16; w.spacing = 10;
     w.add('statictext', undefined, 'The original scans are only read, never changed. The new pages are saved in a different folder.', { multiline: true }).preferredSize.width = 520;
     var g1 = w.add('group'); g1.alignChildren = 'left';
@@ -179,6 +191,9 @@ function askOptions() {
     var g4 = w.add('group'); g4.add('statictext', undefined, 'JPEG quality');
     var e4 = g4.add('edittext', undefined, '12'); e4.characters = 3;
     g4.add('statictext', undefined, '(1 to 12, 12 = best; only used for JPEG files)');
+    var g5 = w.add('group'); g5.add('statictext', undefined, 'Stop after');
+    var e5 = g5.add('edittext', undefined, String(DEFAULT_MAX_PER_RUN)); e5.characters = 5;
+    g5.add('statictext', undefined, 'files (0 = never). Very large scans can overload Photoshop; the script then stops by itself, you restart Photoshop and start it again.');
     var c5 = w.add('checkbox', undefined, 'Copy pictures that are not double pages (covers: taller than wide) unchanged'); c5.value = true;
     w.add('statictext', undefined, 'Files that already exist in the new folder are skipped. To start again from zero, choose an empty folder.', { multiline: true }).preferredSize.width = 520;
     var bg = w.add('group'); bg.alignment = 'right';
@@ -186,13 +201,13 @@ function askOptions() {
     b1.onClick = function () { var f = Folder.selectDialog('Choose the folder with the double-page scans'); if (f) { inF = f; t1.text = f.fsName; } };
     b2.onClick = function () { var f = Folder.selectDialog('Choose the folder for the new single pages (NOT the scan folder)'); if (f) { outF = f; t2.text = f.fsName; } };
     ok.onClick = function () {
-        var o = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), extra: parseFloat(String(e35.text).replace(',', '.')), quality: parseInt(e4.text, 10), copySingles: c5.value };
+        var o = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), extra: parseFloat(String(e35.text).replace(',', '.')), quality: parseInt(e4.text, 10), maxPerRun: parseInt(e5.text, 10), copySingles: c5.value };
         var msg = checkOptions(o);
         if (msg) { alert(msg); return; }
         w.close(1);
     };
     if (w.show() !== 1) return null;
-    var res = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), extra: parseFloat(String(e35.text).replace(',', '.')), quality: parseInt(e4.text, 10), copySingles: c5.value };
+    var res = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), extra: parseFloat(String(e35.text).replace(',', '.')), quality: parseInt(e4.text, 10), maxPerRun: parseInt(e5.text, 10), copySingles: c5.value };
     return res;
 }
 

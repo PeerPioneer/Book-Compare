@@ -43,11 +43,11 @@ function makeWorld(log) {
   }
   const world = {
     File: FileM, Folder: FolderM, Doc,
-    app: { preferences: { rulerUnits: 'in' }, displayDialogs: 'all', bringToFront() {}, open(f) {
+    app: { preferences: { rulerUnits: 'in' }, displayDialogs: 'all', bringToFront() {}, purge(t) { assert.strictEqual(t, 'all'); log.purged = (log.purged || 0) + 1; }, open(f) {
       if (log.cancelAt != null && log.opened.length >= log.cancelAt) { const e = new Error('User cancelled'); e.number = 8007; throw e; }
       if (log.corrupt && log.corrupt.indexOf(f.name) >= 0) throw new Error('mock: not a readable picture');
       return new Doc(f.p); } },
-    Units: { PIXELS: 'px' }, DialogModes: { NO: 'no' }, SaveOptions: { DONOTSAVECHANGES: DONOTSAVE },
+    PurgeTarget: { ALLCACHES: 'all' }, Units: { PIXELS: 'px' }, DialogModes: { NO: 'no' }, SaveOptions: { DONOTSAVECHANGES: DONOTSAVE },
     JPEGSaveOptions: function () { this.kind = 'jpg'; }, TiffSaveOptions: function () { this.kind = 'tif'; }, PNGSaveOptions: function () { this.kind = 'png'; },
     FormatOptions: { STANDARDBASELINE: 1 }, MatteType: { NONE: 0 }, TIFFEncoding: { TIFFLZW: 5 }, Extension: { LOWERCASE: 2 },
     alert() {}, Window: function () { throw new Error('no windows in the test'); }
@@ -56,7 +56,7 @@ function makeWorld(log) {
 }
 let world;
 function runScript(options, log) {
-  log.opened = []; log.saved = []; log.badWrites = []; log.badClose = []; log.closed = 0;
+  log.opened = []; log.saved = []; log.badWrites = []; log.badClose = []; log.closed = 0; log.purged = 0;
   world = makeWorld(log);
   const BC_TEST = { options: typeof options === 'function' ? options(world) : options }, ctx = vm.createContext(Object.assign({ BC_TEST, console }, world));
   const src = fs.readFileSync(SCRIPT, 'utf8').split(/\r?\n/).filter(l => !/^#target/.test(l)).join('\n');
@@ -84,7 +84,7 @@ const pixel = (f, x, y) => JSON.parse(cp.execFileSync('python3', ['-c', `
 from PIL import Image
 import json; im = Image.open(r'''${f}''').convert('RGB'); print(json.dumps([im.size, im.getpixel((${x}, ${y}))]))`]).toString());
 // (the folders must be made with the stand-in classes of the run itself, so `instanceof File` works inside the script)
-const opts = (extra) => (w) => { const o = Object.assign({ inFolder: new w.Folder(IN), outFolder: new w.Folder(OUT), percent: 50, extra: 0, quality: 12, copySingles: true }, extra || {}); if (o.outFolder && o.outFolder.p === undefined && typeof o.outFolder === 'string') o.outFolder = new w.Folder(o.outFolder); if (extra && 'outFolder' in extra) o.outFolder = extra.outFolder === null ? null : new w.Folder(extra.outFolder); return o; };
+const opts = (extra) => (w) => { const o = Object.assign({ inFolder: new w.Folder(IN), outFolder: new w.Folder(OUT), percent: 50, extra: 0, quality: 12, maxPerRun: 0, copySingles: true }, extra || {}); if (o.outFolder && o.outFolder.p === undefined && typeof o.outFolder === 'string') o.outFolder = new w.Folder(o.outFolder); if (extra && 'outFolder' in extra) o.outFolder = extra.outFolder === null ? null : new w.Folder(extra.outFolder); return o; };
 
 // ---------------------------------------------------------------------------------------------- 1. a normal run
 let log = { inDir: IN };
@@ -169,6 +169,21 @@ log = { inDir: IN, corrupt: ['00001.jpg', '00003.jpg', '00011.png'] }; r = runSc
 assert.strictEqual(res.unreachable, false); assert.strictEqual(res.failed.length, 3); assert.strictEqual(res.split, 3);
 assert.deepStrictEqual(hashAll(IN), BEFORE); fs.rmSync(OUT, { recursive: true });
 console.log('  stop after repeated failures: ok');
+
+// ---------------------------------------------------------------------------------------------- 3e. planned stop after N files (Photoshop gets overloaded by very large scans) and memory clearing
+fs.rmSync(OUT, { recursive: true, force: true });
+log = { inDir: IN }; r = runScript(opts({ maxPerRun: 2 }), log); res = r.BC_TEST.result;
+assert.strictEqual(res.limitReached, true); assert.strictEqual(res.worked, 2); assert.strictEqual(log.purged, 2, 'caches cleared after every file that was worked on');
+assert(/STOPPED ON PURPOSE after 2 files/.test(r.BC_TEST.summary)); assert(fs.readFileSync(path.join(OUT, 'split-log.txt'), 'utf8').includes('stop after 2 files'));
+const firstRun = fs.readdirSync(OUT).filter(n => n !== 'split-log.txt').length;
+log = { inDir: IN }; r = runScript(opts({ maxPerRun: 2 }), log); res = r.BC_TEST.result;                  // start again: carries on, skips what is done
+assert(res.skipped >= 2 && res.worked === 2 && res.limitReached === true, 'second start carries on');
+log = { inDir: IN }; r = runScript(opts({ maxPerRun: 2 }), log); r = runScript(opts({ maxPerRun: 100 }), { inDir: IN }); res = r.BC_TEST.result;
+assert.strictEqual(res.limitReached, false); assert.deepStrictEqual(fs.readdirSync(OUT).filter(n => n !== 'split-log.txt'), expectOrder, 'finally everything is there, in order');
+assert(fs.readdirSync(OUT).filter(n => n !== 'split-log.txt').length > firstRun);
+r = runScript(opts({ maxPerRun: -3 }), { inDir: IN }); assert(/Stop after/.test(r.BC_TEST.error));
+assert.deepStrictEqual(hashAll(IN), BEFORE); fs.rmSync(OUT, { recursive: true });
+console.log('  planned stop after N files, memory clearing, carrying on: ok');
 
 // ---------------------------------------------------------------------------------------------- 3d. the failure message says whether it is the drive or Photoshop
 fs.rmSync(OUT, { recursive: true, force: true });
