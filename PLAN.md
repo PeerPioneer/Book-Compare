@@ -517,7 +517,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
-| V12 | Known-differences checks (§4.4): Liber f.19v music table, Melopoiae TOC (done, 16/16), Melopoiae woodcut p.19 (B-Br vs D-Mu fracture lines; his marked files are now found, see 11.3), further pairs from Differences.pdf | partly done | T1–T3 |
+| V12 | Known-differences checks (§4.4): Melopoiae TOC (done, 16/16); Melopoiae woodcut p.19, B-Br vs D-Mu fracture lines (done 15 Nov, 7 of 8 lines assertable; fine Mercury line too thin at working resolution); still to do: Liber f.19v music table, further Melopoiae pairs from Differences.pdf | partly done | T3, T4 |
 | V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
 
@@ -551,12 +551,13 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | D3 | Desktop framework (Electron vs Tauri) — to be proposed with reasons in plain language | before V5 |
 | D4 | Code-signing certificate for the installer (low hundreds of euros a year) | at release |
 | D5 | Grouping design (§5.1) | before P1 |
+| D7 | Differences.pdf lists the horizontal line above Phoebus' head for B-Br **and** D-Mu, but the owner marked it only in B-Br and the measurement finds ink there in D-Mu: ask which is right | before extending the woodcut check |
 | D6 | What exactly is stored for aligned results (V10) | before V8 |
 
 ### 11.5 Order from here (15 November 2026)
 
 1. Photoshop script v1.1 — **done**.
-2. Known-differences check for the Melopoiae woodcut and more pairs (V12), using T3/T4 — **next**, small.
+2. Known-differences check: woodcut — **done**; more Melopoiae pairs and the Liber f.19v table (V12) — next, small.
 3. Thursday 19 Nov: speed test on his PC (V11/T2).
 4. Desktop program (V5), starting with D3.
 5. Compare tab uses printed-area detection and tile alignment (V2a, V3).
