@@ -519,6 +519,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
 | V12 | Known-differences checks (§4.4): Melopoiae TOC (done, 16/16); Melopoiae woodcut p.19, B-Br vs D-Mu fracture lines (done 15 Nov; 7 of 8 lines assertable, the fine Mercury line is too thin at working resolution; the list now agrees with the owner's markings); still to do: Liber f.19v music table, further Melopoiae pairs from Differences.pdf | partly done | T3, T4 |
 | V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
+| V15 | **Alignment settings for a page that aligns badly** (idea from Aruspix: number of main tiles and sub-tiles). Proposal: a button "Try again with other settings" with 2–3 plain presets (stiffer / standard / more flexible), numbers only in an advanced panel; result shown at once for the pair on screen; chosen setting saved per page in the project. Caution: a more flexible alignment can hide real differences, so "fewest unmatched" must NOT be the only criterion (needs the known-differences check, §4.4) | **open** — owner's idea 15 Nov; to be decided with the experiment on difficult copies (F-Pm, A-Wn, D-ARk, D-SHk) | needs V3; test first which settings matter |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
 
 ### 11.2 After version 1
@@ -541,6 +542,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | T2 | Run the speed test on his PC, Thursday 19 Nov, and paste the text | his |
 | T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
 | T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |
+| T5 | CZ-Pu split run with v1.0 (15 Nov): 163 double pages split, then every file from NK4288 to NK4405 failed with "Cannot open the file because the open options are incorrect" (112 files); NK4406 (a single page) opened fine. Cause unknown: the D: drive was no longer reachable when I tried to inspect the files. To do: inspect NK4287/NK4288 (format, colour mode, profile), then make the script robust | his drive; then me |
 
 ### 11.4 Decisions still to be taken
 
