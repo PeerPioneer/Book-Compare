@@ -1,3 +1,8 @@
+## [Music tests: re-set folios, shifted lines, Melopoiae pairs 05 and 09] - 2026-11-15
+- New: research/js/music_pair.js (aligns one pair of scans and measures it per horizontal strip, writes overlay and movement map), research/js/shift_test.js (moves one system of a real music page by a known amount and aligns it), research/js/dump_field.js. tile_align.js can now also return the total movement field and (research only, environment variable BC_LEVELS) use only the first levels; results are unchanged when it is not used
+- Findings (details in PLAN.md section 4.4): copies of the same group match (0.2-3 %), re-set voices stay different (44-50 %), nothing was bent into a false match. A whole line of notation moved by 4-32 px (up to 0.8 of a line space) is pulled back by the tile alignment and is invisible (0.6-2.4 % unmatched); 48 px is almost invisible, 64 px shows. The movement map shows such shifts, but real paper warping makes small shifts (below about 10 px) undetectable automatically. V16 (movement map, unbent view, cautious hint) is now part of version 1
+- Possible slip in the dissertation's lists for folios 9r and 9v: D-ARk behaves as group B
+
 ## [Split script v1.5: fixes an error in v1.4] - 2026-11-15
 - Fixed: tools/photoshop/Split-double-pages.jsx (version 1.5). Version 1.4 stopped at once in the owner's Photoshop with "ReferenceError: freeMemory is not a function": that helper name is not usable in Photoshop's script engine, and the stand-in used in the tests did not show it. The helper is now called bcClearCaches and defined as a variable at the top of the file. Nothing else changed
 

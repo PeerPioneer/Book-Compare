@@ -54,7 +54,7 @@ research, published, and cited by other people. It contains:
 1. **The whole-book workspace** — the grid of copies and pages, which largely exists.
 2. **Automatic detection of the printed area** of each scan, with manual correction.
 3. **Tile-based alignment** — the fine, piecewise registration, usable throughout.
-4. **Difference view**, as it already works.
+4. **Difference view**, as it already works, **and the movement map** ("how far was every part of this copy moved to fit the reference?") with an automatic "possible shift here" hint and a "rough alignment only" view. Reason: tile alignment bends a copy so much that a line of notation that was only shifted becomes invisible (§4.4, tests of 15 Nov 2026; register V16).
 5. **A proper desktop program** — an installer, a project saved in one file, double-click to
    open (§4.8).
 6. **The website**, kept up to date automatically, as the place to try Book Compare without
@@ -142,6 +142,36 @@ be visible, and the alignment must stay within a few pixels where nothing differ
 Melopoiae table of contents, copies of both variant groups): 16 of 16 pass. The displaced poem lines
 of group B stay visible after alignment, the rest of the page matches. The woodcut fracture lines
 and the music table (Folio 19v) are still to do.
+
+**Music tests (15 November 2026)** — scripts `research/js/music_pair.js`, `shift_test.js`, `dump_field.js`
+(scans never in the repository). Reference copy CH-E (group A); every number is "share of ink without a
+partner within 1 px" after tile alignment.
+
+- *Test A, re-set folios 7r, 7v, 9r, 9v (apparatus pp. 199–201).* Same group: 0.3–2 % (7r: D-ARk, D-FUl, US-CA;
+  7v: 1.6–8 %, the high values come from a dark scan edge at the top; 9r/9v: D-Rs, F-Pm 0.4–3 %). Other group: 44–50 % on 7r and 7v
+  (D-Rs, F-Pm: the page is "almost completely set differently"). The re-set voices show as red/blue ghosts, nothing was bent into a false
+  match, the unchanged voices match, the single lower Sextus system on 7v (it stands lower in group A) shows as two displaced copies.
+  On 9r/9v the unchanged top voice matches in all copies and only the re-set voices and the stems pointing the other way differ.
+  Two B copies against each other: 1.3–1.7 %.
+- *Same-group control, f.8r and 8v (all copies group A):* 0.2–2.4 % everywhere, i.e. no invented differences.
+- *f.19v (A1 against A2):* CH-E against F-Pm and D-Rs, 0.6 %.
+- *Possible error in the printed lists:* on 9r and 9v D-ARk matches D-FUl and US-CA (0.3–2.2 %) and differs from CH-E, D-Rs
+  and F-Pm (14–28 %). The printed lists put D-ARk in group A, those of 10r and 10v put it in B, and the list for 9r has only 19 copies
+  (CH-FF missing). Probably a slip in the lists for 9r/9v. **The owner should check this against his own notes.**
+- *Test B, artificial shift (8r, one system moved, CH-E against F-Pm):* a shift of 4–32 px (3000 px working height; the distance between two staff lines is 39 px, so 32 px is 0.8 of a line space) is
+  fully absorbed: 0.6–2.4 % unmatched after tile alignment (28–63 % without). 48 px (1.2 line spaces): 7–11 %, 64 px (1.6 line spaces): 72 % (visible). So even a line moved by about one whole line space, which would change the pitch of every note, is nearly invisible. Even with only
+  the coarsest tile level (384 px tiles) a shift of 16 px is absorbed. So **the owner's fear is justified**. The movement the alignment applied in the band equals the
+  shift that was built in (within 1 px), so the information is not lost, only not shown.
+- *Can the shift be detected automatically?* Comparison of the movement in a band of 350 px with the movement in the 150 px above and below: it equals the shift
+  (4.3 px for 4, 7.8 for 8, 14.7 for 16, 30 for 32), but on real, correctly matching pairs the same measure reaches 2–10 px (up to 14–19 px on some pages with strong paper warping, e.g. 9v). So: usable for shifts of about 15 px and more
+  (0.4 of a line space), unreliable below about 10 px, where it would raise false alarms.
+- *Melopoiae pairs 05 and 09:* the clef and flat differences of pair 05 (C against A and B) and the two single notes (6:7 and 7:8) show in the overlay.
+  The "notes slightly too low" differences of pair 09 (A-Wn1 against B-Br) are NOT visible (1.7 % unmatched, same as the control B-Br against DK-Kk, 1.5 %) and not in the movement map either (patchy 0–12 px
+  everywhere from paper warping): small shifts of notes against their staff are lost in the alignment.
+
+Consequence for the design: the movement map is not a luxury. It is part of version 1, with the display of the rough alignment (unbent) next to it; the
+automatic hint must be cautious (only clear, sharp-edged movements of about 15 px or more, shown as "worth a look", never as "no shift"). For small
+shifts (a few pixels) the overlay and the map cannot be trusted; a more specific measurement (notes against their own staff) would be needed, which is research beyond version 1.
 
 This was planned for after version 1; it moves here because it is how the experiment is
 judged. Speed alone means nothing if the faster version no longer shows the variants. Later,
@@ -517,10 +547,10 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
-| V12 | Known-differences checks (§4.4), all pass (15 Nov): Melopoiae TOC (16); woodcut p.19 B-Br vs D-Mu (7 assertable lines of 8); p.8, five copies against B-Br (25); Liber f.19v, CH-E vs D-FUl and US-CA, whole page and the single notes of the apparatus (11). **Source for the Liber:** the critical apparatus in `Dissertation_Verlag.pdf`, 4.6, pp. 195–224 (PDF page = printed page), with Table 1 of the 20 extant copies on p. 15; for the Melopoiae: `Mein Artikel\\List of Differences.odt`. **Still open:** more Liber folios from the apparatus (many have groups A/B with single notes or text), Melopoiae pairs 05, 09 and others | partly done | T3, T4 |
+| V12 | Known-differences checks (§4.4), all pass (15 Nov): Melopoiae TOC (16); woodcut p.19 B-Br vs D-Mu (7 assertable lines of 8); p.8, five copies against B-Br (25); Liber f.19v, CH-E vs D-FUl and US-CA, whole page and the single notes of the apparatus (11). **Source for the Liber:** the critical apparatus in `Dissertation_Verlag.pdf`, 4.6, pp. 195–224 (PDF page = printed page), with Table 1 of the 20 extant copies on p. 15; for the Melopoiae: `Mein Artikel\\List of Differences.odt`. Music tests added 15 Nov (re-set folios 7r/7v/9r/9v, f.8r/8v control, f.19v A1 against A2, Melopoiae pairs 05 and 09, artificial shifts; see §4.4). **Still open:** the B copies of f.8r/8v (CZ-Pu, GB-Lbl1 and others, once split), other Liber folios with single notes, other Melopoiae pairs | partly done | T3, T4 |
 | V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
 | V15 | **Alignment settings for a page that aligns badly** (idea from Aruspix: number of main tiles and sub-tiles). Proposal: a button "Try again with other settings" with 2–3 plain presets (stiffer / standard / more flexible), numbers only in an advanced panel; result shown at once for the pair on screen; chosen setting saved per page in the project. Caution: a more flexible alignment can hide real differences, so "fewest unmatched" must NOT be the only criterion (needs the known-differences check, §4.4) | **open** — owner's idea 15 Nov; to be decided with the experiment on difficult copies (F-Pm, A-Wn, D-ARk, D-SHk) | needs V3; test first which settings matter |
-| V16 | **Shifts of a few pixels are absorbed by the tile alignment** (found 15 Nov on Melopoiae p. 8: title and kerning "shifted slightly" in group A show only 0–3 % unmatched). Idea: show how far each part was moved (a map or arrows from the displacement field), so that such shifts stay visible. This is the "offset arrows" candidate of §5.6; decide after the first real use | **open** | needs V3 |
+| V16 | **Shifts are absorbed by the tile alignment — now measured (15 Nov, §4.4 music tests).** One whole line moved by 4–32 px is pulled back and invisible (0.6–2.4 % unmatched); only 64 px shows. Melopoiae p. 9: half-staff-space differences are not visible. The movement applied equals the shift, so it can be shown. **Decision: part of version 1** — (1) movement map next to the overlay, (2) the rough, unbent alignment as a second view, (3) a cautious automatic hint for sharp-edged movements of about 15 px or more (false alarms below about 10 px). Small shifts remain undetectable; say so in the help text | **firm, version 1** | needs V3 |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
 
 ### 11.2 After version 1

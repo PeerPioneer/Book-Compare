@@ -6,6 +6,7 @@
           <label>.json       (unmatched ink for the whole printed area and for 12 horizontal strips; movement statistics).
    Scan images are never written to the repository. */
 const fs = require('fs'), path = require('path'), jpeg = require('jpeg-js');
+const dumpField = require('./dump_field');
 const { loadCv, alignPair, unmatchedShare, overlayJpeg } = require('./align_chain');
 
 function moveJpeg(cv, field, w, h, crop, out, scale) {
@@ -40,6 +41,7 @@ function moveJpeg(cv, field, w, h, crop, out, scale) {
   overlayJpeg(cv, r.ref, r.aligned, path.join(outDir, label + '_overlay.jpg'), 0.4, crop);
   overlayJpeg(cv, r.ref, r.rough, path.join(outDir, label + '_rough.jpg'), 0.4, crop);
   moveJpeg(cv, r.field, w, h, crop, path.join(outDir, label + '_move.jpg'), 0.4);
+  dumpField(r.field, r.ref, path.join(outDir, label + '_field'));
   fs.writeFileSync(path.join(outDir, label + '.json'), JSON.stringify(res, null, 1));
   console.log(JSON.stringify({ label, whole_rough: +res.whole_rough.toFixed(1), whole_tiles: +res.whole_tiles.toFixed(1), move: res.move, strips: res.strips.map(s => s.unmatched).join(' ') }));
 })().catch(e => { console.error('ERROR', e.message); process.exit(1); });

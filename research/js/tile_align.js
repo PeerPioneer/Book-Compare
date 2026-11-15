@@ -111,7 +111,8 @@ function denseField(cv, cx, cy, S, rows, cols, W, H) {
 
 /* bend `mov` onto `ref` (ink maps of the same size, already roughly aligned). box = [x0, x1, y0, y1]. Returns a new Mat. */
 function tileAlign(cv, ref, mov, box, opts = {}) {
-  const levels = opts.levels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
+  const envLevels = (typeof process !== 'undefined' && process.env && process.env.BC_LEVELS) ? LEVELS.slice(0, +process.env.BC_LEVELS) : null;   // research only: use just the first N levels (a stiffer alignment)
+  const levels = opts.levels || envLevels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
   const refB = new cv.Mat(); cv.GaussianBlur(ref, refB, new cv.Size(0, 0), 0.8);
   let cur = mov;
   const total = opts.trackField ? { fx: new Float32Array(W * H), fy: new Float32Array(W * H) } : null;   // sum of all level fields (research: movement map)
