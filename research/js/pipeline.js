@@ -38,10 +38,10 @@ function alignCopy(cv, refState, red, opts = {}) {
   const m = Math.max(60, Math.floor(0.02 * Math.max(x1 - x0, y1 - y0)));
   const tbox = [Math.max(60, x0 - m), Math.min(w - 60, x1 + m), Math.max(60, y0 - m), Math.min(h - 60, y1 + m)];
   t = now();
-  const { aligned, stats } = tileAlign(cv, ref, rough, tbox); tm.tiles_s = (now() - t) / 1000;
+  const { aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField }); tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
   mov.delete();
-  const out = { aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale };
+  const out = { field, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale };
   if (opts.measure) out.unmatched = { rough: unmatchedShare(cv, ref, rough, box).share, tiles: unmatchedShare(cv, ref, aligned, box).share };
   if (!opts.keepRough) { rough.delete(); out.rough = null; }
   return out;

@@ -18,7 +18,7 @@ function loadRed(cv, p) {
 }
 
 /* ref and other: paths to scans. Returns {ref, rough, aligned (ink maps), box, tbox, W, stats, times} */
-function alignPair(cv, refPath, movPath, refCache) {
+function alignPair(cv, refPath, movPath, refCache, opts = {}) {
   const T = () => Date.now(), tm = {}; let t = T();
   const cache = refCache || {};
   if (!cache.state) {
@@ -27,8 +27,8 @@ function alignPair(cv, refPath, movPath, refCache) {
   }
   t = T();
   const rm = loadRed(cv, movPath); tm.decode_s = (T() - t) / 1000;
-  const r = alignCopy(cv, cache.state, rm, { keepRough: true }); rm.delete(); Object.assign(tm, r.times);
-  return { ref: cache.state.ref, rough: r.rough, aligned: r.aligned, box: cache.state.box, tbox: r.tbox, W: r.W, stats: r.stats, times: tm, cache };
+  const r = alignCopy(cv, cache.state, rm, { keepRough: true, trackField: opts.trackField }); rm.delete(); Object.assign(tm, r.times);
+  return { field: r.field, ref: cache.state.ref, rough: r.rough, aligned: r.aligned, box: cache.state.box, tbox: r.tbox, W: r.W, stats: r.stats, times: tm, cache };
 }
 
 function overlayJpeg(cv, ref, aligned, path, scale = 0.3, crop = null) {

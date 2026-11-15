@@ -114,6 +114,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
   const levels = opts.levels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
   const refB = new cv.Mat(); cv.GaussianBlur(ref, refB, new cv.Size(0, 0), 0.8);
   let cur = mov;
+  const total = opts.trackField ? { fx: new Float32Array(W * H), fy: new Float32Array(W * H) } : null;   // sum of all level fields (research: movement map)
   for (const [tile, step, search, threshold] of levels) {
     const t0 = Date.now();
     const movB = new cv.Mat(); cv.GaussianBlur(cur, movB, new cv.Size(0, 0), 0.8);
@@ -122,6 +123,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
     const t1 = Date.now();
     const fx = denseField(cv, cx, cy, repair(SX, rows, cols, threshold).S, rows, cols, W, H);
     const fy = denseField(cv, cx, cy, repair(SY, rows, cols, threshold).S, rows, cols, W, H);
+    if (total) for (let p = 0; p < W * H; p++) { total.fx[p] += fx[p]; total.fy[p] += fy[p]; }
     const mapx = new cv.Mat(H, W, cv.CV_32F), mapy = new cv.Mat(H, W, cv.CV_32F);
     { const mx = mapx.data32F, my = mapy.data32F; for (let y = 0, p = 0; y < H; y++) for (let x = 0; x < W; x++, p++) { mx[p] = x + fx[p]; my[p] = y + fy[p]; } }
     const next = new cv.Mat();
@@ -132,7 +134,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
     stats.push({ tile, tiles: rows * cols, measure_s: (t1 - t0) / 1000, field_s: (Date.now() - t1) / 1000 });
   }
   refB.delete();
-  return { aligned: cur, stats };
+  return { aligned: cur, stats, field: total };
 }
 
 module.exports = { tileAlign, LEVELS };

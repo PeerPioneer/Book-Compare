@@ -1,3 +1,6 @@
+## [Split script v1.5: fixes an error in v1.4] - 2026-11-15
+- Fixed: tools/photoshop/Split-double-pages.jsx (version 1.5). Version 1.4 stopped at once in the owner's Photoshop with "ReferenceError: freeMemory is not a function": that helper name is not usable in Photoshop's script engine, and the stand-in used in the tests did not show it. The helper is now called bcClearCaches and defined as a variable at the top of the file. Nothing else changed
+
 ## [Split script v1.4: protects Photoshop against overload] - 2026-11-15
 - Changed: tools/photoshop/Split-double-pages.jsx (version 1.4). Finding on the CZ-Pu scans (41 megapixels each): the files and the drive were fine, but Photoshop itself stopped opening files after about 190 pictures in one session (and then failed on every further file until restarted). Now the script clears Photoshop's undo history and caches after every picture and stops by itself after 100 files (new field "Stop after", 0 = never); the report then says to close Photoshop, open it again and start again with the same folders (finished files are skipped). The dialog title shows the version
 - The same version also holds the failure diagnosis of v1.3 (whether a file can still be read from the disk). The copy in the owner's Dropbox "Claude outputs" folder was still v1.2 when this was found

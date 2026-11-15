@@ -27,8 +27,11 @@
 
 #target photoshop
 
-var BC_VERSION = '1.4';
+var BC_VERSION = '1.5';
 var DEFAULT_MAX_PER_RUN = 100;                                 // Photoshop gets unreliable after very many large scans in one session (found with 41-megapixel scans: it failed after about 190); so a run stops by itself after this many files
+var bcClearCaches = function () {                             // Photoshop: clear undo history and caches (not important if this Photoshop version cannot do it; must never stop the script)
+    try { app.purge(PurgeTarget.ALLCACHES); } catch (e) { /* older Photoshop versions */ }
+};
 var MAX_FAILS_IN_A_ROW = 5;                                   // after this many failures in a row the script stops (probably a loose cable or a vanished drive)
 
 /* ------------------------------------------------------------------------------------------------ small helpers (no Photoshop needed) */
@@ -114,7 +117,7 @@ function processOne(file, o, st) {
     }
     return true;                                                   // this file was worked on (not skipped)
 }
-function freeMemory() { try { app.purge(PurgeTarget.ALLCACHES); } catch (e) { /* older Photoshop versions: not important */ } }
+
 function runAll(o, progress) {
     var files = listPictures(o.inFolder), st = { total: files.length, split: 0, singles: 0, skipped: 0, ignored: 0, files: 0, worked: 0, failed: [], stopped: false, unreachable: false, limitReached: false };
     var oldUnits = app.preferences.rulerUnits, oldDlg = app.displayDialogs;
@@ -124,14 +127,14 @@ function runAll(o, progress) {
         for (var i = 0; i < files.length; i++) {
             if (progress) progress(i, files.length, files[i].name);
             try {
-                if (processOne(files[i], o, st)) { st.worked++; freeMemory(); }       // clear Photoshop's undo history and caches after every picture
+                if (processOne(files[i], o, st)) { st.worked++; bcClearCaches(); }       // clear Photoshop's undo history and caches after every picture
                 inARow = 0;
             }
             catch (e) {
                 if (e && e.number === 8007) { st.stopped = true; break; }                     // Esc pressed: Photoshop's "cancel"
                 st.failed.push(files[i].name + ': ' + (e && e.message ? e.message : e) + diagnose(files[i]));
                 inARow++;
-                freeMemory();
+                bcClearCaches();
                 if (inARow >= MAX_FAILS_IN_A_ROW) { st.unreachable = true; break; }          // not a problem of one file: stop instead of failing 100 more times
             }
             if (o.maxPerRun > 0 && st.worked >= o.maxPerRun && i < files.length - 1) { st.limitReached = true; break; }      // planned stop: restart Photoshop, then start again
