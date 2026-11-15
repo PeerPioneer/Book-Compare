@@ -82,7 +82,7 @@ const pixel = (f, x, y) => JSON.parse(cp.execFileSync('python3', ['-c', `
 from PIL import Image
 import json; im = Image.open(r'''${f}''').convert('RGB'); print(json.dumps([im.size, im.getpixel((${x}, ${y}))]))`]).toString());
 // (the folders must be made with the stand-in classes of the run itself, so `instanceof File` works inside the script)
-const opts = (extra) => (w) => { const o = Object.assign({ inFolder: new w.Folder(IN), outFolder: new w.Folder(OUT), percent: 50, quality: 12, copySingles: true }, extra || {}); if (o.outFolder && o.outFolder.p === undefined && typeof o.outFolder === 'string') o.outFolder = new w.Folder(o.outFolder); if (extra && 'outFolder' in extra) o.outFolder = extra.outFolder === null ? null : new w.Folder(extra.outFolder); return o; };
+const opts = (extra) => (w) => { const o = Object.assign({ inFolder: new w.Folder(IN), outFolder: new w.Folder(OUT), percent: 50, extra: 0, quality: 12, copySingles: true }, extra || {}); if (o.outFolder && o.outFolder.p === undefined && typeof o.outFolder === 'string') o.outFolder = new w.Folder(o.outFolder); if (extra && 'outFolder' in extra) o.outFolder = extra.outFolder === null ? null : new w.Folder(extra.outFolder); return o; };
 
 // ---------------------------------------------------------------------------------------------- 1. a normal run
 let log = { inDir: IN };
@@ -128,6 +128,32 @@ assert.deepStrictEqual(fs.readdirSync(OUT).filter(n => n !== 'split-log.txt'), e
 assert.deepStrictEqual(hashAll(IN), BEFORE);
 console.log('  other cut position, broken file, Esc and resume: ok');
 
+// ---------------------------------------------------------------------------------------------- 3b. extra: each page gets a strip from the other side
+fs.rmSync(OUT, { recursive: true });
+log = { inDir: IN }; r = runScript(opts({ extra: 3 }), log); res = r.BC_TEST.result;                    // 1000 px wide: 3 % = 30 px
+assert(!r.BC_TEST.error, r.BC_TEST.error); assert.strictEqual(res.failed.length, 0); assert.strictEqual(res.split, 6);
+[sz, px] = pixel(path.join(OUT, '00001_L.jpg'), 10, 5); assert.deepStrictEqual(sz, [530, 700]);        // left half + 30 px
+[sz, px] = pixel(path.join(OUT, '00001_R.jpg'), 10, 5); assert.deepStrictEqual(sz, [530, 700]);        // 30 px + right half
+assert(Math.abs(px[0] - 255 * 480 / 1000) < 14, 'the right file starts at x = 470: ' + px);
+assert.strictEqual(pixel(path.join(OUT, '00012_R.tif'), 0, 0)[0][0], 530); assert.strictEqual(pixel(path.join(OUT, '00011_L.png'), 0, 0)[0][0], 530);
+assert(fs.readFileSync(path.join(OUT, 'split-log.txt'), 'utf8').includes('extra 3 %'));
+assert.deepStrictEqual(hashAll(IN), BEFORE);
+// spine a little left of the middle (49 %) with extra: left = 0..520, right = 460..1000
+fs.rmSync(OUT, { recursive: true });
+r = runScript(opts({ percent: 49, extra: 3 }), { inDir: IN });
+assert.strictEqual(pixel(path.join(OUT, '00001_L.jpg'), 0, 0)[0][0], 520); assert.strictEqual(pixel(path.join(OUT, '00001_R.jpg'), 0, 0)[0][0], 540);
+// the two files together always cover the whole picture (no gap), also at the extremes
+const ctx0 = vm.createContext({ BC_TEST: { options: null }, console }); // only the pure functions are needed:
+const fnSrc = fs.readFileSync(SCRIPT, 'utf8').split(/\r?\n/).filter(l => !/^#target/.test(l)).join('\n').replace(/main\(\);\s*$/, '');
+vm.runInContext(fnSrc, ctx0);
+for (const pct of [20, 45, 50, 52.3, 80]) for (const ex of [0, 1, 3, 15]) {
+  const b = vm.runInContext(`halfBounds(7307, 5813, ${pct}, ${ex})`, ctx0);
+  assert(b.left[0] === 0 && b.right[2] === 7307 && b.left[2] >= b.right[0], `no gap at ${pct} % / extra ${ex}`);
+  assert(b.left[2] <= 7307 && b.right[0] >= 0 && b.left[3] === 5813 && b.right[3] === 5813);
+}
+fs.rmSync(OUT, { recursive: true });
+console.log('  extra strip on each side: ok');
+
 // ---------------------------------------------------------------------------------------------- 4. the output folder must not be the scan folder or inside it
 for (const bad of [IN, path.join(IN, 'sub'), path.join(IN, 'Split into single pages'), IN + path.sep]) {
   const before = fs.readdirSync(IN).sort(); log = { inDir: IN };
@@ -137,6 +163,7 @@ for (const bad of [IN, path.join(IN, 'sub'), path.join(IN, 'Split into single pa
 }
 r = runScript(opts({ percent: 5 }), { inDir: IN }); assert(/between 20 and 80/.test(r.BC_TEST.error));
 r = runScript(opts({ quality: 40 }), { inDir: IN }); assert(/1 to 12/.test(r.BC_TEST.error));
+r = runScript(opts({ extra: 40 }), { inDir: IN }); assert(/between 0 and 15/.test(r.BC_TEST.error)); r = runScript(opts({ extra: -1 }), { inDir: IN }); assert(/between 0 and 15/.test(r.BC_TEST.error));
 r = runScript(opts({ outFolder: null }), { inDir: IN }); assert(/folder for the new/.test(r.BC_TEST.error));
 assert.deepStrictEqual(hashAll(IN), BEFORE);
 console.log('  safety refusals: ok');

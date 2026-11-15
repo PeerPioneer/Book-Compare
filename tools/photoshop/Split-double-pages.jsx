@@ -5,6 +5,9 @@
 //   This script goes through a folder of such scans, cuts every double page in the middle and saves the LEFT and the RIGHT page as two
 //   new files in ANOTHER folder, in reading order:
 //        00001.jpg  ->  00001_L.jpg  (left page)  and  00001_R.jpg  (right page)
+//   The spine of a scanned book is rarely exactly in the middle, so each half gets a little EXTRA from the other side (default 3 % of the
+//   width of the picture): the left file is the left half plus the extra, the right file is the right half plus the extra. This way no
+//   part of a page is cut off. The extra strip of the neighbouring page does not matter for Book Compare, which crops to the printed area.
 //   Pictures that are not double pages (a cover, a back cover: taller than wide) are copied unchanged as  00000_single.jpg .
 //   Sorted by name the new files are in the right order: 00000_single, 00001_L, 00001_R, 00002_L, 00002_R, ...
 //
@@ -22,7 +25,7 @@
 
 #target photoshop
 
-var BC_VERSION = '1.0';
+var BC_VERSION = '1.1';
 
 /* ------------------------------------------------------------------------------------------------ small helpers (no Photoshop needed) */
 function naturalCompare(a, b) {                               // "p2" before "p10"
@@ -47,6 +50,11 @@ function baseOf(name) { return String(name).replace(/\.[A-Za-z0-9]+$/, ''); }
 function isPicture(name) { var e = extOf(name); return e === 'jpg' || e === 'tif' || e === 'png'; }
 function isDouble(w, h) { return w >= h * 1.1; }              // a double page is clearly wider than tall; a single page is taller than wide
 function cutPosition(w, percent) { var c = Math.round(w * percent / 100); return Math.max(1, Math.min(w - 1, c)); }
+function extraPixels(w, extra) { return Math.max(0, Math.round(w * extra / 100)); }           // extra = percent of the picture width
+function halfBounds(w, h, percent, extra) {                  // the two crop rectangles [left, top, right, bottom]; they overlap by 2 x extra
+    var cut = cutPosition(w, percent), e = extraPixels(w, extra);
+    return { left: [0, 0, Math.min(w, cut + e), h], right: [Math.max(0, cut - e), 0, w, h] };
+}
 function norm(path) { return String(path).replace(/\//g, '\\').toLowerCase().replace(/\\+$/, '') + '\\'; }
 function isInside(childPath, parentPath) { var c = norm(childPath), p = norm(parentPath); return c.indexOf(p) === 0; }   // also true when both are the same folder
 function outName(base, ext, part) { return base + '_' + part + '.' + ext; }          // part = 'L', 'R' or 'single'
@@ -84,9 +92,9 @@ function processOne(file, o, st) {
     try {
         w = doc.width.as('px'); h = doc.height.as('px');
         if (isDouble(w, h)) {
-            var cut = cutPosition(w, o.percent);
-            saveHalf(doc, [0, 0, cut, h], fl, ext, o.quality);
-            saveHalf(doc, [cut, 0, w, h], fr, ext, o.quality);
+            var b = halfBounds(w, h, o.percent, o.extra);
+            saveHalf(doc, b.left, fl, ext, o.quality);
+            saveHalf(doc, b.right, fr, ext, o.quality);
             st.split++; st.files += 2;
         } else single = true;
     } finally { doc.close(SaveOptions.DONOTSAVECHANGES); }          // never saves anything into the original
@@ -125,7 +133,7 @@ function summary(st) {
 function writeLog(o, st) {
     try {
         var f = new File(o.outPath + '/split-log.txt'); f.encoding = 'UTF-8'; f.open('w');
-        f.write('Book Compare - Split-double-pages.jsx ' + BC_VERSION + '\nFrom: ' + o.inFolder.fsName + '\nTo:   ' + o.outFolder.fsName + '\nCut at ' + o.percent + ' % from the left, JPEG quality ' + o.quality + '\n\n' + summary(st));
+        f.write('Book Compare - Split-double-pages.jsx ' + BC_VERSION + '\nFrom: ' + o.inFolder.fsName + '\nTo:   ' + o.outFolder.fsName + '\nCut at ' + o.percent + ' % from the left, extra ' + o.extra + ' % on each side, JPEG quality ' + o.quality + '\n\n' + summary(st));
         f.close();
     } catch (e) { /* the log is a courtesy */ }
 }
@@ -136,6 +144,7 @@ function checkOptions(o) {                                    // returns a text 
     if (!o.outFolder) return 'Please choose the folder for the new single pages.';
     if (isInside(o.outFolder.fsName, o.inFolder.fsName)) return 'The new files must go to a DIFFERENT folder, not into the scan folder or a folder inside it. This keeps the original scans untouched.\n\nPlease choose another folder for the new files.';
     if (!(o.percent >= 20 && o.percent <= 80)) return 'The cut position must be a number between 20 and 80 (50 = exactly in the middle).';
+    if (!(o.extra >= 0 && o.extra <= 15)) return 'The extra must be a number between 0 and 15 (percent of the picture width; 0 = no extra, cut exactly at the cut position).';
     if (!(o.quality >= 1 && o.quality <= 12)) return 'The JPEG quality must be a number from 1 to 12 (12 = best).';
     return '';
 }
@@ -153,6 +162,9 @@ function askOptions() {
     var g3 = w.add('group'); g3.add('statictext', undefined, 'Cut at');
     var e3 = g3.add('edittext', undefined, '50'); e3.characters = 5;
     g3.add('statictext', undefined, '% from the left edge   (50 = exactly in the middle; if the spine of your book is a little left of the middle, try 49)');
+    var g35 = w.add('group'); g35.add('statictext', undefined, 'Extra');
+    var e35 = g35.add('edittext', undefined, '3'); e35.characters = 5;
+    g35.add('statictext', undefined, '% of the width added to each page from the other side (so the spine never cuts off a page; 0 = none)');
     var g4 = w.add('group'); g4.add('statictext', undefined, 'JPEG quality');
     var e4 = g4.add('edittext', undefined, '12'); e4.characters = 3;
     g4.add('statictext', undefined, '(1 to 12, 12 = best; only used for JPEG files)');
@@ -163,13 +175,13 @@ function askOptions() {
     b1.onClick = function () { var f = Folder.selectDialog('Choose the folder with the double-page scans'); if (f) { inF = f; t1.text = f.fsName; } };
     b2.onClick = function () { var f = Folder.selectDialog('Choose the folder for the new single pages (NOT the scan folder)'); if (f) { outF = f; t2.text = f.fsName; } };
     ok.onClick = function () {
-        var o = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), quality: parseInt(e4.text, 10), copySingles: c5.value };
+        var o = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), extra: parseFloat(String(e35.text).replace(',', '.')), quality: parseInt(e4.text, 10), copySingles: c5.value };
         var msg = checkOptions(o);
         if (msg) { alert(msg); return; }
         w.close(1);
     };
     if (w.show() !== 1) return null;
-    var res = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), quality: parseInt(e4.text, 10), copySingles: c5.value };
+    var res = { inFolder: inF, outFolder: outF, percent: parseFloat(String(e3.text).replace(',', '.')), extra: parseFloat(String(e35.text).replace(',', '.')), quality: parseInt(e4.text, 10), copySingles: c5.value };
     return res;
 }
 
