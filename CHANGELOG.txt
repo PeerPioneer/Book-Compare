@@ -1,3 +1,6 @@
+## [Plan notes: grouping answers, further test prints] - 2026-11-16
+- PLAN.md: the owner's answers on two-forme printing, grouping by forme alterations only (not registration), sheet/side-of-sheet group patterns (5.1); further test prints Odhecaton A 1504, Marenzio, a chant print, and the red-ink weak spot (10); splitting done (T1)
+
 ## [Plan notes: D-ARk confirmed, same-sheet rule] - 2026-11-15
 - PLAN.md: the apparatus error for D-ARk on f.9r/9v is confirmed by the owner (group B; the appendix is correct); rule for checking suspected wrong groupings against the appendix and the same sheet; idea of sheet-wise grouping hints added to 5.1
 

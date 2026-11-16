@@ -297,6 +297,14 @@ pp. 365–386). The grouping of the grouping tool could therefore be *proposed* 
 for the other three pages of the sheet) and *checked* sheet-wise (warn when one page of a sheet disagrees with its sheet partners,
 as happened with D-ARk on 9r/9v). Exceptions exist (e.g. 10v) so it stays a hint, never automatic.
 
+*Owner's answers, 16 Nov 2026:* (1) "Zweiphasendruck" = every page printed twice (two formes, two runs). (2) His variant
+groups belong to both formes of a page together; he did not record which forme was altered. Registration (staves against
+notes) played no role in the Liber, and for the Melopoiae he wants, for now, to group copies **only by changes made to the
+formes, not by registration**. So the grouping tool groups by alterations; misregistration is shown (movement map, V16) but
+does not create groups. (3) Groups are most often equal across all four pages of a sheet, second most often equal per side
+of a sheet (= per forme); any other pattern is possible but rarer. He expects this to hold for most early prints. So the
+hint should first offer the sheet, then the side of the sheet.
+
 **The gap this closes.** Book Compare helps the owner *see* a difference and then gives him
 nothing to take away. His lists of differences, which are the substance of chapter 4.7 of
 his dissertation, are kept by hand, while the tool that found them knows nothing about what
@@ -530,6 +538,21 @@ All in the owner's Dropbox folder "Example pages", reachable from his tablet and
 Music pages matter most and should be tested hardest, starting with a page that has few
 differences and working towards pages with more and with different kinds of alteration.
 
+**Further prints for testing the alignment (agreed 16 Nov 2026; the owner is looking for digitized copies):**
+- *Petrucci, Odhecaton A, Venice 1504* (mensural, printed in several impressions). Only copies of the 1504 edition
+  against each other (1501 and 1503 are different settings). Scans of the Paris (BnF/Gallica) and New York (NYPL) copies
+  are on IMSLP. Known differences: Hewitt, *Harmonice Musices Odhecaton A* (1942), pp. 4–10 (inking, legibility,
+  initials, attributions; her variant list, Section X, not yet read). Boorman, *Ottaviano Petrucci: Catalogue
+  Raisonné* (2006) is the standard reference; contents not checked.
+- *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin, Troja 17
+  (2018), pp. 103–123: Aruspix superimposition of copies of first editions found many stop-press corrections, recorded in
+  the critical apparatus of the Marenzio Online Digital Edition (marenzio.org, not yet opened).
+- *A chant print, two or more copies*, even without a list of differences: pairs of identical copies show the noise
+  floor (paper warping, inking, show-through); artificial changes (as in Test B: move a note, delete a note) give a
+  ground truth for any print. **Weak spot to test:** chant prints often have red staves or rubrics; the ink map uses the
+  red channel, in which red ink nearly disappears. (Antiphonale Pataviense: only two copies known, BSB and ÖNB; no
+  copy comparison by David Merlin found.)
+
 ---
 
 ## 11. Register of open items and decisions
@@ -578,7 +601,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 
 | ID | Item | Status |
 |----|------|--------|
-| T1 | Split double-page copies (CZ-Pu, D-SHk, GB-Lbl1, SK-Mmf) with `Split-double-pages.jsx` v1.1 into a *different* folder (never into the protected scan folders) | his; SK-Mmf partly done with v1.0 |
+| T1 | Split double-page copies (CZ-Pu, D-SHk, GB-Lbl1, SK-Mmf) with `Split-double-pages.jsx` into a *different* folder (never into the protected scan folders) | **done 16 Nov** (owner): all split; the single-page folders are now sub-folders of the original copy folders. Paths for the B copies of f.8r/8v still to be looked up |
 | T2 | Run the speed test on his PC, Thursday 19 Nov, and paste the text | his |
 | T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
 | T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |
