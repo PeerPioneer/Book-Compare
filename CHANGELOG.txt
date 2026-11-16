@@ -1,3 +1,6 @@
+## [Plan notes: grouping tool suggests nothing; Boorman as ground truth] - 2026-11-17
+- PLAN.md 5.1: the grouping tool makes no suggestions (owner's decision); book-structure ideas parked until after version 1. Section 10: Boorman's catalogue lists copy differences for Odhecaton A 1504 and Canti C 1504
+
 ## [Plan notes: grouping answers, further test prints] - 2026-11-16
 - PLAN.md: the owner's answers on two-forme printing, grouping by forme alterations only (not registration), sheet/side-of-sheet group patterns (5.1); further test prints Odhecaton A 1504, Marenzio, a chant print, and the red-ink weak spot (10); splitting done (T1)
 

@@ -292,18 +292,17 @@ already decided (see §6).
 
 ### 5.1 Recording findings, and grouping copies — open design question
 
-*Idea added 15 Nov 2026:* pages printed on the same sheet normally share the same grouping of copies (dissertation, appendix
-pp. 365–386). The grouping of the grouping tool could therefore be *proposed* sheet-wise (set a copy's group on one page, offer it
-for the other three pages of the sheet) and *checked* sheet-wise (warn when one page of a sheet disagrees with its sheet partners,
-as happened with D-ARk on 9r/9v). Exceptions exist (e.g. 10v) so it stays a hint, never automatic.
+*Decided by the owner, 17 Nov 2026:* the grouping tool **suggests nothing**; the user groups the copies himself.
+Recorded facts (16 Nov): every page of the Liber was printed twice (two formes); his groups cover both formes of a page together;
+copies are grouped only by changes made to the formes, not by registration (misregistration is shown in the movement map, V16,
+but creates no groups); groups are most often equal across a whole sheet, second most often across one side of a sheet.
 
-*Owner's answers, 16 Nov 2026:* (1) "Zweiphasendruck" = every page printed twice (two formes, two runs). (2) His variant
-groups belong to both formes of a page together; he did not record which forme was altered. Registration (staves against
-notes) played no role in the Liber, and for the Melopoiae he wants, for now, to group copies **only by changes made to the
-formes, not by registration**. So the grouping tool groups by alterations; misregistration is shown (movement map, V16) but
-does not create groups. (3) Groups are most often equal across all four pages of a sheet, second most often equal per side
-of a sheet (= per forme); any other pattern is possible but rarer. He expects this to hold for most early prints. So the
-hint should first offer the sheet, then the side of the sheet.
+*Ideas for after version 1, to be discussed then (the owner thinks they may be too complex for Book Compare):*
+1. Record the structure of the book (gatherings, sheets, sides of sheets, pages).
+2. Show that structure in the navigation.
+3. A view of the groups across gatherings, sheets, sides of sheets and pages.
+4. Only then: point out a grouping that looks suspicious (e.g. one copy in a different group on one page while it agrees
+   with the rest of its sheet, as with D-ARk on 9r/9v), so the user can check for a mistake. Never change anything itself.
 
 **The gap this closes.** Book Compare helps the owner *see* a difference and then gives him
 nothing to take away. His lists of differences, which are the substance of chapter 4.7 of
@@ -539,14 +538,20 @@ Music pages matter most and should be tested hardest, starting with a page that 
 differences and working towards pages with more and with different kinds of alteration.
 
 **Further prints for testing the alignment (agreed 16 Nov 2026; the owner is looking for digitized copies):**
-- *Petrucci, Odhecaton A, Venice 1504* (mensural, printed in several impressions). Only copies of the 1504 edition
-  against each other (1501 and 1503 are different settings). Scans of the Paris (BnF/Gallica) and New York (NYPL) copies
-  are on IMSLP. Known differences: Hewitt, *Harmonice Musices Odhecaton A* (1942), pp. 4–10 (inking, legibility,
-  initials, attributions; her variant list, Section X, not yet read). Boorman, *Ottaviano Petrucci: Catalogue
-  Raisonné* (2006) is the standard reference; contents not checked.
-- *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin, Troja 17
-  (2018), pp. 103–123: Aruspix superimposition of copies of first editions found many stop-press corrections, recorded in
-  the critical apparatus of the Marenzio Online Digital Edition (marenzio.org, not yet opened).
+- *Petrucci, Odhecaton A, Venice 1504* (mensural, several impressions). Only 1504 copies against each other.
+  **Ground truth: Boorman, *Ottaviano Petrucci: A Catalogue Raisonné* (Oxford UP 2006), No. 14, pp. 543–548** (owner's copy:
+  `Example pages\Secondary Literature with lists of differences between copies`). Item "In-house corrections" lists stop-press
+  changes and corrections made after printing, folio (by signature).stave.note, with the copies concerned: F-Pc (Rés.538, now
+  BnF), I-TVcap, US-NYp, US-Wc (M1490.P4 Case). Mostly small: folio numbers, a signature, inverted letters, one word; a few
+  notes stamped in or erased. **US-NYp: the outer sheet of gathering F (F1, F2, F7, F8) is from the 1503 edition** = a re-set
+  sheet, like Test A. Boorman warns his lists are not complete (p. 456). Hewitt (1942) and Pugin (2018) give no list of
+  differences between copies of one edition (owner, 17 Nov).
+- *Petrucci, Canti C, Venice 1504* (Boorman No. 12, pp. 525–534): stop-press changes of notes and folio numbers, many
+  stamped-in and erased notes; copies A-Wn, F-Pc, I-TVcap. Other Boorman entries with listed stop-press changes: No. 4
+  Josquin, Misse (p. 479), No. 7 Motetti B (p. 499), No. 11 La Rue, Misse (p. 518), No. 13 Agricola, Misse (pp. 536, 541).
+- *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
+  reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
+  (marenzio.org, not yet checked).
 - *A chant print, two or more copies*, even without a list of differences: pairs of identical copies show the noise
   floor (paper warping, inking, show-through); artificial changes (as in Test B: move a note, delete a note) give a
   ground truth for any print. **Weak spot to test:** chant prints often have red staves or rubrics; the ink map uses the
