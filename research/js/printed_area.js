@@ -153,4 +153,17 @@ function printedBox(cv, r) {
   return box;
 }
 
-module.exports = { H0, redScaled, inkMap, printedBox, smoothBlur };
+/* Staves are long thin lines, so printedBox removes them and can lose staves that carry few notes (e.g. the top half of a page
+   whose lower staves are full). This stretches the box vertically over every row in which at least 45 % of the box width is ink
+   (a staff line, even if short notes sit on it), ignoring the outer 3 % of the image where page edges give long lines. ref = ink map. */
+function extendBoxByStaves(box, ref) {
+  const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows, d = ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h);
+  let sy0 = y0, sy1 = y1;
+  for (let y = margin; y < h - margin; y++) {
+    let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++;
+    if (c >= need) { if (y < sy0) sy0 = y; if (y > sy1) sy1 = y; }
+  }
+  return [x0, sy0, x1, sy1];
+}
+
+module.exports = { H0, redScaled, inkMap, printedBox, smoothBlur, extendBoxByStaves };

@@ -1,7 +1,7 @@
 'use strict';
 /* The alignment chain without any file handling, so that it can run in Node.js (research scripts) and in the browser's worker (app).
    Input: the red channel of a scan scaled to 3000 px height as a 32-bit float Mat (see printed_area.js: redScaled). */
-const { inkMap, printedBox } = require('./printed_area');
+const { inkMap, printedBox, extendBoxByStaves } = require('./printed_area');
 const { roughAlign, warp } = require('./rough_align');
 const { tileAlign } = require('./tile_align');
 
@@ -22,8 +22,9 @@ function unmatchedShare(cv, a_, b_, box) {
 /* reference copy: printed area and ink map (kept for all copies that are aligned onto it) */
 function prepareReference(cv, red) {
   const t0 = now();
-  const box = printedBox(cv, red), t1 = now();
+  let box = printedBox(cv, red); const t1 = now();
   const ref = inkMap(cv, red);
+  if (process.env.STAFFBOX === '1') box = extendBoxByStaves(box, ref); // experiment (research notes, Odhecaton/Canti C tests): keep sparse staves inside the box
   return { ref, box, times: { box_s: (t1 - t0) / 1000, ink_ref_s: (now() - t1) / 1000 } };
 }
 

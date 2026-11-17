@@ -570,10 +570,30 @@ idx = 16·gathering + 2·(leaf−1) (+1 verso), gatherings A B C D E F G H J K L
   or at the page edge. The Vienna scans show dark binding edges, so Paris was the reference.
 - Detected clearly at this resolution: **L1v.iv.9–10** (changed notes, stave 4) and **R8r** final chords (staves 5 and 6; F-Pn differs from A-Wn,
   as Boorman describes).
-- **Not visible: the folio numbers** (B4r 12/21, T3r 147/1047, T5r 149/1049): they lie above the printed-area box and are cut off. Same weak
-  spot as in Odhecaton A. D7r's number (31) is visible and equal.
-- Not located yet: the single stamped-in note heads (D3v.i.1, C4r.iv, O4v.iv.19–22). They are small; my quick look did not find them, which is
-  not proof that they are invisible. To do: crop exactly at Boorman's stave.note position.
+- **Folio numbers: visible once the margin is shown** (second run, `PAD=0.15`): B4r Paris "21" against Vienna's handwritten "12", T3r "1047"
+  against "147", T5r "1049" against "149" — all exactly as Boorman says. In the first run they were cut off by the research overlay's crop
+  (not by the app, which shows the whole page).
+- **O4v.iv.19–22** (changed notes) is also found, at the stave and note position Boorman gives. D3v.i.1, C4r.iv: still not confirmed.
+- **New weak spot found: the printed-area box can cover only part of a page.** On Canti C B4r the box began at about half the page height;
+  the two top staves were outside it and stayed unaligned (red/blue doubling). Cause: staves are removed as "lines" and sparse staves
+  vanish. Fix tried: stretch the box over every row that is mostly ink across the box width (`extendBoxByStaves` in printed_area.js,
+  switched on with `STAFFBOX=1`). B4r then aligns over the full page (4.3 % unmatched, same as before but now for the whole page).
+  Three of 21 Canti C pages (B4r, F1r, O4v) and several Odhecaton pages had suspiciously small boxes.
+- Marginalia are found as differences, too: a drawn manicule in the Paris margin (Odhecaton H5v) and Vienna's handwritten folio number.
+  Useful for readers, but they should be nameable as "later addition", not as a change to the printing forme (see 5.1).
+
+**Insights for Book Compare (to implement, 17 Nov 2026, accepted by the owner):**
+1. Small scans are not a problem for alignment (about 1000–1400 px wide aligned as well as 3000 px). No resolution warning is needed
+   for alignment; a hint is only needed when a user looks for single-note changes in very small scans.
+2. The app must show the margin around the printed area (folio numbers, signatures and headlines sit there), and the tile alignment
+   must also cover it: ~15 % extra around the box, and aligned with the extrapolated field.
+3. Printed-area box: extend it over the staves (as above) and let the user see/correct it; test on pages with few staves.
+4. Pages with almost no ink ("box too small for this level"): fall back to the rough alignment and say so, rather than failing.
+5. Warn the user when a copy's page sequence looks shifted (a whole-page offset, as in the New York scan set from gathering F on):
+   check the best match of each page against its neighbours and offer the shifted partner.
+6. Dark binding edges: choose the reference automatically as the scan with the cleanest border (or let the user choose).
+7. Show marginalia separately (later additions) — idea for after version 1, belongs to 5.1.
+
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
   (marenzio.org, not yet checked).

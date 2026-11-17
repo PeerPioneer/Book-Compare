@@ -37,7 +37,15 @@ function moveJpeg(cv, field, w, h, crop, out, scale) {
   const mags = []; for (let y = y0; y < y1; y += 3) for (let x = x0; x < x1; x += 3) { const p = y * w + x; mags.push(Math.hypot(r.field.fx[p], r.field.fy[p])); }
   mags.sort((a, b) => a - b);
   res.move = { median: +mags[mags.length >> 1].toFixed(2), p95: +mags[Math.floor(mags.length * 0.95)].toFixed(2), max: +mags[mags.length - 1].toFixed(2), over8: +(100 * mags.filter(v => v > 8).length / mags.length).toFixed(1) };
-  const crop = [x0, y0, x1, y1];
+  // PAD (environment variable, e.g. 0.08): show a margin of that fraction of the box around the printed area, so folio numbers, signatures and headlines at the edge are visible. Measurements stay inside the box.
+  const pad = parseFloat(process.env.PAD || '0'), px = Math.round(pad * (x1 - x0)), py = Math.round(pad * (y1 - y0));
+  let sy0 = y0, sy1 = y1; // WIDE=1: also include the full height of the staves (rows that are mostly ink across the box width); sparse pages can lose their top or bottom staves in the box
+  if (process.env.WIDE) {
+    const d = r.ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h);
+    for (let y = margin; y < h - margin; y++) { let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++; if (c >= need) { sy0 = Math.min(sy0, y); sy1 = Math.max(sy1, y); } }
+    res.wide_box = [x0, sy0, x1, sy1];
+  }
+  const crop = [Math.max(0, x0 - px), Math.max(0, sy0 - py), Math.min(w, x1 + px), Math.min(h, sy1 + py)];
   overlayJpeg(cv, r.ref, r.aligned, path.join(outDir, label + '_overlay.jpg'), 0.4, crop);
   overlayJpeg(cv, r.ref, r.rough, path.join(outDir, label + '_rough.jpg'), 0.4, crop);
   moveJpeg(cv, r.field, w, h, crop, path.join(outDir, label + '_move.jpg'), 0.4);
