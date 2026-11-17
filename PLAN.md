@@ -563,6 +563,17 @@ chosen from Boorman No. 14. Scan page = idx + 3 (Paris, New York) or idx + 7 (Wa
 - *Petrucci, Canti C, Venice 1504* (Boorman No. 12, pp. 525–534): stop-press changes of notes and folio numbers, many
   stamped-in and erased notes; copies A-Wn, F-Pc, I-TVcap. Other Boorman entries with listed stop-press changes: No. 4
   Josquin, Misse (p. 479), No. 7 Motetti B (p. 499), No. 11 La Rue, Misse (p. 518), No. 13 Agricola, Misse (pp. 536, 541).
+**Canti C (1504) alignment tests — first results (17 Nov 2026).** Copies A-Wn (Vienna) and F-Pn (Paris), both small scans
+(about 1400 × 1050 px, 200–300 KB each). 21 pages chosen from Boorman No. 12 (pp. 525–527). Scan page = idx + 3 (Paris) or idx + 9 (Vienna),
+idx = 16·gathering + 2·(leaf−1) (+1 verso), gatherings A B C D E F G H J K L M N O P Q R S T V X. No page shift in either copy.
+- All 21 pages align (1–7.5 % unmatched ink; 1–3 % on the cleanest pages). Strip values of 8–18 % always sit where something really differs
+  or at the page edge. The Vienna scans show dark binding edges, so Paris was the reference.
+- Detected clearly at this resolution: **L1v.iv.9–10** (changed notes, stave 4) and **R8r** final chords (staves 5 and 6; F-Pn differs from A-Wn,
+  as Boorman describes).
+- **Not visible: the folio numbers** (B4r 12/21, T3r 147/1047, T5r 149/1049): they lie above the printed-area box and are cut off. Same weak
+  spot as in Odhecaton A. D7r's number (31) is visible and equal.
+- Not located yet: the single stamped-in note heads (D3v.i.1, C4r.iv, O4v.iv.19–22). They are small; my quick look did not find them, which is
+  not proof that they are invisible. To do: crop exactly at Boorman's stave.note position.
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
   (marenzio.org, not yet checked).
