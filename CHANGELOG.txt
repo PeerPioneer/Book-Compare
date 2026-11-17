@@ -1,3 +1,6 @@
+## [Known-differences check: new cases 5-8 (Liber f.8, Petrucci, Giunta, Opusculum); D3 results] - 2026-11-18
+- Changed: research/js/check_known_differences.js: cases 5-8, run with a third argument (folder with the digitised copies; second argument "-" skips the Melopoiae cases). 14 whole-page checks from the tests of 17-18 Nov (Liber f.8r/8v group B against group A, Petrucci same-setting controls, Giunta Graduale, Opusculum musices p. 30). All pass; cases 1 and 4 unchanged and still pass. Not part of the website tests (they need the scans). PLAN.md: results of D3, D5, a correction for the Giunta CCXXv entry (the three copies all differ in the lower part).
+
 ## [Plan: results of the chant-print tests (D4), shift test on small scans (D2), Boorman items (D1 partly)] - 2026-11-17
 - PLAN.md section 10: results of D4a/b/c (Opusculum musices, Antiphonarium, Giunta Graduale), D2 and D1. Main findings: a dark scan border makes a scan unusable as reference (Opusculum B-Br: 22 of 68 pages fail, the rest bad; the same pages with D-Mbs as reference 0.6-3.2 %); STAFFBOX=1 is not safe for every page (Antiphonarium 0.6 % became 12.4 %); differences in red ink only are invisible; the movement map reveals shifts on small scans as on large ones; real variants found in the Opusculum (page 30, captions). Still open: D3, D5, extras (a)-(c). No program code changed.
 

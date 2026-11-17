@@ -20,6 +20,17 @@
    stands on G in A1 and B but on F in A2. CH-E (A1) against D-FUl (A2) and US-CA (B): whole printed area, those notes, and control systems.
    Two kinds of difference are only REPORTED, not asserted: the title and the kerning are "shifted slightly" in group A. After tile alignment
    they show as 0-3 % unmatched, i.e. the alignment absorbs a shift of a few pixels (an honest limit, see PLAN.md V16). */
+/* Cases 5-8 (third argument = the folder that holds the digitised copies, i.e. the folders "Liber selectarum cantionum. Digitalisate",
+   "Odhecaton A. Petrucci 1504. Digitalisate", "Canti C, Petrucci 1504. Digitalisate", "Graduale Romanum. Giunta. Digitalisate",
+   "Opusculum musices. Digitalisate"; results of the tests D3 and D4 of 17-18 Nov 2026, PLAN.md section 10). Whole-page values only:
+   same setting = matching, different setting = clearly different. Each pair is aligned with the reference named first.
+   Case 5: Liber f.8r and f.8v. CZ-Pu and GB-Lbl1 (group B) agree (< 3 %), CZ-Pu against US-CA (group A) is re-set (> 10 %).
+   Case 6: Petrucci controls: Odhecaton A1v, Paris against Washington and New York (< 3 %), Canti C Q4r Paris against Vienna (< 3 %).
+   Case 7: Giunta Graduale: CCXIXv and CLVv agree between the copies (< 3 %), the lower part of CCXXv differs in all three copies (> 8 %).
+   Case 8: Opusculum musices p. 30: D-Mbs against B-Br (< 3 %), D-Mbs against D-B (> 15 %, real difference of setting). D-Mbs is the reference
+   because the dark border of the B-Br scans breaks the printed-area box.
+       node check_known_differences.js "<Example pages>" "<Melopoiae folder or ->" "<folder with the digitised copies>"
+*/
 const path = require('path'), fs = require('fs');
 const { loadCv, alignPair, unmatchedShare } = require('./align_chain');
 
@@ -125,6 +136,54 @@ function folio19vCase(cv, root, rows) {
   return { total, failed };
 }
 
+/* ---- Cases 5-8: pairs from the digitised copies (whole-page values) ---- */
+function findScan(dir, re) {                                                                  // first file in dir (searched downwards) whose name matches re
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    const f = path.join(d, e.name); if (e.isDirectory()) { const r = walk(f); if (r) return r; } else if (re.test(e.name)) return f; } return null; };
+  if (!fs.existsSync(dir)) throw new Error('folder not found: ' + dir);
+  const f = walk(dir); if (!f) throw new Error('no scan ' + re + ' in ' + dir); return f;
+}
+function pairsCase(cv, scans, rows, label, list) {                                            // list: [title, refFile, otherFile, 'same'|'different', limit]
+  let total = 0, failed = 0;
+  for (const [title, refF, othF, kind, limit] of list) {
+    const r = alignPair(cv, refF, othF), [x0, y0, x1, y1] = r.box, whole = 100 * unmatchedShare(cv, r.ref, r.aligned, [x0, y0, x1, y1]).share;
+    const ok = kind === 'same' ? whole < limit : whole > limit; total++; if (!ok) failed++;
+    rows.push(`${ok ? 'PASS' : 'FAIL'}  ${label}  ${title.padEnd(34)} whole printed area ${whole.toFixed(1).padStart(5)} % unmatched   expected ${kind === 'same' ? 'matching (< ' : 'clearly different (> '}${limit} %)`);
+  }
+  return { total, failed };
+}
+function liber8Case(cv, scans, rows) {
+  const L = path.join(scans, 'Liber selectarum cantionum. Digitalisate'), list = [];
+  for (const [fol, cz, gb, ca] of [['8r', 'NK4134_R.jpg', 'K9a24_010_R.jpg', 'Harvard_0022.jpg'], ['8v', 'NK4135_L.jpg', 'K9a24_011_L.jpg', 'Harvard_0023.jpg']]) {
+    const f = (d, n) => findScan(path.join(L, d), new RegExp('^' + n.replace('.', '\.') + '$'));
+    list.push([`f.${fol} CZ-Pu (B) vs GB-Lbl1 (B)`, f('CZ-Pu', cz), f('GB-Lbl1', gb), 'same', 3], [`f.${fol} CZ-Pu (B) vs US-CA (A)`, f('CZ-Pu', cz), f('US-CA', ca), 'different', 10]);
+  }
+  return pairsCase(cv, scans, rows, 'Liber ', list);
+}
+function petrucciCase(cv, scans, rows) {
+  const O = path.join(scans, 'Odhecaton A. Petrucci 1504. Digitalisate'), C = path.join(scans, 'Canti C, Petrucci 1504. Digitalisate');
+  const o = (d, n) => findScan(path.join(O, d), new RegExp('Page_' + String(n).padStart(3, '0') + '_')), c = (d, n) => findScan(path.join(C, d), new RegExp('Page_' + String(n).padStart(3, '0') + '_'));
+  return pairsCase(cv, scans, rows, 'Petrucci', [
+    ['Odhecaton A1v Paris vs Washington', o('F-Pn. Odhecaton A. Petrucci 1504', 4), o('US-Wc. Odhecaton A. Petrucci 1504', 8), 'same', 3],
+    ['Odhecaton A1v Paris vs New York', o('F-Pn. Odhecaton A. Petrucci 1504', 4), o('US-NYp. Odhecaton A. Petrucci 1504', 4), 'same', 3],
+    ['Canti C Q4r Paris vs Vienna', c('F-Pn. Canti C', 249), c('A-Wn. Canti C', 255), 'same', 3]]);
+}
+function giuntaCase(cv, scans, rows) {
+  const G = path.join(scans, 'Graduale Romanum. Giunta. Digitalisate'), m = n => findScan(path.join(G, 'Biblioteca nazionale Marciana - Venezia'), new RegExp('Image_' + n + '\.jpg$'));
+  const v1 = n => findScan(path.join(G, 'Vatican 1'), new RegExp(n)), v2 = n => findScan(path.join(G, 'Vatican 2'), new RegExp(n));
+  return pairsCase(cv, scans, rows, 'Giunta ', [
+    ['CCXIXv Vatican 1 vs Marciana', v1('Inc\.S\.245_0004_'), m('0005'), 'same', 3],
+    ['CCXIXv Vatican 1 vs Rossiana', v1('Inc\.S\.245_0004_'), v2('0152_'), 'same', 3],
+    ['CLVv Vatican 1 vs Vatican 2', v1('Inc\.S\.244_0312_'), v2('_0024_'), 'same', 3],
+    ['CCXXv Vatican 1 vs Marciana (set differently)', v1('Inc\.S\.245_0006_'), m('0007'), 'different', 8],
+    ['CCXXv Vatican 1 vs Rossiana (other text)', v1('Inc\.S\.245_0006_'), v2('0154_'), 'different', 8]]);
+}
+function opusculumCase(cv, scans, rows) {                                                     // page n of B-Br = scan n-1 of D-Mbs and D-B
+  const D = path.join(scans, 'Opusculum musices. Digitalisate'), sc = (d, n) => findScan(path.join(D, d), new RegExp('_Image_' + String(n).padStart(4, '0') + '\.jpg$'));
+  const mbs = sc('D-Mbs. Opusculum musices', 29), br = findScan(path.join(D, 'B-Br. Opusculum musices'), /^page_030\.jpg$/), db = sc('D-B. Opusculum musices', 29);
+  return pairsCase(cv, scans, rows, 'Opusculum', [['p.30 D-Mbs vs B-Br', mbs, br, 'same', 3], ['p.30 D-Mbs vs D-B (other setting)', mbs, db, 'different', 15]]);
+}
+
 /* The cases run in SEPARATE processes: each one decodes big scans, and OpenCV.js (WebAssembly) would run out of memory when all cases share one
    process. "--only=3" runs just case 3 (cases: 1 table of contents, 2 woodcut, 3 page 8, 4 folio 19v). Without it all cases run, one process each. */
 function tocCase(cv, root, rows) {
@@ -145,21 +204,23 @@ function tocCase(cv, root, rows) {
 }
 (async () => {
   const args = process.argv.slice(2), flags = args.filter(a => a.startsWith('--')), pos = args.filter(a => !a.startsWith('--'));
-  const root = pos[0], mel = pos[1], only = (flags.find(a => a.startsWith('--only=')) || '').slice(7);
-  if (!root) { console.error('usage: node check_known_differences.js "<Example pages folder>" ["<Melopoiae folder>"]'); process.exit(2); }
+  const root = pos[0], mel = pos[1] === '-' ? null : pos[1], scans = pos[2], only = (flags.find(a => a.startsWith('--only=')) || '').slice(7);
+  if (!root) { console.error('usage: node check_known_differences.js "<Example pages folder>" ["<Melopoiae folder>" or -] ["<folder with the digitised copies>"]'); process.exit(2); }
   if (!only) {                                                                               // parent: one child process per case
     const cp = require('child_process'); let failed = 0, total = 0;
-    for (const k of mel ? ['1', '2', '3', '4'] : ['1', '4']) {
+    for (const k of [...(mel ? ['1', '2', '3', '4'] : ['1', '4']), ...(scans ? ['5', '6', '7', '8'] : [])]) {
       const r = cp.spawnSync(process.execPath, [__filename, '--only=' + k, ...pos], { encoding: 'utf8', maxBuffer: 1 << 26 });
       process.stdout.write(r.stdout || ''); if (r.stderr) process.stderr.write(r.stderr);
       const m = /RESULT (\d+) (\d+)/.exec(r.stdout || ''); if (m) { total += +m[1]; failed += +m[2]; } else { failed++; total++; console.log(`FAIL  case ${k} did not finish (exit code ${r.status})`); }
     }
+    if (!scans) console.log('(cases 5-8, Liber f.8, Petrucci, Giunta, Opusculum, skipped: give the folder with the digitised copies as third argument)');
     if (!mel) console.log('(cases 2 and 3, Melopoiae woodcut and page 8, skipped: give the Melopoiae folder as second argument)');
     console.log(failed ? `\nKNOWN-DIFFERENCES CHECK FAILED: ${failed} of ${total}` : `\nKNOWN-DIFFERENCES CHECK OK (${total} of ${total})`);
     process.exit(failed ? 1 : 0);
   }
   const cv = await loadCv(), rows = [];
-  const res = { 1: () => tocCase(cv, root, rows), 2: () => woodcutCase(cv, mel, rows), 3: () => pair08Case(cv, mel, rows), 4: () => folio19vCase(cv, root, rows) }[only]();
+  const res = { 1: () => tocCase(cv, root, rows), 2: () => woodcutCase(cv, mel, rows), 3: () => pair08Case(cv, mel, rows), 4: () => folio19vCase(cv, root, rows),
+    5: () => liber8Case(cv, scans, rows), 6: () => petrucciCase(cv, scans, rows), 7: () => giuntaCase(cv, scans, rows), 8: () => opusculumCase(cv, scans, rows) }[only]();
   console.log(rows.join('\n')); console.log(`RESULT ${res.total} ${res.failed}`);
   process.exit(0);
 })().catch(e => { console.error(e && e.message ? e : (typeof e === 'number' && typeof cvGlobal !== 'undefined' ? e : 'error ' + e)); process.exit(1); });

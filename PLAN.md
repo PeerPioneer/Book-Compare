@@ -638,9 +638,11 @@ more than two or three institutions except the one below; most German chant prin
 - **D4c Giunta (15 pairs, Vatican Inc.S.245 as reference).** Pages that are really the same align cleanly: Vatican 1 – Marciana
   CCXIXv 0.8 %, Vatican 1 – Rossiana CCXIXv 1.2 %, the three CLVr/CLVv/CLVIr pairs (Vatican 1 – Vatican 2) 0.4–0.5 % (CLVr 6.1 %:
   the page edge), CCXIXr 9.5–10 % and CCXXr 9–11 % (the hand-painted initial in Marciana and Rossiana against the woodcut
-  initial in Vatican 1 shows as a large red/blue area, as it should). **CCXXv is a real printed difference** (Rossiana "Ostendat
-  faciem suam…" against "Quam dilecta tabernacula…" in Marciana and Vatican 1): 17–20 % and the lower half of the page
-  at 12–55 % strip values. Red staves are not seen by the ink map and cause no problem when the notes and text align. The
+  initial in Vatican 1 shows as a large red/blue area, as it should). **The lower part of CCXXr and CCXXv differs between ALL three copies** (strip values 12–55 %, whole page 9–20 %): on
+  CCXXv Rossiana has other text ("Ostendat faciem suam…"), Vatican 1 and Marciana have the same text ("Quam dilecta
+  tabernacula…") but set with different line breaks. Corrects an earlier note: Marciana and Vatican 1 do NOT agree here.
+  In every copy the text block of this part sits on a visibly lighter rectangle of paper, so these may be printed slips
+  pasted over the page (to be checked by the owner on the originals). Red staves are not seen by the ink map and cause no problem when the notes and text align. The
   red watermark/copyright strip of the Vatican images shows as a small difference at the page edge.
 - **D4b Antiphonarium fol. I (Bodleian against D-Mbs, both directions).** 0.6 % unmatched ink with the default box (very clean,
   although the Bodleian scan has ruler and dark border and the red staves are invisible to the ink map). **`STAFFBOX=1` made it
@@ -670,13 +672,22 @@ more than two or three institutions except the one below; most German chant prin
   H5v "e", N8r colophon "e" (the Device woodcut gives speckle), F5v, A7v, D2v, N4r single notes; L6r not staged (folio number
   stamped in in all three copies, so no difference between them). Method note: finding a single changed note needs a view of
   that note only (the app's tile and zoom view), not a whole-page overlay. Canti C D3v.i.1 and C4r.iv still not confirmed.
-- **Still to do:** D3 (the B copies of f.8r/8v: CZ-Pu, D-As, D-B, D-Tu, GB-Lbl1, GB-Lbl2 are group B, the others group A; the
-  scan files that carry f.8r/8v in CZ-Pu and GB-Lbl1 have to be identified first); D5 (add Odhecaton and Canti C pairs to
-  `check_known_differences.js`; the checks that can be asserted from the results above: Odhecaton D1r/D7r page numbers,
-  A1v first word, Canti C L1v.iv.9–10, R8r chords, folio numbers B4r/T3r/T5r; the box coordinates still have to be fixed);
-  extra measurements (a) and (b) and (c): (b) answered in part by D4a (a reference with a clean border works, a dark-bordered one
-  fails; the four-cornered area is not yet tested), (c) pages where box and tile settings both fail: the Brussels Opusculum pages
-  as reference (22 of 68), Odhecaton F8r, Canti C B4r (see above).
+- **D3 Liber f.8r and f.8v, group B copies (18 Nov 2026; file names from the owner: CZ-Pu NK4134_R / NK4135_L, GB-Lbl1 K9a24_010_R /
+  K9a24_011_L; the group A comparison copy is US-CA Harvard_0022 / 0023).** The two group B copies agree: CZ-Pu against GB-Lbl1 0.4 %
+  (f.8r) and 1.3 % (f.8v), movement median 1.7–1.9 px, almost nothing bent over 8 px. Group B against group A (US-CA) is clearly different:
+  13–17 % (CZ-Pu) and 16–31 % (GB-Lbl1, whose spread scan has a black background), movement median 8–29 px and 49–86 % of the page bent over
+  8 px (CA as reference: 19 % and 18 %). Both measures separate "same setting" from "re-set" without a gap. In the overlay of f.8r the notes
+  mostly agree but the first stave, the initial V, the custodes and the stems stand apart, and on f.8v the text doubles; the tile alignment
+  bends hard to force a fit, so **the movement map (or the share of the page bent over 8 px) is needed as a second signal next to the
+  unmatched-ink figure** (supports B4).
+- **D5 done (18 Nov 2026): `research/js/check_known_differences.js` has four new cases** (5 Liber f.8r/8v, 6 Petrucci controls Odhecaton A1v
+  and Canti C Q4r, 7 Giunta CCXIXv/CLVv/CCXXv, 8 Opusculum p. 30), switched on by a third argument (the folder that holds the digitised copies;
+  the second argument may be `-` to skip the Melopoiae cases). 14 whole-page assertions, all pass on the staged scans; cases 1 and 4 still pass
+  (16 and 11). Single-note and margin differences (Boorman items, folio numbers) are NOT asserted yet: they need regions in pixels.
+- **Still to do:** the single Boorman items of D1 (need a close view of one note, see above); extra measurements (a) tile settings that start
+  hiding known differences, (b) the four-cornered area against the dark-border reference problem (the Opusculum result shows the problem is
+  real: B-Br as reference fails on 22 of 68 pages), (c) the list of pages where box and tile settings both fail (Opusculum B-Br pages 7, 10, 11,
+  19, 21, 27, 32–35, 39, 42, 48, 49, 52, 54, 62, 66, 69, 70, 72, 73 as reference; Odhecaton F8r; Canti C B4r).
 
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
