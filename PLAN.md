@@ -546,6 +546,20 @@ differences and working towards pages with more and with different kinds of alte
   notes stamped in or erased. **US-NYp: the outer sheet of gathering F (F1, F2, F7, F8) is from the 1503 edition** = a re-set
   sheet, like Test A. Boorman warns his lists are not complete (p. 456). Hewitt (1942) and Pugin (2018) give no list of
   differences between copies of one edition (owner, 17 Nov).
+**Odhecaton A (1504) alignment tests — first results (17 Nov 2026).** Copies F-Pn (Paris, small scans, ~1000 px), US-Wc
+(Washington, ~1300 px, dark binding border) and US-NYp (New York, large scans). 21 pages from gatherings A, D, F, H, K, L, N,
+chosen from Boorman No. 14. Scan page = idx + 3 (Paris, New York) or idx + 7 (Washington), idx = 16·gathering + 2·(leaf−1) (+1 verso).
+- Same setting, different scan quality: 1–4 % unmatched ink (e.g. Paris–Washington A1v 1.1 %, K3v 2.1 %). The small Paris scan
+  aligns as well as the large ones; even upsampled about 3× nothing bent.
+- **The New York scan set is shifted by one leaf (2 scan pages) from gathering F onward** (colophon at idx 204, in Paris at 206;
+  one leaf missing or skipped in the scan sequence, between gatherings D and F). Compared with the unshifted pages the result was
+  29–43 % unmatched ink; with the shift corrected 0.8–2.9 % (H2r 1.0, H5v 1.8, K3r 2.9, K3v 2.5, L4r 1.3), i.e. as good as Paris–Washington.
+  Gatherings D (and earlier) have no shift. The re-set outer sheet of F (F1, F2, F7, F8) stays different: 4–8 % even when shifted.
+- A reference scan with a dark border (Washington) breaks printed-area detection: always use a clean-border scan as reference.
+- Weak spots: (1) "box too small for this level" error on pages with almost no ink (blank staves, e.g. F8r); (2) the printed-area box
+  clips the margin, so page numbers and signatures at the edge are not shown and headlines on the edge are only partly shown
+  (H5v headline); (3) a few red/blue specks at 1–3 % are normal scan noise, not differences.
+- Not yet done: small Boorman differences (page numbers, signature, single notes) were only partly checked visually; Canti C next.
 - *Petrucci, Canti C, Venice 1504* (Boorman No. 12, pp. 525–534): stop-press changes of notes and folio numbers, many
   stamped-in and erased notes; copies A-Wn, F-Pc, I-TVcap. Other Boorman entries with listed stop-press changes: No. 4
   Josquin, Misse (p. 479), No. 7 Motetti B (p. 499), No. 11 La Rue, Misse (p. 518), No. 13 Agricola, Misse (pp. 536, 541).
