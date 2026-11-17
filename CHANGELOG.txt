@@ -1,3 +1,6 @@
+## [Plan: results of the chant-print tests (D4), shift test on small scans (D2), Boorman items (D1 partly)] - 2026-11-17
+- PLAN.md section 10: results of D4a/b/c (Opusculum musices, Antiphonarium, Giunta Graduale), D2 and D1. Main findings: a dark scan border makes a scan unusable as reference (Opusculum B-Br: 22 of 68 pages fail, the rest bad; the same pages with D-Mbs as reference 0.6-3.2 %); STAFFBOX=1 is not safe for every page (Antiphonarium 0.6 % became 12.4 %); differences in red ink only are invisible; the movement map reveals shifts on small scans as on large ones; real variants found in the Opusculum (page 30, captions). Still open: D3, D5, extras (a)-(c). No program code changed.
+
 ## [Plan: consolidated test findings, decisions on box, tiles, shifted pages] - 2026-11-17
 - PLAN.md section 10: findings of all tests in one place and the plan A (engine), B (user), C (later), D (tests first). Register: V2 box with four free corners; V15 tile settings decided (presets, advanced panel, this copy on this page only); new V17 matching points (only if needed), V18 shifted-page warning in version 1; new order 11.5 (tests D before engine fixes A)
 

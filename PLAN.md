@@ -605,7 +605,7 @@ Plan (IDs used in the register, §11):
   with the existing gap tools; B3 reference proposal prefers clean borders and reliably found boxes (V7); B4 movement map (V16);
   B5 help text on what cannot be seen; B6 tile settings per page (V15).
 - **C — after version 1**: C1 handwritten additions as "later addition" (5.1); C2 book structure (5.1 idea 1); C3 suspicious-grouping hint.
-- **D — tests first**: D1 remaining Boorman items (Canti C D3v.i.1, C4r.iv; Odhecaton A1v, A7v, D1r/D7r, D2v, F5v, H2r signature,
+- **D — tests first**: D1 remaining Boorman items — partly done 17 Nov, see results (Canti C D3v.i.1, C4r.iv; Odhecaton A1v, A7v, D1r/D7r, D2v, F5v, H2r signature,
   H5v "e", L6r, N4r.iv.33, N8r); D2 artificial shift on a small scan (does the V16 hint hold?); D3 Liber B copies of f.8r/8v;
   D4 chant print (noise floor, artificial changes, red ink; material below); D5 add Odhecaton/Canti C pairs to
   `check_known_differences.js`. Also during D: (a) which tile settings start hiding known differences (sets the safe range for B6);
@@ -629,9 +629,54 @@ more than two or three institutions except the one below; most German chant prin
   owner's folder `D:\Antiphonarium Augustense. Ratdolt 1495. Digitalisate\D-Mbs`). Tests: noise floor on red staves; an
   artificial shift of the red staves against the black notes (the ink map in the red channel should not see it — confirm and
   measure); dark border and ruler (A4, four-cornered area).
-- **Possible D4c — *Graduale Romanum*, Venice: Emerich for L. A. Giunta, 1499–1500 (GW 10982, ISTC ig00332000).** Square
-  notation on red staves, whole book notated. GW lists digitized copies: Vatican Inc.S.244–245 (one copy, two volumes), Vatican
-  Stamp.Ross.1857 (vellum, incomplete), Venice Marciana (two links, probably Rari V. 708–709). Not downloaded yet.
+- **D4c — *Graduale Romanum*, Venice: Emerich for L. A. Giunta, 1499–1500 (GW 10982, ISTC ig00332000).** Square notation on
+  red staves. Three digitized copies in the owner's folder `D:\Graduale Romanum. Giunta. Digitalisate`: Venice Marciana
+  (≈1085 × 1496 px), Vatican Inc.S.244–245 (≈1650 × 2300), Vatican Stamp.Ross.1857 (vellum, ≈1625 × 2338). Four common
+  pages (CCXIXr, CCXIXv, CCXXr, CCXXv) in all three; CLVr, CLVv, CLVIr in both Vatican copies.
+
+**D tests — results so far (17 Nov 2026, Sonnet).**
+- **D4c Giunta (15 pairs, Vatican Inc.S.245 as reference).** Pages that are really the same align cleanly: Vatican 1 – Marciana
+  CCXIXv 0.8 %, Vatican 1 – Rossiana CCXIXv 1.2 %, the three CLVr/CLVv/CLVIr pairs (Vatican 1 – Vatican 2) 0.4–0.5 % (CLVr 6.1 %:
+  the page edge), CCXIXr 9.5–10 % and CCXXr 9–11 % (the hand-painted initial in Marciana and Rossiana against the woodcut
+  initial in Vatican 1 shows as a large red/blue area, as it should). **CCXXv is a real printed difference** (Rossiana "Ostendat
+  faciem suam…" against "Quam dilecta tabernacula…" in Marciana and Vatican 1): 17–20 % and the lower half of the page
+  at 12–55 % strip values. Red staves are not seen by the ink map and cause no problem when the notes and text align. The
+  red watermark/copyright strip of the Vatican images shows as a small difference at the page edge.
+- **D4b Antiphonarium fol. I (Bodleian against D-Mbs, both directions).** 0.6 % unmatched ink with the default box (very clean,
+  although the Bodleian scan has ruler and dark border and the red staves are invisible to the ink map). **`STAFFBOX=1` made it
+  WORSE (12.4 %, red/blue bands at the top and bottom edge): the stretched box reaches into the headline and the margin. So A1
+  must not simply switch `extendBoxByStaves` on for every page.** Artificial changes to the red layer of the Munich scan: red
+  staves shifted by 14 px: 1.7 % (nothing visible); red staves removed completely: 0.0 %. So **a difference that exists only
+  in red ink (staves, rubrics, red initials) cannot be seen at all by the engine** — to be said in the help text (B5).
+- **D4a Opusculum musices (five copies).** Page map (B-Br page n = D-Mbs and D-B scan n − 1; A-Wn n − 1 up to Br page 13,
+  then n − 3: the A-Wn scans lack two pages after Br page 13; US-Wc: two-page openings with a black background, bitonal).
+  **First run with B-Br as reference: 66 of 202 pairs failed ("box too small", 22 of 68 pages, the same pages in all three
+  copies) and of the 136 that ran, most showed 30–90 % unmatched ink. Cause: the dark gilt/black border of the Brussels scans
+  confuses the printed-area box.** Second run with D-Mbs as reference (15 sampled pages, 45 pairs, none failed): B-Br 0.6–3.2 %
+  (median 1.0 %) on all 15 pages; D-B and A-Wn 5–27 % (median 9 %). In D-B and A-Wn staves and notes align, but several captions
+  ("Tenor", "Discantus", "Exemplum … notulis") stand slightly apart in the same way in both copies, so they look like a real
+  variant group. **Page 30 differs in layout: D-B and A-Wn (and US-Wc) agree with each other (US-Wc left page against D-B 5.1 %)
+  and differ from D-Mbs and B-Br (26–28 %).** The black-and-white US-Wc scan with its black background aligns well once the
+  reference has a clean border and the opening is split into single pages. Lesson for B3 (reference proposal) and A4: the Brussels
+  scans are unusable as reference; a reference should be proposed by border cleanliness and a reliably found box, not by size.
+- **D2 artificial shift on small scans (Canti C Q4r, F-Pn against A-Wn, both ≈1050 px high, one system moved).** Control 1.5 %;
+  shift of 8 / 16 px sideways: 1.6 / 1.7 % (invisible); 32 px: 4.8 %; 48 px: 4.5 %; 64 px: 25 %. Shift downward 16 / 32 px: 1.8 / 2.6 %.
+  The movement the alignment applied in the band equals the built-in shift (7.9, 14.1, 25.7, 38.3 px for 8, 16, 32, 48 sideways;
+  14.7, 32.7 for 16, 32 downward), so the movement map (V16) reveals it, as on the large Liber scans. Small scans behave like large ones.
+- **D1 Boorman items (Odhecaton A, with `PAD=0.15` so margins show).** Confirmed: **A1v line 9 first word** (Paris "temis" against
+  "meas") is marked; **D1r page number** (Paris and Washington agree, New York differs: black against blue) and **D7r page number**
+  (the same pattern) are visible in the margin. Not confirmed (the largest differences on these pages are scan edges and the
+  right-hand custos strokes, the single changes are below the noise of the 1000–1400 px scans or hidden in speckle): H2r signature,
+  H5v "e", N8r colophon "e" (the Device woodcut gives speckle), F5v, A7v, D2v, N4r single notes; L6r not staged (folio number
+  stamped in in all three copies, so no difference between them). Method note: finding a single changed note needs a view of
+  that note only (the app's tile and zoom view), not a whole-page overlay. Canti C D3v.i.1 and C4r.iv still not confirmed.
+- **Still to do:** D3 (the B copies of f.8r/8v: CZ-Pu, D-As, D-B, D-Tu, GB-Lbl1, GB-Lbl2 are group B, the others group A; the
+  scan files that carry f.8r/8v in CZ-Pu and GB-Lbl1 have to be identified first); D5 (add Odhecaton and Canti C pairs to
+  `check_known_differences.js`; the checks that can be asserted from the results above: Odhecaton D1r/D7r page numbers,
+  A1v first word, Canti C L1v.iv.9–10, R8r chords, folio numbers B4r/T3r/T5r; the box coordinates still have to be fixed);
+  extra measurements (a) and (b) and (c): (b) answered in part by D4a (a reference with a clean border works, a dark-bordered one
+  fails; the four-cornered area is not yet tested), (c) pages where box and tile settings both fail: the Brussels Opusculum pages
+  as reference (22 of 68), Odhecaton F8r, Canti C B4r (see above).
 
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
