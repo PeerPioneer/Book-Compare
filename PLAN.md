@@ -607,10 +607,31 @@ Plan (IDs used in the register, §11):
 - **C — after version 1**: C1 handwritten additions as "later addition" (5.1); C2 book structure (5.1 idea 1); C3 suspicious-grouping hint.
 - **D — tests first**: D1 remaining Boorman items (Canti C D3v.i.1, C4r.iv; Odhecaton A1v, A7v, D1r/D7r, D2v, F5v, H2r signature,
   H5v "e", L6r, N4r.iv.33, N8r); D2 artificial shift on a small scan (does the V16 hint hold?); D3 Liber B copies of f.8r/8v;
-  D4 chant print (noise floor, artificial changes, red ink; needs scans from the owner); D5 add Odhecaton/Canti C pairs to
+  D4 chant print (noise floor, artificial changes, red ink; material below); D5 add Odhecaton/Canti C pairs to
   `check_known_differences.js`. Also during D: (a) which tile settings start hiding known differences (sets the safe range for B6);
   (b) whether leaving out a dark border with a four-cornered area fixes the US-Wc/A-Wn reference problem; (c) note every page where
   box and tile settings both fail (decides on matching points, V17).
+
+**D4 material (17 Nov 2026).** A survey of vdm16, ISTC, GW and library catalogues found no chant print with full scans from
+more than two or three institutions except the one below; most German chant prints are online only at BSB.
+- **D4a — Simon de Quercu, *Opusculum musices*, Nuremberg: Johann Weissenburger, 1513 (vdm 407).** Five copies, owner's folder
+  `D:\Opusculum musices. Digitalisate`: B-Br (≈2400 × 3250 px, colour), D-Mbs (≈1750 × 2470, colour), A-Wn (1240 px wide), D-B
+  (1000 px wide), US-Wc (greyscale, two-page openings, must be split). All five checked: same imprint ("Dns Joan. Weyssenburger
+  Nurenberge impressit"), 1513 colophon page in the four copies whose scans include it. 34 leaves, 68 pages; A-Wn seems 2 pages short, US-Wc seems to end
+  before the last leaf (map pages by content). Woodcut chant and mensural examples, black staves; red print on the title page
+  only. Known copy marks: hand-coloured title woodcut (D-B), handwritten notes under the colophon (A-Wn), handwritten note on a
+  "De Tonis" page (US-Wc), stamps, strong show-through (D-Mbs). Plan: B-Br as reference, all pages of the other four; artificial
+  changes on music pages; red title text against the greyscale US-Wc scan.
+- **D4b — *Antiphonarium Augustense*, Augsburg: Ratdolt, 1495 (ISTC ia00773000, GW 2062).** Hufnagel notation on **red staves**,
+  red rubrics, red/black initial — the red-ink weak spot. Only one page has two copies: printed fol. I ("Antiffanarium per
+  circulum anni"), Bodleian Inc. c.G5.1495.1 (single page online, labelled "a3 recto", 2073 × 2857 px, ruler and dark border
+  in the scan) and D-Mbs 2 Inc.c.a. 3159 (BSB image 0013, 4340 × 6026 px, fetched from the BSB IIIF server and saved in the
+  owner's folder `D:\Antiphonarium Augustense. Ratdolt 1495. Digitalisate\D-Mbs`). Tests: noise floor on red staves; an
+  artificial shift of the red staves against the black notes (the ink map in the red channel should not see it — confirm and
+  measure); dark border and ruler (A4, four-cornered area).
+- **Possible D4c — *Graduale Romanum*, Venice: Emerich for L. A. Giunta, 1499–1500 (GW 10982, ISTC ig00332000).** Square
+  notation on red staves, whole book notated. GW lists digitized copies: Vatican Inc.S.244–245 (one copy, two volumes), Vatican
+  Stamp.Ross.1857 (vellum, incomplete), Venice Marciana (two links, probably Rari V. 708–709). Not downloaded yet.
 
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
