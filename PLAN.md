@@ -582,17 +582,35 @@ idx = 16·gathering + 2·(leaf−1) (+1 verso), gatherings A B C D E F G H J K L
 - Marginalia are found as differences, too: a drawn manicule in the Paris margin (Odhecaton H5v) and Vienna's handwritten folio number.
   Useful for readers, but they should be nameable as "later addition", not as a change to the printing forme (see 5.1).
 
-**Insights for Book Compare (to implement, 17 Nov 2026, accepted by the owner):**
-1. Small scans are not a problem for alignment (about 1000–1400 px wide aligned as well as 3000 px). No resolution warning is needed
-   for alignment; a hint is only needed when a user looks for single-note changes in very small scans.
-2. The app must show the margin around the printed area (folio numbers, signatures and headlines sit there), and the tile alignment
-   must also cover it: ~15 % extra around the box, and aligned with the extrapolated field.
-3. Printed-area box: extend it over the staves (as above) and let the user see/correct it; test on pages with few staves.
-4. Pages with almost no ink ("box too small for this level"): fall back to the rough alignment and say so, rather than failing.
-5. Warn the user when a copy's page sequence looks shifted (a whole-page offset, as in the New York scan set from gathering F on):
-   check the best match of each page against its neighbours and offer the shifted partner.
-6. Dark binding edges: choose the reference automatically as the scan with the cleanest border (or let the user choose).
-7. Show marginalia separately (later additions) — idea for after version 1, belongs to 5.1.
+**Consolidated findings and plan from ALL tests (17 Nov 2026; agreed with the owner).**
+What the tests showed, across Liber, Melopoiae, printed-area set (116 scans), page matching, Odhecaton A, Canti C:
+- Same setting 0.2–4 % unmatched in every print and at every scan size; re-set pages 30–50 %; nothing bent into a false match.
+- Small scans (1000–1400 px wide) align as well as 3000 px; single-note changes stay visible on them. Limit: very thin lines
+  (woodcut crack through Mercury's chest). **No resolution warning, and the grid does not show resolution (owner, 17 Nov).**
+- Shifts up to about one staff space are absorbed (V16); shifts of a few px cannot be detected at all.
+- The printed-area box is the weakest step: misses sparse staves (Canti C B4r/F1r/O4v, Odhecaton, US-CA, CH-E f.158v, D-FUl,
+  CZ-Jm — probably one cause); dark binding edges/scan borders (US-Wc, A-Wn Canti C, Liber 7v); margins (folio numbers,
+  signatures, headlines, marginalia) only carried along, not aligned; near-empty pages fail ("box too small", Odhecaton F8r; D-W title).
+- Page order in scan sets cannot be trusted (US-NYp Odhecaton from gathering F; D-ARk versos in the Liber). High mismatch alone
+  cannot tell a shifted page from a re-set page; only comparison with neighbouring pages can.
+- The unmatched-ink figure is orientation, never a verdict (ranges overlap). Handwritten additions show as differences.
+  Printed lists of differences contain errors and gaps. OpenCV.js runs out of memory in long runs.
+
+Plan (IDs used in the register, §11):
+- **A — alignment engine** (A1 box extended over sparse staves; A2 align a margin around the box; A3 near-empty page → rough
+  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs). Each must keep every
+  check that passes today. **Done only AFTER the tests D (owner, 17 Nov: the tests may change A).**
+- **B — what the user sees, version 1**: B1 box visible and correctable (see V2b); B2 **small shifted-page warning** (owner: version 1):
+  when a page matches badly, compare with the copy's neighbouring pages and, if one fits clearly better, suggest moving the column
+  with the existing gap tools; B3 reference proposal prefers clean borders and reliably found boxes (V7); B4 movement map (V16);
+  B5 help text on what cannot be seen; B6 tile settings per page (V15).
+- **C — after version 1**: C1 handwritten additions as "later addition" (5.1); C2 book structure (5.1 idea 1); C3 suspicious-grouping hint.
+- **D — tests first**: D1 remaining Boorman items (Canti C D3v.i.1, C4r.iv; Odhecaton A1v, A7v, D1r/D7r, D2v, F5v, H2r signature,
+  H5v "e", L6r, N4r.iv.33, N8r); D2 artificial shift on a small scan (does the V16 hint hold?); D3 Liber B copies of f.8r/8v;
+  D4 chant print (noise floor, artificial changes, red ink; needs scans from the owner); D5 add Odhecaton/Canti C pairs to
+  `check_known_differences.js`. Also during D: (a) which tile settings start hiding known differences (sets the safe range for B6);
+  (b) whether leaving out a dark border with a four-cornered area fixes the US-Wc/A-Wn reference problem; (c) note every page where
+  box and tile settings both fail (decides on matching points, V17).
 
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
@@ -619,7 +637,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | ID | Item | Status | Depends on / note |
 |----|------|--------|-------------------|
 | V1 | Whole-book workspace (grid of copies × pages, importing, copy names stay empty) | mostly done | §4.9 lists what is left |
-| V2 | Printed-area detection, automatic + manual correction | detection done in experiment (§4.3); **not yet in the Compare tab**; manual correction not built | V2a make Compare tab use it; V2b correction by hand |
+| V2 | Printed-area detection, automatic + manual correction | detection done in experiment (§4.3); **not yet in the Compare tab**; manual correction not built. **Owner, 17 Nov: the box is shown on both scans and has four FREE corners** (not only a rectangle): the automatic proposal is a rectangle, each corner can be dragged on its own, everything outside the shape is ignored by the alignment (main use: leave out a slanted dark binding edge or a sliver of the next page); the pair is aligned again at once; "back to automatic"; saved per scan. Engine fixes A1–A5 (§10) after the tests D | V2a make Compare tab use it; V2b correction by hand |
 | V3 | Tile-based alignment in the Compare tab | experiment done, runs in the speed test (worker); **not yet in the Compare tab** | needs V2a; Thursday speed test decides nothing about *whether*, only about expectations |
 | V4 | Difference view | done | — |
 | V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a decide framework (Electron vs Tauri) — see D3; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
@@ -631,7 +649,9 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
 | V12 | Known-differences checks (§4.4), all pass (15 Nov): Melopoiae TOC (16); woodcut p.19 B-Br vs D-Mu (7 assertable lines of 8); p.8, five copies against B-Br (25); Liber f.19v, CH-E vs D-FUl and US-CA, whole page and the single notes of the apparatus (11). **Source for the Liber:** the critical apparatus in `Dissertation_Verlag.pdf`, 4.6, pp. 195–224 (PDF page = printed page), with Table 1 of the 20 extant copies on p. 15; for the Melopoiae: `Mein Artikel\\List of Differences.odt`. Music tests added 15 Nov (re-set folios 7r/7v/9r/9v, f.8r/8v control, f.19v A1 against A2, Melopoiae pairs 05 and 09, artificial shifts; see §4.4). **Still open:** the B copies of f.8r/8v (CZ-Pu, GB-Lbl1 and others, once split), other Liber folios with single notes, other Melopoiae pairs | partly done | T3, T4 |
 | V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
-| V15 | **Alignment settings for a page that aligns badly** (idea from Aruspix: number of main tiles and sub-tiles). Proposal: a button "Try again with other settings" with 2–3 plain presets (stiffer / standard / more flexible), numbers only in an advanced panel; result shown at once for the pair on screen; chosen setting saved per page in the project. Caution: a more flexible alignment can hide real differences, so "fewest unmatched" must NOT be the only criterion (needs the known-differences check, §4.4) | **open** — owner's idea 15 Nov; to be decided with the experiment on difficult copies (F-Pm, A-Wn, D-ARk, D-SHk) | needs V3; test first which settings matter |
+| V15 | **Tile settings for a page that aligns badly** (owner's Aruspix idea). **Decided 17 Nov:** plain presets shown by default (stiffer / standard / more flexible); a button opens an advanced panel with the two numbers — *main tiles* (how many large tiles cover the page height, today about 8) and *sub-tiles* (how many times each is split again, today 3); the pair is aligned again at once, with overlay, movement map and unmatched figure; a note that more flexible settings can hide real differences; "standard" button; **applies only to this copy on this page** and is saved in the project. Safe range of the numbers comes from tests D(a) | **decided, version 1** | needs V3 |
+| V17 | **Matching points by hand** (click three or four matching points on both pages as a starting point for the alignment) | **only if** tests D show pages where box correction and tile settings both fail (owner, 17 Nov) | after D |
+| V18 | **Shifted-page warning, small version** (B2 in §10) | **decided, version 1** (owner, 17 Nov) | needs V3; full automatic page matching stays P4 |
 | V16 | **Shifts are absorbed by the tile alignment — now measured (15 Nov, §4.4 music tests).** One whole line moved by 4–32 px is pulled back and invisible (0.6–2.4 % unmatched); only 64 px shows. Melopoiae p. 9: half-staff-space differences are not visible. The movement applied equals the shift, so it can be shown. **Decision: part of version 1** — (1) movement map next to the overlay, (2) the rough, unbent alignment as a second view, (3) a cautious automatic hint for sharp-edged movements of about 15 px or more (false alarms below about 10 px). Small shifts remain undetectable; say so in the help text | **firm, version 1** | needs V3 |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
 
@@ -669,7 +689,16 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | D7 | ~~Differences.pdf listed the line above Phoebus' head for D-Mu too~~ **Resolved 15 Nov:** the owner says that was an error in the old Differences.pdf; the line is in B-Br only. His current list is `Mein Artikel\List of Differences.odt` (Dropbox\Melopoiae), which already says so. **That file, not Differences.pdf, is the reference for all checks from now on** | done |
 | D6 | What exactly is stored for aligned results (V10) | before V8 |
 
-### 11.5 Order from here (15 November 2026)
+### 11.5 Order from here (17 November 2026)
+
+1. Tests D1–D5 with the extra measurements (a)–(c) (§10) — research only, on Sonnet.
+2. Thursday 19 Nov: speed test on his PC (V11/T2).
+3. Engine fixes A1–A5, checked against every earlier check.
+4. Desktop program (V5), starting with D3.
+5. Compare tab uses the new alignment (V2a, V3) with box correction (V2b), tile settings (V15), shifted-page warning (V18), movement map (V16).
+6. Reference copy (V7, D1), then background alignment, progress bar and stored results (V8–V10).
+
+### 11.6 Earlier order (15 November 2026), kept for the record
 
 1. Photoshop script v1.1 — **done**.
 2. Known-differences check: woodcut — **done**; more Melopoiae pairs and the Liber f.19v table (V12) — next, small.
