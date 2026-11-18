@@ -7,7 +7,8 @@
    Scan images are never written to the repository. */
 const fs = require('fs'), path = require('path'), jpeg = require('jpeg-js');
 const dumpField = require('./dump_field');
-const { loadCv, alignPair, unmatchedShare, overlayJpeg } = require('./align_chain');
+const { loadCv, loadRed, alignPair, unmatchedShare, overlayJpeg } = require('./align_chain');
+const { prepareReference } = require('./pipeline');
 
 function moveJpeg(cv, field, w, h, crop, out, scale) {
   const [x0, y0, x1, y1] = crop, cw = x1 - x0, ch = y1 - y0, rgba = new Uint8Array(cw * ch * 4);
@@ -25,9 +26,26 @@ function moveJpeg(cv, field, w, h, crop, out, scale) {
   const [label, refP, movP, outDir] = process.argv.slice(2);
   fs.mkdirSync(outDir, { recursive: true });
   const cv = await loadCv();
-  const r = alignPair(cv, refP, movP, null, { trackField: true });
+  // Research switches for the printed-area box of the REFERENCE (PLAN.md test D, extra (b): does a hand-set area rescue references with a dark scan border?)
+  //   BOX=x0,y0,x1,y1  box in pixels at the working height of 3000 px, replaces the automatic one (a rectangle stands in for the four-cornered area the app will offer)
+  //   BOXAUTO=<f>      automatic stand-in for a hand-set area: ignore a strip of fraction f (e.g. 0.05) of the image on all four sides, then take the 0.5 % to 99.5 % range of the ink
+  let cache = null;
+  if (process.env.BOX || process.env.BOXAUTO) {
+    const rr = loadRed(cv, refP), st = prepareReference(cv, rr); rr.delete();
+    st.autoBox = st.box.slice();
+    if (process.env.BOX) st.box = process.env.BOX.split(',').map(Number);
+    else {
+      const f = parseFloat(process.env.BOXAUTO), w = st.ref.cols, h = st.ref.rows, d = st.ref.data32F, mx = Math.round(f * w), my = Math.round(f * h);
+      const cx = new Float64Array(w), cy = new Float64Array(h); let tot = 0;
+      for (let y = my; y < h - my; y++) for (let x = mx; x < w - mx; x++) if (d[y * w + x] > 0.5) { cx[x]++; cy[y]++; tot++; }
+      const q = (c, p) => { let a = 0; for (let i = 0; i < c.length; i++) { a += c[i]; if (a >= p * tot) return i; } return c.length - 1; };
+      st.box = [q(cx, 0.005), q(cy, 0.005), q(cx, 0.995), q(cy, 0.995)];
+    }
+    cache = { state: st };
+  }
+  const r = alignPair(cv, refP, movP, cache, { trackField: true });
   const [x0, y0, x1, y1] = r.box, w = r.ref.cols, h = r.ref.rows;
-  const res = { label, box: r.box, whole_rough: 100 * unmatchedShare(cv, r.ref, r.rough, r.box).share, whole_tiles: 100 * unmatchedShare(cv, r.ref, r.aligned, r.box).share, strips: [] };
+  const res = { label, box: r.box, auto_box: r.cache.state.autoBox || null, whole_rough: 100 * unmatchedShare(cv, r.ref, r.rough, r.box).share, whole_tiles: 100 * unmatchedShare(cv, r.ref, r.aligned, r.box).share, strips: [] };
   const n = 12, sh = (y1 - y0) / n;
   for (let i = 0; i < n; i++) {
     const a = Math.round(y0 + i * sh), b = Math.round(y0 + (i + 1) * sh), u = unmatchedShare(cv, r.ref, r.aligned, [x0, a, x1, b]);
@@ -46,7 +64,8 @@ function moveJpeg(cv, field, w, h, crop, out, scale) {
     res.wide_box = [x0, sy0, x1, sy1];
   }
   const crop = [Math.max(0, x0 - px), Math.max(0, sy0 - py), Math.min(w, x1 + px), Math.min(h, sy1 + py)];
-  overlayJpeg(cv, r.ref, r.aligned, path.join(outDir, label + '_overlay.jpg'), 0.4, crop);
+  const os = parseFloat(process.env.OVERLAY_SCALE || '0.4');                                        // OVERLAY_SCALE=1 writes the overlay at the full working height (3000 px), for looking at single notes
+  overlayJpeg(cv, r.ref, r.aligned, path.join(outDir, label + '_overlay.jpg'), os, crop);
   overlayJpeg(cv, r.ref, r.rough, path.join(outDir, label + '_rough.jpg'), 0.4, crop);
   moveJpeg(cv, r.field, w, h, crop, path.join(outDir, label + '_move.jpg'), 0.4);
   dumpField(r.field, r.ref, path.join(outDir, label + '_field'));

@@ -665,13 +665,23 @@ more than two or three institutions except the one below; most German chant prin
   shift of 8 / 16 px sideways: 1.6 / 1.7 % (invisible); 32 px: 4.8 %; 48 px: 4.5 %; 64 px: 25 %. Shift downward 16 / 32 px: 1.8 / 2.6 %.
   The movement the alignment applied in the band equals the built-in shift (7.9, 14.1, 25.7, 38.3 px for 8, 16, 32, 48 sideways;
   14.7, 32.7 for 16, 32 downward), so the movement map (V16) reveals it, as on the large Liber scans. Small scans behave like large ones.
-- **D1 Boorman items (Odhecaton A, with `PAD=0.15` so margins show).** Confirmed: **A1v line 9 first word** (Paris "temis" against
-  "meas") is marked; **D1r page number** (Paris and Washington agree, New York differs: black against blue) and **D7r page number**
-  (the same pattern) are visible in the margin. Not confirmed (the largest differences on these pages are scan edges and the
-  right-hand custos strokes, the single changes are below the noise of the 1000–1400 px scans or hidden in speckle): H2r signature,
-  H5v "e", N8r colophon "e" (the Device woodcut gives speckle), F5v, A7v, D2v, N4r single notes; L6r not staged (folio number
-  stamped in in all three copies, so no difference between them). Method note: finding a single changed note needs a view of
-  that note only (the app's tile and zoom view), not a whole-page overlay. Canti C D3v.i.1 and C4r.iv still not confirmed.
+- **D1 Boorman items (Odhecaton A; first pass with `PAD=0.15` so margins show, second pass 18 Nov at the full working height of 3000 px,
+  `PAD=0.1 OVERLAY_SCALE=1`, Paris as reference against New York "PN" and Washington "PW").** Confirmed: **A1v line 9 first word**
+  (Paris "temis" against "meas") is marked; **D1r page number** (Paris and Washington agree, New York differs: black against blue) and
+  **D7r page number** (the same pattern) are visible in the margin. Partly confirmed: **H5v headline "Alexander"**: in the Paris–New York
+  overlay there is a red mass over the top of the "d" and the final "e", in the Paris–Washington overlay only thin edges. That fits
+  Boorman (second "e" inverted in NYp, corrected in Wc), but a shifted letter looks the same, so the overlay only says "look here".
+  Not confirmed: **N8r colophon "e"**: the first colophon line ("Impressum Venetijs per Octavianum ...") is black (identical) in all three
+  copies, the largest differences are specks (< 350 px) next to the "P" and in the device woodcut; Boorman's exact "e" is not identified.
+  **H2r signature**: with a wide margin (`PAD=0.35`) neither Paris nor New York nor Washington shows a letter below the last staff, only
+  staves and a blue stain in New York, so the signature is somewhere else or lies outside the scanned margin (the position in Boorman is needed).
+  **A7v, D2v, F5v, N4r single notes**: the blobs where Paris differs from BOTH other copies are staff-line edges and a faint number block,
+  no note head; the single changes stay below what a whole-page overlay shows. L6r not staged (folio number stamped in in all three copies).
+  Canti C D3v.i.1 and C4r.iv not confirmed. **Seen by eye on the way:** a hand-drawn mark (looks like a pointing hand) in the left margin of
+  H5v and pen strokes in the left margin of H2r, both only in the Paris copy (red). **Method notes:** (1) finding one changed note needs
+  a view of that note only (the app's tile and zoom view) and its position; a catalogue entry "system v, note 14" cannot be turned into a
+  position automatically; (2) a signature, folio number or catchword needs a generous margin, the margin of the overlay must be adjustable
+  (V-feature "show margin") and the printed-area box must not clip it.
 - **D3 Liber f.8r and f.8v, group B copies (18 Nov 2026; file names from the owner: CZ-Pu NK4134_R / NK4135_L, GB-Lbl1 K9a24_010_R /
   K9a24_011_L; the group A comparison copy is US-CA Harvard_0022 / 0023).** The two group B copies agree: CZ-Pu against GB-Lbl1 0.4 %
   (f.8r) and 1.3 % (f.8v), movement median 1.7–1.9 px, almost nothing bent over 8 px. Group B against group A (US-CA) is clearly different:
@@ -684,10 +694,34 @@ more than two or three institutions except the one below; most German chant prin
   and Canti C Q4r, 7 Giunta CCXIXv/CLVv/CCXXv, 8 Opusculum p. 30), switched on by a third argument (the folder that holds the digitised copies;
   the second argument may be `-` to skip the Melopoiae cases). 14 whole-page assertions, all pass on the staged scans; cases 1 and 4 still pass
   (16 and 11). Single-note and margin differences (Boorman items, folio numbers) are NOT asserted yet: they need regions in pixels.
-- **Still to do:** the single Boorman items of D1 (need a close view of one note, see above); extra measurements (a) tile settings that start
-  hiding known differences, (b) the four-cornered area against the dark-border reference problem (the Opusculum result shows the problem is
-  real: B-Br as reference fails on 22 of 68 pages), (c) the list of pages where box and tile settings both fail (Opusculum B-Br pages 7, 10, 11,
-  19, 21, 27, 32–35, 39, 42, 48, 49, 52, 54, 62, 66, 69, 70, 72, 73 as reference; Odhecaton F8r; Canti C B4r).
+- **Extra (a), done 18 Nov 2026: what happens when the tile alignment is made stiffer.** `BC_LEVELS=n` uses only the first n of the four
+  tile levels (384, 192, 96, 48 px tiles); all 73 known-difference assertions (cases 1–8) were run with n = 1, 2, 3 and 4 (= normal).
+  Result: **no known difference disappears at any setting**; what the stiffer settings spoil is the matching side: matching regions stay matched only with all four
+  levels: assertions failed 16 of 73 with one level, 7 with two, 2 with three, 0 with four. Examples (unmatched ink in %, levels 1 / 2 / 3 / 4):
+  f.19v CH-E against D-FUl (A1 against A2) whole area 8.6 / 2.7 / 0.9 / 0.7, control system 1 20.2 / 4.5 / 0.8 / 0.6; Melopoiae p.8 B-Br against
+  DK-Kk "meonii" (should match) 29.8 / 27.9 / 1.5 / 0.7. Known differences get SMALLER the more the alignment may bend: f.19v stems 3:12–20
+  (A1 against B) 36 / 24 / 22 / 21, p.8 "amando" (A-Wn1) 37 / 30 / 25 / 21, Opusculum p.30 D-Mbs against D-B 42.5 / 35 / 31 / 27.5, Giunta
+  CCXXv (V1 against Rossiana) 15.5 / 14.2 / 12.7 / 11.6. **Reading: the present setting (four levels, finest tiles 48 px, ±1.5 px) is the loosest
+  one tested and every known difference still stands clear of its threshold (tightest margin: Giunta CCXXv Rossiana 11.6 % against > 8 %); the
+  trend says a looser setting than level 4 (smaller tiles, a larger range) would start absorbing real differences, so B6 (tile settings in the
+  app) should offer "stiffer" but not "looser" than the present setting without a warning.** A fifth, finer level was not tried, so the looser side is only
+  inferred from the trend.
+- **Extra (b), done 18 Nov 2026: a hand-set printed area rescues the dark-border reference.** Research switch in `music_pair.js`:
+  `BOX=x0,y0,x1,y1` (rectangle in working pixels) or `BOXAUTO=<fraction>` (stand-in for a hand-drawn area: ignore that fraction of the image on all
+  four sides, take the 0.5–99.5 % range of the ink). With `BOXAUTO=0.05` all 22 Opusculum pages on which B-Br as reference had failed
+  ("box too small") now align: unmatched ink 1.9–6.6 % (median 3.5 %), page 73 13.3 %; with D-Mbs as reference the same pages give 0.4–4.1 %
+  (median 1.1 %). The box found automatically on these pages was a fragment of the page (100–700 px wide on 21 of 22 pages, 1130 px on page 66); the stand-in box
+  is about 1900 px wide. The extra ≈ 2.4 points come from edge marks inside the generous box, a tight hand-drawn box should close most of the gap (page 73:
+  the box reaches down to y = 2778 while most end between 2430 and 2720; to be looked at). Movement statistics are as good as with D-Mbs as reference
+  (over 8 px: median 2 %, pages 32 and 54 16–26 % against 11–17 % with the other reference, probably real re-setting). **Consequence for
+  A4/B3: a scan with a dark border can stay reference if the printed area is set by hand (or proposed after ignoring a border strip);
+  switching references is not needed.** Not tested: a four-cornered (slanted) area.
+- **Extra (c), done 18 Nov 2026: pages where box AND tile settings fail.** With the hand-set area none of the 22 Opusculum pages fails any more
+  (see (b)). Canti C B4r (box covered half the page): `BOXAUTO=0.05` aligns the whole page, 2.1 % unmatched (earlier with `STAFFBOX=1` 4.3 %),
+  strips 0.9–3.8 %. **Odhecaton F8r (blank staves, almost no ink) still fails in substance:** the box error is gone but rough alignment leaves 30 %
+  and the tile alignment moves the copy by a median of 7 px (46 % of the page over 8 px) to find something to hold on to, result 5.7 % unmatched
+  that cannot be trusted. Nearly empty pages need a warning ("too little ink to align") or alignment from the neighbouring page. Remaining list:
+  Odhecaton F8r (blank staves), Canti C pages with sparse staves not retested after `BOXAUTO` (F1r, O4v).
 
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
