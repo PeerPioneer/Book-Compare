@@ -49,7 +49,7 @@ with sync_playwright() as p:
     assert pg2.evaluate("(window.__lastOpts||[]).length") == 0, 'no folder picker was needed'
     pg2.click('#ws-compare'); pg2.wait_for_timeout(1500)
     assert pg2.evaluate("document.getElementById('ws').hidden") and prompts(pg2) == ['scans'], prompts(pg2)
-    pg2.click('#back'); pg2.wait_for_timeout(600)
+    leave_compare(pg2); pg2.wait_for_timeout(600)
     assert hid(pg2, '#ws-banner') and pg2.locator('#ws .ws-hmeta.lost').count() == 0
 
     # --- the folder window starts where the last folder was chosen ---------------------------------------------------

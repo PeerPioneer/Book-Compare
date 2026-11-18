@@ -113,8 +113,8 @@ with sync_playwright() as p:
     pg.click('#ws-compare'); pg.wait_for_timeout(1500)
     assert pg.evaluate("document.getElementById('ws').hidden")
     assert pg.evaluate("[...document.querySelectorAll('#compare_container ul.vertical-image-list img')].every(i=>i.src.startsWith('blob:') && i.naturalWidth>0)")
-    pg.click('#back'); pg.wait_for_timeout(600)
-    assert not pg.evaluate("document.getElementById('ws').hidden"), 'Back must return to the workspace'
+    leave_compare(pg); pg.wait_for_timeout(600)
+    assert not pg.evaluate("document.getElementById('ws').hidden"), 'Back (or the PAGES tab) must return to the workspace'
     # the two-image screen starts in Perspective mode
     assert pg.evaluate("document.querySelector('#transform_select #selected-text').textContent.trim()") == 'Perspective'
     assert pg.evaluate("document.querySelector('#transform_select').MDCSelect.value") == 'perspective'
@@ -131,7 +131,7 @@ with sync_playwright() as p:
     assert not pg2.evaluate("document.getElementById('ws').hidden") and 'once more' in pg2.inner_text('#ws-toast'), pg2.inner_text('#ws-toast')
     pg2.click('#ws-compare'); pg2.wait_for_timeout(1500)
     assert pg2.evaluate("document.getElementById('ws').hidden") and prompts(pg2) == ['Copy-A', 'Copy-B'], prompts(pg2)
-    pg2.click('#back'); pg2.wait_for_timeout(600)
+    leave_compare(pg2); pg2.wait_for_timeout(600)
     clicks = 0
     while not hid(pg2, '#ws-banner') and clicks < 6:
         pg2.click('#ws-banner [data-act=allow]'); clicks += 1; pg2.wait_for_timeout(700)

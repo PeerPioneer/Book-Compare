@@ -71,6 +71,9 @@ def add_copy(pg, key, name, start=None, ticks=()):
     if start: pg.fill('#ac-start', str(start))
     for i in ticks: pg.check('#ac-groups input[data-g="%d"]'%i)
     pg.click('#ac-ok'); pg.wait_for_timeout(600)
+def leave_compare(pg):
+    # from the Compare screen back to the pages: the Compare tab has the PAGES tab (it has no Back button any more); the old two-image screen has Back
+    pg.click('#ct_tab_pages' if pg.is_visible('#ct_tab_pages') else '#back')
 def thumbs(pg, n=1, seconds=20):
     # True as soon as at least n preview pictures are shown (making them takes a moment, longer on a slow computer)
     for _ in range(seconds * 5):
