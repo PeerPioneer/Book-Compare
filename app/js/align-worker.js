@@ -56,7 +56,12 @@ function ones(cv, rows, cols) { return cv.Mat.ones(rows, cols, cv.CV_8U); }
 function redScaled(cv, rgba, w, h) {
   const red = new cv.Mat(h, w, cv.CV_8U);
   const r = red.data;
-  for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j];
+  // research switch INKCH (node only): which colour part of the scan the ink map is made from. Default 'r' = red channel (red print nearly disappears);
+  // 'g' = green channel, 'min' = darkest of red, green, blue per pixel (sees black AND red print as ink)
+  const ch = (typeof process !== 'undefined' && process.env && process.env.INKCH) || 'r';
+  if (ch === 'min') for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = Math.min(rgba[j], rgba[j + 1], rgba[j + 2]);
+  else if (ch === 'g') for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j + 1];
+  else for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j];
   const s = H0 / h;
   const out8 = new cv.Mat();
   if (h === H0) red.copyTo(out8);                       // already at the working height (the browser worker scales while decoding)
@@ -199,7 +204,20 @@ function printedBox(cv, r) {
   return box;
 }
 
-module.exports = { H0, redScaled, inkMap, printedBox, smoothBlur };
+/* Staves are long thin lines, so printedBox removes them and can lose staves that carry few notes (e.g. the top half of a page
+   whose lower staves are full). This stretches the box vertically over every row in which at least 45 % of the box width is ink
+   (a staff line, even if short notes sit on it), ignoring the outer 3 % of the image where page edges give long lines. ref = ink map. */
+function extendBoxByStaves(box, ref) {
+  const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows, d = ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h);
+  let sy0 = y0, sy1 = y1;
+  for (let y = margin; y < h - margin; y++) {
+    let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++;
+    if (c >= need) { if (y < sy0) sy0 = y; if (y > sy1) sy1 = y; }
+  }
+  return [x0, sy0, x1, sy1];
+}
+
+module.exports = { H0, redScaled, inkMap, printedBox, smoothBlur, extendBoxByStaves };
 
 };
 __defs["rough_align"] = function (module, exports, require) {
@@ -433,9 +451,11 @@ function denseField(cv, cx, cy, S, rows, cols, W, H) {
 
 /* bend `mov` onto `ref` (ink maps of the same size, already roughly aligned). box = [x0, x1, y0, y1]. Returns a new Mat. */
 function tileAlign(cv, ref, mov, box, opts = {}) {
-  const levels = opts.levels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
+  const envLevels = (typeof process !== 'undefined' && process.env && process.env.BC_LEVELS) ? LEVELS.slice(0, +process.env.BC_LEVELS) : null;   // research only: use just the first N levels (a stiffer alignment)
+  const levels = opts.levels || envLevels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
   const refB = new cv.Mat(); cv.GaussianBlur(ref, refB, new cv.Size(0, 0), 0.8);
   let cur = mov;
+  const total = opts.trackField ? { fx: new Float32Array(W * H), fy: new Float32Array(W * H) } : null;   // sum of all level fields (research: movement map)
   for (const [tile, step, search, threshold] of levels) {
     const t0 = Date.now();
     const movB = new cv.Mat(); cv.GaussianBlur(cur, movB, new cv.Size(0, 0), 0.8);
@@ -444,6 +464,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
     const t1 = Date.now();
     const fx = denseField(cv, cx, cy, repair(SX, rows, cols, threshold).S, rows, cols, W, H);
     const fy = denseField(cv, cx, cy, repair(SY, rows, cols, threshold).S, rows, cols, W, H);
+    if (total) for (let p = 0; p < W * H; p++) { total.fx[p] += fx[p]; total.fy[p] += fy[p]; }
     const mapx = new cv.Mat(H, W, cv.CV_32F), mapy = new cv.Mat(H, W, cv.CV_32F);
     { const mx = mapx.data32F, my = mapy.data32F; for (let y = 0, p = 0; y < H; y++) for (let x = 0; x < W; x++, p++) { mx[p] = x + fx[p]; my[p] = y + fy[p]; } }
     const next = new cv.Mat();
@@ -454,7 +475,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
     stats.push({ tile, tiles: rows * cols, measure_s: (t1 - t0) / 1000, field_s: (Date.now() - t1) / 1000 });
   }
   refB.delete();
-  return { aligned: cur, stats };
+  return { aligned: cur, stats, field: total };
 }
 
 module.exports = { tileAlign, LEVELS };
@@ -463,7 +484,7 @@ module.exports = { tileAlign, LEVELS };
 __defs["pipeline"] = function (module, exports, require) {
 /* The alignment chain without any file handling, so that it can run in Node.js (research scripts) and in the browser's worker (app).
    Input: the red channel of a scan scaled to 3000 px height as a 32-bit float Mat (see printed_area.js: redScaled). */
-const { inkMap, printedBox } = require('./printed_area');
+const { inkMap, printedBox, extendBoxByStaves } = require('./printed_area');
 const { roughAlign, warp } = require('./rough_align');
 const { tileAlign } = require('./tile_align');
 
@@ -484,8 +505,9 @@ function unmatchedShare(cv, a_, b_, box) {
 /* reference copy: printed area and ink map (kept for all copies that are aligned onto it) */
 function prepareReference(cv, red) {
   const t0 = now();
-  const box = printedBox(cv, red), t1 = now();
+  let box = printedBox(cv, red); const t1 = now();
   const ref = inkMap(cv, red);
+  if (typeof process !== 'undefined' && process.env && process.env.STAFFBOX === '1') box = extendBoxByStaves(box, ref); // experiment (research notes, Odhecaton/Canti C tests): keep sparse staves inside the box
   return { ref, box, times: { box_s: (t1 - t0) / 1000, ink_ref_s: (now() - t1) / 1000 } };
 }
 
@@ -500,10 +522,10 @@ function alignCopy(cv, refState, red, opts = {}) {
   const m = Math.max(60, Math.floor(0.02 * Math.max(x1 - x0, y1 - y0)));
   const tbox = [Math.max(60, x0 - m), Math.min(w - 60, x1 + m), Math.max(60, y0 - m), Math.min(h - 60, y1 + m)];
   t = now();
-  const { aligned, stats } = tileAlign(cv, ref, rough, tbox); tm.tiles_s = (now() - t) / 1000;
+  const { aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField }); tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
   mov.delete();
-  const out = { aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale };
+  const out = { field, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale };
   if (opts.measure) out.unmatched = { rough: unmatchedShare(cv, ref, rough, box).share, tiles: unmatchedShare(cv, ref, aligned, box).share };
   if (!opts.keepRough) { rough.delete(); out.rough = null; }
   return out;

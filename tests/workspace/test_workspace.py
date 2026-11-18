@@ -21,7 +21,7 @@ with sync_playwright() as p:
     pg.click('#ws .ws-addbtn'); pg.wait_for_timeout(150)
     pg.evaluate("k=>window.__picks.push(window.__h[k])", 'B'); pg.click('#ac-folder'); pg.wait_for_timeout(500)
     assert pg.is_checked('#ac-groups input[data-g="0"]') and 'already used by B-Test' in pg.inner_text('#ac-groups'), 'one folder: all of it is the default'
-    pg.locator('#ac-groups details summary').first.click(); pg.wait_for_timeout(200)
+    pg.evaluate("document.querySelector('#ac-groups details').open = true"); pg.wait_for_timeout(300)        # (the arrow; a click on the folder name would tick or untick it)
     boxes = pg.locator('#ac-groups .flist input'); assert boxes.count() == 6 and all(boxes.nth(i).is_checked() for i in range(6))
     for i in (0, 1, 2, 3, 5): boxes.nth(i).uncheck()
     assert pg.evaluate("document.querySelector('#ac-groups input[data-g=\"0\"]').indeterminate") and '1 of 6' in pg.inner_text('#ac-groups')

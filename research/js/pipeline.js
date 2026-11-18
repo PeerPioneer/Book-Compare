@@ -24,7 +24,7 @@ function prepareReference(cv, red) {
   const t0 = now();
   let box = printedBox(cv, red); const t1 = now();
   const ref = inkMap(cv, red);
-  if (process.env.STAFFBOX === '1') box = extendBoxByStaves(box, ref); // experiment (research notes, Odhecaton/Canti C tests): keep sparse staves inside the box
+  if (typeof process !== 'undefined' && process.env && process.env.STAFFBOX === '1') box = extendBoxByStaves(box, ref); // experiment (research notes, Odhecaton/Canti C tests): keep sparse staves inside the box
   return { ref, box, times: { box_s: (t1 - t0) / 1000, ink_ref_s: (now() - t1) / 1000 } };
 }
 
