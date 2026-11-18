@@ -676,10 +676,19 @@ more than two or three institutions except the one below; most German chant prin
   blue flat-like sign in New York, i.e. the erasure and re-stamped semibreve; the 33rd note was not counted exactly). *Seen only weakly:* H5v
   headline "Alexander" (extra red over the "d" and the final "e" against New York only; a shifted letter looks the same); Canti C D3v.i.1 (the first
   note after the clef: the inner window and the corners of the head show a red and blue fringe in Vienna, not stronger than the fringe on the next
-  head). *Not resolved:* N8r colophon (Boorman: first "e" of "Forosempronienses" inverted in F-Pc, corrected elsewhere): at 5x the "e" in "Foroſem" has the same
-  orientation in all three copies, so the overlay does not show it (the Paris scan shows "temis" on A1v, i.e. it behaves like F-Pc there; the discrepancy
-  is open). The **signature is on H1r, not H2r** (Boorman's "Har" is the OCR of "H1r"; a bare "H" belongs on a first leaf): H2r carries "H ij" in Paris and
-  New York alike, H1r carries "H" in New York; **H1r of Paris (Page_115) and Washington (Page_119) are not staged yet (owner asked, 18 Nov).** *Not to be expected:* Canti C C4r.iv: Boorman lists
+  head). *Closed (owner, 18 Nov):* N8r colophon. The owner read the words ("Ferosemp[ro] niensem", last words of the first colophon row) and says the first "e" is
+  inverted in ALL THREE copies, so there is no difference at this spot and the tool was right to show none (at 5x the "e" looked the same in all three; Boorman says it
+  is inverted in F-Pc only and corrected by a stop-press change in the others; **the scans we have do not show that**, so Boorman's note is not usable as a
+  "must differ" check here; it stays a good negative control: nothing may be reported). The **signature is on H1r, not H2r** (Boorman's "Har" is the OCR of "H1r"):
+  H2r carries "H ij" in Paris and New York alike. **H1r done 18 Nov** (owner staged all three: Paris Page_115, New York Page_113, Washington Page_119):
+  Boorman's note reads "H1r signature: [nil] H [US-NYp, US-Wc]" (nil in the other copies, i.e. F-Pc), but **all three scans show the same small mark at the lower right
+  (a gothic H with a hook; Paris 1373 px wide, so the form is only roughly readable) — no difference in this spot either.** In the overlay (margin shown, PAD=0.35) the mark
+  appears as a red/blue pair about 10–15 px apart, because it lies outside the printed-area box and is only carried along by the rough alignment: **a margin
+  item that exists in both copies shows up as a false difference when the margin is shown (supports A2, B8).** What the pairs DO show on H1r is a real difference that Boorman describes
+  elsewhere ("the sixth stave is increasingly seldom inked as the book progresses ... on the following rectos: G4, H1,2,4,7, ..."): **Paris prints six staves, New York and
+  Washington five (three blank staves in Paris, two in the others);** the sixth blank stave is the only large red block in the overlays (strips 11–12 are
+  100 % unmatched, whole page 8.2 % Paris–New York, 8.1 % Paris–Washington; the music itself matches). A real, expected difference, found without looking for it.
+  *Not to be expected:* Canti C C4r.iv: Boorman lists
   that correction for F-Pc and I-TVcap, not for F-Pn or A-Wn, so the two copies here should agree (they do, 3.0 % whole page). L6r not staged.
   Seen by eye on the way: a hand-drawn mark (looks like a pointing hand) in the left margin of H5v and pen strokes in the left margin of H2r, both
   only in Paris. **How the notes were located:** by counting symbols by eye in the system band; an automatic count failed because the staff lines
@@ -759,8 +768,10 @@ more than two or three institutions except the one below; most German chant prin
   6. **Differences in red ink are invisible** (Antiphonarium: red staves shifted 14 px 1.7 %, removed 0.0 %), because the ink map uses the red channel.
      *Prototype tested 18 Nov (`INKCH=min`, ink map from the darkest of red, green and blue):* red staves shifted 14 px 5.9 % (default 1.7 %), red staves removed
      21 % (default 0.0 %), the cross-copy control Bodleian against Munich 1.3 % (default 0.6 %): red print is seen and matching copies still match.
-     *New proposal (A6):* a choice per pair, "dark ink / red and dark ink"; until then **B5** says in the help text that red print takes no part in the
-     alignment and its differences are not measured.
+     *Owner 18 Nov:* there can be any number of colours, so the choice is not "red" but **"dark ink" / "dark ink and lighter inks"** (A6); for now **B5**, a help text, is enough:
+     it says that lighter inks (red, and others) take no part in the alignment and that their differences are not measured; integrating lighter inks comes after version 1.
+     *Caution for that later step:* "lighter inks" also catches stains, show-through, paper yellowing and pencil, so the default stays "dark ink" and the other
+     mode is a deliberate choice per pair, with a warning that it is more sensitive to such marks.
   7. **A single changed note hides in a whole-page overlay.** Four of seven single Boorman items on the Odhecaton pages were found at full resolution and
      only because I knew the system and the note; automatic lists of the largest spots were swamped by right-edge custos strokes, staff-line fringes
      and device-woodcut speckle. *New proposal (B7, owner 18 Nov: only after version 1, see C4; wants to see an example first, mock-up sent):* after alignment, a list ("jump list") of the strongest difference spots as small pictures that
@@ -772,7 +783,15 @@ more than two or three institutions except the one below; most German chant prin
      is moved by the rough alignment (nothing is cut off); only the fine tile step and the unmatched-ink measure are limited to the box plus a 2 % ring.
      So margin items are carried along but not fine-aligned or measured. *Change:* **A2** widened: the fine alignment ring covers every printed item of the page
      (headline, folio number, signature, catchword) while ignoring the scan edge; **B8 (version 1)**: a "show margin" control, default wide enough to show them;
-     and margin items are added to the checks (D1r/D7r page numbers, H5v headline, H1r signature once staged, Canti C folio numbers).
+     and margin items are added to the checks (D1r/D7r page numbers, H5v headline, Canti C folio numbers). **H1r signature checked 18 Nov: present in all three scans, so it
+     is a "must NOT differ" control, and in the overlay it shows as a red/blue pair 10–15 px apart (outside the box, not fine-aligned): exactly the false difference A2 has to remove.**
+  8a. **The printed-area proposal is automatic for every page, the user does not confirm it page by page** (owner 18 Nov: confirming a box for every single page would be
+     impractical, and that is not the plan). Design: (1) the app proposes a box for every page by itself, with candidate boxes (A4) and an internal check
+     ("does the box cut through print?"), at no cost to the user; (2) the user is only asked on pages the check flags (box very small, box much larger than the
+     other pages of the same copy, little ink) and sees the box drawn there; (3) systematic problems are solved once per copy, not per page: one setting such as "ignore a border
+     strip of x %" for a dirty scan edge, applied to every page of that copy (the Opusculum case: one setting for 22 pages); (4) the hand-set box (V2b) is the safety
+     net on single pages and is saved. *Idea not yet tested:* mask the outer border strip of the ink map (set to paper) before the standard automatic box instead of
+     the percentile box; it would keep the box that works on the Antiphonarium and still clean dirty borders. To be run on the 22 Opusculum pages, the Antiphonarium pair and Canti C B4r.
   9. **Page numbers do not line up between copies** (New York is two pages off from gathering F on, Brussels is one off, Vienna three off after
      Brussels 13); I had to build the page map by hand for every print. *Owner 18 Nov: not needed, the page grid already lets the user match pages across copies (B9 dropped).*
   10. **Catalogues name copies by siglum, and a correction may belong to other copies than the two on screen** (Canti C C4r.iv: F-Pc and I-TVcap,
@@ -783,7 +802,7 @@ more than two or three institutions except the one below; most German chant prin
       part of the workflow. Time: 25–50 s per pair on Claude's two-core machine; the speed test on the owner's PC on 19 Nov decides whether the
       10-second target holds, and **A5** (release memory) matters because every test ran in a separate process.
 
-- **Status of D1–D5 (18 Nov 2026): all done.** Open only: H2r signature position, N8r colophon "e", L6r (not staged); the extra tests named above (Antiphonarium with the trimmed box, red-ink mode, jump-list ranking).
+- **Status of D1–D5 (18 Nov 2026): all done.** The H1r signature and the N8r colophon are closed (no difference in these scans; see D1). Open only: L6r (not staged); the extra tests: border strip masked before the standard box (see lesson 8a), red-ink mode as research, jump-list ranking (after version 1).
 
 - *Marenzio, madrigal books, Venice 1580s–90s* (mensural, single impression: a useful contrast). Pugin (Troja 17, 2018)
   reports stop-press corrections found with Aruspix but lists none; a list may exist only in the edition's apparatus
@@ -827,6 +846,15 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V18 | **Shifted-page warning, small version** (B2 in §10) | **decided, version 1** (owner, 17 Nov) | needs V3; full automatic page matching stays P4 |
 | V16 | **Shifts are absorbed by the tile alignment — now measured (15 Nov, §4.4 music tests).** One whole line moved by 4–32 px is pulled back and invisible (0.6–2.4 % unmatched); only 64 px shows. Melopoiae p. 9: half-staff-space differences are not visible. The movement applied equals the shift, so it can be shown. **Decision: part of version 1** — (1) movement map next to the overlay, (2) the rough, unbent alignment as a second view, (3) a cautious automatic hint for sharp-edged movements of about 15 px or more (false alarms below about 10 px). Small shifts remain undetectable; say so in the help text | **firm, version 1** | needs V3 |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
+
+### 11.1a Small changes for the next release (owner, 18 Nov 2026; not to be built now, only with the next new version)
+
+| ID | Change | Note |
+|----|--------|------|
+| S1 | Grid view, "add new copy" name box: change the example text from "Austria, Austrian National Library" to "e. g. Austria, Austrian National Library" | wording only |
+| S2 | Grid view, moving a file: instead of swapping with an existing file, the moved file is **inserted between two adjacent files** (the files after it shift by one place) | owner confirmed the meaning; check how a gap or the end of the row is handled |
+| S3 | Adding files: besides adding a whole folder, **select individual files** (e.g. one picture); the default stays "add a whole folder" | |
+| S4 | "Start Book Compare.bat" should open **Microsoft Edge** instead of the default browser (Firefox on the owner's PC), because the app works best in Edge | `launcher/serve.ps1` (line 56, `Start-Process $url`) and `launcher/tray.ps1` (lines 53–54): try Edge first, fall back to the default browser if Edge is not found; the new desktop program (V5) brings its own browser engine and makes this obsolete |
 
 ### 11.2 After version 1
 
