@@ -10,7 +10,12 @@ function ones(cv, rows, cols) { return cv.Mat.ones(rows, cols, cv.CV_8U); }
 function redScaled(cv, rgba, w, h) {
   const red = new cv.Mat(h, w, cv.CV_8U);
   const r = red.data;
-  for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j];
+  // research switch INKCH (node only): which colour part of the scan the ink map is made from. Default 'r' = red channel (red print nearly disappears);
+  // 'g' = green channel, 'min' = darkest of red, green, blue per pixel (sees black AND red print as ink)
+  const ch = (typeof process !== 'undefined' && process.env && process.env.INKCH) || 'r';
+  if (ch === 'min') for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = Math.min(rgba[j], rgba[j + 1], rgba[j + 2]);
+  else if (ch === 'g') for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j + 1];
+  else for (let i = 0, j = 0; i < r.length; i++, j += 4) r[i] = rgba[j];
   const s = H0 / h;
   const out8 = new cv.Mat();
   if (h === H0) red.copyTo(out8);                       // already at the working height (the browser worker scales while decoding)

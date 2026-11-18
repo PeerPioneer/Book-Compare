@@ -603,9 +603,9 @@ Plan (IDs used in the register, §11):
 - **B — what the user sees, version 1**: B1 box visible and correctable (see V2b); B2 **small shifted-page warning** (owner: version 1):
   when a page matches badly, compare with the copy's neighbouring pages and, if one fits clearly better, suggest moving the column
   with the existing gap tools; B3 reference proposal prefers clean borders and reliably found boxes (V7); B4 movement map (V16);
-  B5 help text on what cannot be seen; B6 tile settings per page (V15). **Proposed 18 Nov (owner to decide, see the lessons in §10):** B7 jump list of
-  the strongest difference spots; B8 show-margin control; B9 per-copy page-offset list.
-- **C — after version 1**: C1 handwritten additions as "later addition" (5.1); C2 book structure (5.1 idea 1); C3 suspicious-grouping hint.
+  B5 help text on what cannot be seen; B6 tile settings per page (V15). **Proposed 18 Nov (owner to decide, see the lessons in §10):** B8 show-margin control (**decided, version 1**, owner 18 Nov). B7 jump list moved to C4 (after
+  version 1); B9 page-offset list dropped (the page grid does it).
+- **C — after version 1**: C1 handwritten additions as "later addition" (5.1); C2 book structure (5.1 idea 1); C3 suspicious-grouping hint; C4 jump list of the strongest difference spots (B7; owner 18 Nov, after version 1, mock-up seen).
 - **D — tests first (D1–D5 all done 18 Nov 2026, results and lessons in §10)**: D1 remaining Boorman items — partly done 17 Nov, see results (Canti C D3v.i.1, C4r.iv; Odhecaton A1v, A7v, D1r/D7r, D2v, F5v, H2r signature,
   H5v "e", L6r, N4r.iv.33, N8r); D2 artificial shift on a small scan (does the V16 hint hold?); D3 Liber B copies of f.8r/8v;
   D4 chant print (noise floor, artificial changes, red ink; material below); D5 add Odhecaton/Canti C pairs to
@@ -676,8 +676,10 @@ more than two or three institutions except the one below; most German chant prin
   blue flat-like sign in New York, i.e. the erasure and re-stamped semibreve; the 33rd note was not counted exactly). *Seen only weakly:* H5v
   headline "Alexander" (extra red over the "d" and the final "e" against New York only; a shifted letter looks the same); Canti C D3v.i.1 (the first
   note after the clef: the inner window and the corners of the head show a red and blue fringe in Vienna, not stronger than the fringe on the next
-  head). *Not found:* N8r colophon "e" (the whole first colophon line is identical in all three copies); H2r signature (no letter below the last
-  staff in any of the three copies, even with `PAD=0.35`; the position in Boorman is needed). *Not to be expected:* Canti C C4r.iv: Boorman lists
+  head). *Not resolved:* N8r colophon (Boorman: first "e" of "Forosempronienses" inverted in F-Pc, corrected elsewhere): at 5x the "e" in "Foroſem" has the same
+  orientation in all three copies, so the overlay does not show it (the Paris scan shows "temis" on A1v, i.e. it behaves like F-Pc there; the discrepancy
+  is open). The **signature is on H1r, not H2r** (Boorman's "Har" is the OCR of "H1r"; a bare "H" belongs on a first leaf): H2r carries "H ij" in Paris and
+  New York alike, H1r carries "H" in New York; **H1r of Paris (Page_115) and Washington (Page_119) are not staged yet (owner asked, 18 Nov).** *Not to be expected:* Canti C C4r.iv: Boorman lists
   that correction for F-Pc and I-TVcap, not for F-Pn or A-Wn, so the two copies here should agree (they do, 3.0 % whole page). L6r not staged.
   Seen by eye on the way: a hand-drawn mark (looks like a pointing hand) in the left margin of H5v and pen strokes in the left margin of H2r, both
   only in Paris. **How the notes were located:** by counting symbols by eye in the system band; an automatic count failed because the staff lines
@@ -722,7 +724,12 @@ more than two or three institutions except the one below; most German chant prin
   the box reaches down to y = 2778 while most end between 2430 and 2720; to be looked at). Movement statistics are as good as with D-Mbs as reference
   (over 8 px: median 2 %, pages 32 and 54 16–26 % against 11–17 % with the other reference, probably real re-setting). **Consequence for
   A4/B3: a scan with a dark border can stay reference if the printed area is set by hand (or proposed after ignoring a border strip);
-  switching references is not needed.** Not tested: a four-cornered (slanted) area.
+  switching references is not needed.** Not tested: a four-cornered (slanted) area. **Correction the same day: the trimmed box is NOT a general rule.** On the
+  Antiphonarium pair (Bodleian against Munich) it gives 24.0 % unmatched, against 0.6 % with the automatic box, because it is far too large (1752 x 2634 px
+  instead of the correct 1383 x 1967 px found automatically: edge noise lies inside the percentile range). So neither box is right everywhere: the
+  automatic one fails on dirty borders (Opusculum, 22 pages), the trimmed one on this page. What works in every case tested is a box that is set (or
+  confirmed) by hand; for the proposal a rule is needed that says which candidate to trust (next research step: candidate boxes and a test "does the box cut
+  through print?", i.e. ink just outside its edges, run on all pages of all checks).
 - **Extra (c), done 18 Nov 2026: pages where box AND tile settings fail.** With the hand-set area none of the 22 Opusculum pages fails any more
   (see (b)). Canti C B4r (box covered half the page): `BOXAUTO=0.05` aligns the whole page, 2.1 % unmatched (earlier with `STAFFBOX=1` 4.3 %),
   strips 0.9–3.8 %. **Odhecaton F8r (blank staves, almost no ink) still fails in substance:** the box error is gone but rough alignment leaves 30 %
@@ -733,13 +740,13 @@ more than two or three institutions except the one below; most German chant prin
 - **Lessons from tests D1–D5 (18 Nov 2026): what did not work, what it taught, what changes in Book Compare.** Items marked *new* are
   proposals for the owner to decide; the others sharpen items that already exist (A1–A5, B1–B6, V2, V15, V16, V18).
   1. **A dark scan border broke the printed-area box** (Opusculum B-Br: 22 of 68 pages "box too small", the rest poor; also US-Wc, GB-Lbl1 spreads).
-     *Learned:* a box that ignores a 5 % border strip and takes the 0.5–99.5 % range of the ink rescues all 22 pages (extra b). *Change:* **A4** = this
-     trimmed box is the proposal, **B1/V2b** lets the user correct it; **B3** still prefers clean borders when proposing a reference, but a dark-bordered
+     *Learned:* a box that ignores a 5 % border strip and takes the 0.5–99.5 % range of the ink rescues all 22 pages (extra b), but fails on the Antiphonarium
+     (24 % against 0.6 %), so it cannot simply replace the automatic box. *Change:* **A4** = two candidate boxes plus a rule which one to trust, and **B1/V2b**
+     lets the user set or confirm the box (the reliable fix); **B3** still prefers clean borders when proposing a reference, but a dark-bordered
      scan is no longer unusable as reference.
   2. **Sparse staves cost half a page** (Canti C B4r, Odhecaton) and the cure `STAFFBOX=1` is not safe (Antiphonarium 0.6 % became 12.4 %).
-     *Learned:* no single automatic rule fits every print; the trimmed box handles B4r (2.1 %) and the Opusculum. *Change:* **A1** is not "switch STAFFBOX
-     on"; it is the trimmed box plus the user's correction. **Before A1/A4 are finished the trimmed box must be run on the Antiphonarium pair and on all pages
-     of every check** (not done yet).
+     *Learned:* no single automatic rule fits every print (automatic box, `STAFFBOX`, trimmed box each fail somewhere). *Change:* **A1** is not "switch STAFFBOX
+     on"; it is the candidate-box rule of A4 plus the user's correction, **tested on all pages of every check before it is adopted**.
   3. **Near-empty pages produce a number without meaning** (Odhecaton F8r: the copy is moved by a median of 7 px to find something to hold on to,
      5.7 % unmatched). *Change:* **A3** as planned (rough alignment only, say so); the trigger is little ink in the box plus large movement.
   4. **Small shifts are absorbed, and real warping looks like a shift.** 8–16 px invisible, 32–48 px a faint signal, 64 px visible (D2, also on
@@ -750,19 +757,24 @@ more than two or three institutions except the one below; most German chant prin
      more the alignment may bend, the smaller the real differences get. *Change:* **B6/V15** presets: "standard" = today; "stiffer" is safe (only more
      false differences); nothing looser than today without a warning that real differences may vanish.
   6. **Differences in red ink are invisible** (Antiphonarium: red staves shifted 14 px 1.7 %, removed 0.0 %), because the ink map uses the red channel.
-     *New proposal (A6):* a choice per pair, "dark ink / red ink / both" (red ink is dark in the green or blue channel). Until then **B5** says so in the
-     help text. To be tested on the Antiphonarium pair first.
+     *Prototype tested 18 Nov (`INKCH=min`, ink map from the darkest of red, green and blue):* red staves shifted 14 px 5.9 % (default 1.7 %), red staves removed
+     21 % (default 0.0 %), the cross-copy control Bodleian against Munich 1.3 % (default 0.6 %): red print is seen and matching copies still match.
+     *New proposal (A6):* a choice per pair, "dark ink / red and dark ink"; until then **B5** says in the help text that red print takes no part in the
+     alignment and its differences are not measured.
   7. **A single changed note hides in a whole-page overlay.** Four of seven single Boorman items on the Odhecaton pages were found at full resolution and
      only because I knew the system and the note; automatic lists of the largest spots were swamped by right-edge custos strokes, staff-line fringes
-     and device-woodcut speckle. *New proposal (B7):* after alignment, a list ("jump list") of the strongest difference spots as small pictures that
+     and device-woodcut speckle. *New proposal (B7, owner 18 Nov: only after version 1, see C4; wants to see an example first, mock-up sent):* after alignment, a list ("jump list") of the strongest difference spots as small pictures that
      open in the zoom view, with those three kinds of noise filtered out; the owner decides what counts. *Acceptance test:* on the seven known
-     locations, how many rank in the first 20? (research script, before anything is built.) The app also needs a fast zoom to 1:1.
+     locations, how many rank in the first 20? (research script, before anything is built.) The app also needs a fast zoom to 1:1. **Mock-up on N4r (Paris against Washington): a plain list of the six strongest spots shows only fringes at clefs and staff lines; the real
+     difference (the erased and re-stamped note, 52 % from the left) is not among them. This is why B7 waits for the noise filter and the ranking test.**
   8. **Signatures, folio numbers and headlines sit outside the box** and show only when the margin is shown (Canti C folio numbers "21" against a
-     handwritten "12"; the Odhecaton H2r signature was not found even with a wide margin). *Change:* **A2** (margin carried along) plus *new B8*: a
-     "show margin" control on the overlay, adjustable.
+     handwritten "12"; the Odhecaton H2r signature was not found even with a wide margin). *Owner 18 Nov: headlines, folio numbers and signatures are printed and must be part of the alignment, not cut off.* **What the code does today:** the whole page
+     is moved by the rough alignment (nothing is cut off); only the fine tile step and the unmatched-ink measure are limited to the box plus a 2 % ring.
+     So margin items are carried along but not fine-aligned or measured. *Change:* **A2** widened: the fine alignment ring covers every printed item of the page
+     (headline, folio number, signature, catchword) while ignoring the scan edge; **B8 (version 1)**: a "show margin" control, default wide enough to show them;
+     and margin items are added to the checks (D1r/D7r page numbers, H5v headline, H1r signature once staged, Canti C folio numbers).
   9. **Page numbers do not line up between copies** (New York is two pages off from gathering F on, Brussels is one off, Vienna three off after
-     Brussels 13); I had to build the page map by hand for every print. *New proposal (B9):* a per-copy page-offset list ("from page X on, add k"),
-     checked with the neighbour-page comparison of **B2**; a pair with a wrong offset gives a very high unmatched value, which can be flagged.
+     Brussels 13); I had to build the page map by hand for every print. *Owner 18 Nov: not needed, the page grid already lets the user match pages across copies (B9 dropped).*
   10. **Catalogues name copies by siglum, and a correction may belong to other copies than the two on screen** (Canti C C4r.iv: F-Pc and I-TVcap,
       not our F-Pn and A-Wn). Catalogues and the dissertation also contain errors and gaps (D-ARk f.9). *Change:* every known difference in the
       checks carries the copies it applies to; "expected" only when both copies are named. `check_known_differences.js` (now 77 assertions on six
