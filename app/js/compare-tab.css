@@ -5,8 +5,8 @@ div.result_container.ct-on.ct-noside { --ct-side-w: 0px; }
 div.result_container.ct-on.ct-focus { --ct-top-h: 0px; --ct-side-w: 0px; }
 div.result_container.ct-on #workspace { top: var(--ct-top-h); left: var(--ct-side-w); }
 div.result_container.ct-on.ct-stale #workspace { opacity: .4; transition: opacity .15s; }
-.ct-leave[hidden], .ct-top[hidden], .ct-side[hidden], .ct-pagebar[hidden], .ct-busy[hidden], .ct-spin[hidden], .ct-map[hidden], .ct-tip[hidden], .ct-flagpal[hidden], .ct-filters[hidden], .ct-fcols[hidden] { display: none !important; }
-.ct-top *, .ct-side *, .ct-pagebar *, .ct-busy *, .ct-map * { box-sizing: border-box; }
+.ct-leave[hidden], .ct-top[hidden], .ct-side[hidden], .ct-barleft[hidden], .ct-view[hidden], .ct-busy[hidden], .ct-spin[hidden], .ct-map[hidden], .ct-tip[hidden], .ct-flagpal[hidden], .ct-filters[hidden], .ct-fcols[hidden] { display: none !important; }
+.ct-top *, .ct-side *, .ct-barleft *, .ct-view *, .ct-busy *, .ct-map * { box-sizing: border-box; }
 
 .ct-top { position: absolute; top: 0; left: 0; right: 0; height: 46px; z-index: 3; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #fff; border-bottom: 1px solid #cfdcdc; color: #1b2a2a; }
 .ct-brand { font-weight: 500; font-size: 16px; }
@@ -56,7 +56,7 @@ div.result_container.ct-on.ct-stale #workspace { opacity: .4; transition: opacit
 .ct-fcols { display: flex; gap: 8px; padding: 8px 14px 0; }
 .ct-fcols button, .ct-flagpal button[data-c] { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #9db5b5; cursor: pointer; padding: 0; }
 .ct-fcols button[aria-pressed="true"], .ct-flagpal button[aria-pressed="true"] { box-shadow: 0 0 0 2px #1b2a2a; }
-.ct-fcols button:focus-visible, .ct-flagpal button:focus-visible, .ct-pin:focus-visible, .ct-chip:focus-visible, .ct-nav:focus-visible { outline: 2px solid #008080; outline-offset: 2px; }
+.ct-fcols button:focus-visible, .ct-flagpal button:focus-visible, .ct-pin:focus-visible, .ct-chip:focus-visible { outline: 2px solid #008080; outline-offset: 2px; }
 .ct-list li.none { color: #7d8e8e; cursor: default; }
 .ct-foot { display: flex; gap: 8px; align-items: flex-start; padding: 8px 14px 4px; font-size: 12.5px; color: #3c4f4f; cursor: pointer; }
 .ct-foot input { margin-top: 2px; accent-color: #008080; }
@@ -75,25 +75,54 @@ div.result_container.ct-on.ct-stale #workspace { opacity: .4; transition: opacit
 .ct-btn { font: inherit; font-size: 13px; border: 1px solid #008080; background: #fff; color: #008080; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
 .ct-btn:hover { background: #008080; color: #fff; }
 
-.ct-pagebar { position: relative; display: flex; align-items: center; justify-content: center; gap: 16px; min-height: 46px; padding: 4px 12px; background: #e6f2f2; border-top: 1px solid #bcd6d6; color: #004d4d; }
-.ct-nav { font: inherit; font-weight: 500; font-size: 13.5px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid #008080; background: #fff; color: #008080; border-radius: 4px; padding: 6px 14px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
-.ct-nav span { font-size: 20px; line-height: 1; margin-top: -2px; }
-.ct-nav:hover { background: #008080; color: #fff; }
-.ct-where { min-width: 150px; text-align: center; line-height: 1.2; }
-.ct-where b { display: block; font-size: 16px; font-weight: 500; }
-.ct-where span { font-size: 12px; color: #4a6666; }
-.ct-note { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #a85d00; }
+/* ONE bar at the bottom: the dark teal bar of the app. Left: page turning and flag. Middle: the view switcher. Right: Linked and More as symbols.
+   (The old light bar and the Back button are gone; the PAGES tab at the top does what Back did.) */
+body.ct-active .bar.step3 { display: flex; align-items: center; min-height: 54px; padding: 0 10px; gap: 4px; }
+body.ct-active .bar.step3 > * { margin: 0; }
+body.ct-active .bar.step3 > #back, body.ct-active .bar.step3 > div.mdc-tab, body.ct-active .bar.step3 #compare { display: none !important; }
+body.ct-active .bar.step3 > .bar_right { display: contents; }
+.ct-barleft { order: 1; display: flex; align-items: center; gap: 2px; color: #fff; }
+.ct-view { order: 2; margin-left: auto; display: flex; align-items: center; }
+body.ct-active .bar.step3 #action { order: 3; margin: 0 auto 0 14px; }
+body.ct-active .bar.step3 #link_toggle { order: 4; }
+body.ct-active .bar.step3 #more { order: 5; }
+body.ct-active .bar.step3 #link_toggle, body.ct-active .bar.step3 #more { height: 40px; min-width: 40px; padding: 0 6px; flex: 0 0 auto; }
+body.ct-active .bar.step3 #link_toggle .mdc-tab__text-label, body.ct-active .bar.step3 #more .mdc-tab__text-label { display: none; }
+body.ct-active .bar.step3 #link_toggle .mdc-tab__icon, body.ct-active .bar.step3 #more .mdc-tab__icon { font-size: 24px; width: 24px; height: 24px; margin: 0; }
+.ct-bb { width: 36px; height: 36px; border: 0; background: transparent; color: #fff; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
+.ct-bb:hover { background: rgba(255, 255, 255, .2); }
+.ct-bb:focus-visible, .ct-vpill:focus-visible, .ct-vpop button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.ct-where { min-width: 86px; text-align: center; line-height: 1.2; color: #fff; padding: 0 4px; }
+.ct-where b { display: block; font-size: 15px; font-weight: 500; white-space: nowrap; }
+.ct-where span { font-size: 12px; color: rgba(255, 255, 255, .82); white-space: nowrap; }
 
 /* flag button and its colour choice */
-.ct-flagwrap { position: relative; display: inline-block; margin-left: 10px; padding-left: 16px; border-left: 1px solid #bcd6d6; }
-.ct-flagbtn span { font-size: inherit; line-height: normal; margin-top: 0; }
-.ct-flagbtn svg { color: var(--ct-flag, currentColor); filter: drop-shadow(0 0 .6px rgba(0, 0, 0, .5)); }
-.ct-flagbtn[aria-pressed="true"] { background: #fff; border-width: 2px; padding: 5px 13px; }
-.ct-flagbtn:hover svg { color: var(--ct-flag, currentColor); }
-.ct-flagbtn[aria-pressed="true"]:hover { background: #e6f2f2; color: #008080; }
-.ct-flagpal { position: absolute; bottom: calc(100% + 8px); left: 8px; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 3px 14px rgba(0, 40, 40, .25); white-space: nowrap; }
+.ct-flagwrap { position: relative; display: inline-block; margin-left: 4px; }
+.ct-flagbtn svg { color: var(--ct-flag, currentColor); filter: drop-shadow(0 0 .6px rgba(0, 0, 0, .55)); }
+.ct-flagbtn[aria-pressed="true"] { background: rgba(255, 255, 255, .26); }
+.ct-flagbtn[aria-pressed="true"]:hover { background: rgba(255, 255, 255, .36); }
+.ct-flagpal { position: absolute; bottom: calc(100% + 10px); left: 0; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 3px 14px rgba(0, 40, 40, .25); white-space: nowrap; }
 .ct-flagpal .rm { border: 0; background: none; color: #5a6d6d; font: inherit; font-size: 13px; cursor: pointer; padding: 0 2px 0 6px; text-decoration: underline; }
 .ct-flagpal .rm:hover { color: #a00; }
+
+/* the view switcher: the name of the view on screen, a frame and six dots; the six names unfold over the middle of the bar when the pointer rests on it */
+.ct-vpill { display: inline-flex; align-items: center; gap: 10px; font: inherit; font-size: 14px; font-weight: 500; letter-spacing: .02em; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .65); border-radius: 999px; padding: 6px 14px; cursor: pointer; white-space: nowrap; }
+.ct-vpill:hover, .ct-view.open .ct-vpill { background: rgba(255, 255, 255, .16); border-color: #fff; }
+.ct-view.rowopen .ct-vpill { visibility: hidden; }
+.ct-vdots { display: inline-flex; align-items: center; gap: 3px; }
+.ct-vdots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, .5); }
+.ct-vdots i.on { width: 7px; height: 7px; background: #fff; }
+.ct-vpop { position: absolute; top: 0; bottom: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 6px; background: #006060; }
+.ct-vpop[hidden] { display: none; }
+.ct-vpop button { font: inherit; font-size: 14px; color: #e6f5f5; background: transparent; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.ct-vpop button:hover { background: rgba(255, 255, 255, .18); }
+.ct-vpop button.on { background: #fff; color: #006060; font-weight: 500; }
+.ct-vpop .k { font-size: 11px; opacity: .6; }
+/* not enough room for six names in a row (a half-width window): they stand one under the other, above the view name */
+.ct-vpop.col { top: auto; bottom: calc(100% + 6px); flex-direction: column; align-items: stretch; gap: 0; padding: 6px; border-radius: 10px; box-shadow: 0 3px 14px rgba(0, 40, 40, .35); }
+.ct-vpop.col button { border-radius: 6px; justify-content: flex-start; }
+/* every menu and popup of the bar lies above the thin book map line */
+#compare_screen > footer .mdc-menu-surface { z-index: 40; }
 
 /* the book map: a thin line at the bottom edge that opens over the pictures when the pointer comes near */
 .ct-map { --ct-map-left: 0px; position: relative; flex: none; height: 7px; z-index: 12; }

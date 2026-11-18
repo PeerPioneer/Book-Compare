@@ -1,6 +1,6 @@
 # 1. "helper": tests the Book Compare helper on a real Windows machine (Windows PowerShell 5.1 and a Windows folder window),
 #    which is the one thing that can not be tested on the machine where the code is written.
-# 2. "quick": the workspace and library-folder tests (Chromium) and the test of the Photoshop script.
+# 2. "quick": the workspace and library-folder tests (Chromium).
 # 3. "publish": ONLY when both passed (and only for main): puts the folder "app" on the website (GitHub Pages).
 #    A failed test therefore never reaches the website; the last good version stays online.
 #    The website can also be refreshed by hand: Actions > this workflow > Run workflow (the tests run first).
@@ -12,7 +12,6 @@ on:
       - 'launcher/**'
       - 'app/**'
       - 'tests/**'
-      - 'tools/**'
       - '*.bat'
       - '.github/workflows/windows-test.yml'
   workflow_dispatch:
@@ -98,9 +97,6 @@ jobs:
           (node research/js/build_worker.js --check && python tests/workspace/test_align_worker.py) > /tmp/bc-worker-test.txt 2>&1 || rc=1
           (python tests/workspace/test_modes.py > /tmp/bc-modes-test.txt 2>&1 && python tests/workspace/test_workspace.py > /tmp/bc-workspace-test.txt 2>&1 && python tests/workspace/test_roots.py > /tmp/bc-roots-test.txt 2>&1) || rc=1
           exit $rc
-      - name: Photoshop script (with a stand-in for Photoshop)
-        if: always()
-        run: node tests/photoshop/test_split_script.js
       - name: Test output (shown as a note on this job)
         if: always()
         run: |

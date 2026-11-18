@@ -255,7 +255,7 @@ def scenario(p, kind):
     pg.click('.ct-atools [data-t=rect]'); bx = pg.locator('#pane_main .ct-ann svg').bounding_box()
     pg.mouse.click(bx['x'] + bx['width'] * 0.5, bx['y'] + bx['height'] * 0.5); pg.wait_for_timeout(200); pg.keyboard.type('Ä ö mark'); pg.wait_for_timeout(1800)      # an annotation too
     an = project_json().get('annotations', {}).get('1'); assert an and an[0]['t'] == 'rect' and an[0]['text'] == 'Ä ö mark' and len(an[0]['pair']) == 2, project_json().get('annotations')
-    pg.click('#back'); pg.wait_for_timeout(700)
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(700)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'back to the pages'
     assert pg.locator('#ws .ws-lbl[data-r="1"] svg.ws-flag').count() == 1, 'the flag shows in the grid'
     # --- a scan folder was moved: one choice of the folder that holds it is enough -----------------------------------------

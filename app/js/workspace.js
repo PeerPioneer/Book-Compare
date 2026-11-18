@@ -1090,36 +1090,67 @@
   function addDialog() {
     var picked = null, extra = [];
     var sc = modal('<h3>Add a copy</h3>' +
-      '<label>Name of the copy<input type="text" id="ac-name" autocomplete="off" placeholder="Austria, Austrian National Library"></label>' +
+      '<label>Name of the copy<input type="text" id="ac-name" autocomplete="off" placeholder="e. g. Austria, Austrian National Library"></label>' +
       srcBlock('ac') +
       '<div id="ac-groups"></div>' +
       '<label>Place the first file at row<input type="number" id="ac-start" min="1" value="1"></label>' +
       '<p class="note">Files are placed in name order, one per row. You fix the placement afterwards in the grid. Book Compare only reads the scan folder; it never changes anything in it. If one folder holds the scans of several copies, choose it once: for the next copy it is in the list of folders used so far.</p>' +
       '<div class="err" id="ac-err"></div>' +
       '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="ac-ok">Add copy</button></div>');
+    // Whole folders are the usual way (a folder with one tick takes all its pictures); a folder can also be opened to take single pictures.
+    function chosenKeys(g) { return g.keys.filter(function (k) { return g.chosen && g.chosen[k]; }); }
+    function syncGroup(gr, i) {
+      var g = picked.groups[i], n = chosenKeys(g).length, box = gr.querySelector('input[data-g="' + i + '"]'), cnt = gr.querySelector('[data-gn="' + i + '"]');
+      if (box) { box.checked = n === g.keys.length; box.indeterminate = n > 0 && n < g.keys.length; }
+      if (cnt) cnt.textContent = (n > 0 && n < g.keys.length ? n + ' of ' + g.keys.length : g.keys.length) + (g.by ? ' · already used by ' + g.by : '');
+    }
+    function fillFiles(gr, i) {
+      var list = gr.querySelector('[data-gl="' + i + '"]'), g = picked.groups[i]; if (!list || list.dataset.done) return;
+      list.dataset.done = '1';
+      var h = ''; g.keys.forEach(function (k, j) { h += '<label class="inl"><input type="checkbox" data-gi="' + i + '" data-j="' + j + '"' + (g.chosen[k] ? ' checked' : '') + '><span class="mono">' + esc(baseName(k)) + '</span></label>'; });
+      list.innerHTML = h;
+    }
     function showPicked(pk) {
       picked = pk;
       var info = sc.querySelector('#ac-info'), gr = sc.querySelector('#ac-groups');
       if (!pk.groups.length) { info.textContent = 'No JPG or PNG files found in “' + pk.name + '” or in the folders directly inside it.'; gr.innerHTML = ''; return; }
       var total = pictureCount(pk.groups), used = usedPictures(pk.root.id);
       info.textContent = '“' + pk.name + '”: ' + total + ' picture' + (total === 1 ? '' : 's') + ignoredNote(pk.ignored);
-      if (pk.groups.length === 1) pk.groups[0].on = true;
-      var h = '<div class="note">' + (pk.groups.length === 1 ? 'Folder used:' : 'The pictures are in several folders. Tick the ones that belong to this copy:') + '</div><div class="groups">';
-      pk.groups.forEach(function (g, i) {
-        var by = used[joinPath(pk.path, g.keys[0])];
-        h += '<label><input type="checkbox" data-g="' + i + '"' + (g.on ? ' checked' : '') + '>' + (g.path ? esc(g.path) : 'directly in “' + esc(pk.name) + '”') + ' <span class="note">· ' + g.keys.length + (by ? ' · already used by ' + esc(by) : '') + '</span></label>';
+      pk.groups.forEach(function (g) {
+        g.chosen = {}; if (pk.groups.length === 1) g.keys.forEach(function (k) { g.chosen[k] = true; });          // one folder: all of it is the default
+        g.by = used[joinPath(pk.path, g.keys[0])] || '';
       });
-      gr.innerHTML = h + '</div>';
-      Array.prototype.forEach.call(gr.querySelectorAll('input[data-g]'), function (cbx) { cbx.onchange = function () { pk.groups[+cbx.dataset.g].on = cbx.checked; }; });
+      var h = '<div class="note">' + (pk.groups.length === 1 ? 'Folder used:' : 'The pictures are in several folders. Tick the ones that belong to this copy:') + '</div><div class="groups big">';
+      pk.groups.forEach(function (g, i) {
+        h += '<details data-gi="' + i + '"><summary><label><input type="checkbox" data-g="' + i + '"' + (pk.groups.length === 1 ? ' checked' : '') + '> ' + (g.path ? esc(g.path) : 'directly in “' + esc(pk.name) + '”') + ' <span class="note">· <span data-gn="' + i + '"></span></span></label></summary><div class="flist" data-gl="' + i + '"></div></details>';
+      });
+      gr.innerHTML = h + '</div><div class="note">Only some of the pictures? Click the little arrow in front of a folder and tick them one by one.</div>';
+      pk.groups.forEach(function (g, i) { syncGroup(gr, i); });
     }
+    (function () {                                                           // wired once; the lists are rebuilt for every folder that is chosen
+      var gr = sc.querySelector('#ac-groups');
+      gr.addEventListener('change', function (e) {
+        var t = e.target, i;
+        if (!picked) return;
+        if (t.dataset.g != null) {                                           // a whole folder
+          i = +t.dataset.g; var g = picked.groups[i]; g.chosen = {}; if (t.checked) g.keys.forEach(function (k) { g.chosen[k] = true; });
+          Array.prototype.forEach.call(gr.querySelectorAll('input[data-gi="' + i + '"]'), function (x) { x.checked = t.checked; });
+          syncGroup(gr, i);
+        } else if (t.dataset.j != null) {                                    // one picture
+          i = +t.dataset.gi; var g2 = picked.groups[i], k = g2.keys[+t.dataset.j]; if (t.checked) g2.chosen[k] = true; else delete g2.chosen[k];
+          syncGroup(gr, i);
+        }
+      });
+      gr.addEventListener('toggle', function (e) { var d = e.target; if (picked && d && d.tagName === 'DETAILS' && d.open) fillFiles(gr, +d.dataset.gi); }, true);
+    })();
     wireSrc(sc, 'ac', extra, showPicked);
     function finish() {
       var name = sc.querySelector('#ac-name').value.trim(), err = sc.querySelector('#ac-err');
       if (!name) { err.textContent = 'Give the copy a name, for example “Austria, Austrian National Library”.'; sc.querySelector('#ac-name').focus(); return; }
       if (S.copies.some(function (c) { return c.name.toLowerCase() === name.toLowerCase(); })) { err.textContent = 'A copy with this name already exists.'; return; }
       if (!picked) { err.textContent = 'Choose the scan folder of this copy first.'; return; }
-      var keys = []; picked.groups.forEach(function (g) { if (g.on) keys = keys.concat(g.keys); });
-      if (!keys.length) { err.textContent = picked.groups.length ? 'Tick at least one folder.' : 'That folder has no JPG or PNG files.'; return; }
+      var keys = []; picked.groups.forEach(function (g) { keys = keys.concat(chosenKeys(g)); });
+      if (!keys.length) { err.textContent = picked.groups.length ? 'Tick at least one folder or picture.' : 'That folder has no JPG or PNG files.'; return; }
       keys.sort(nat);
       var start = Math.max(1, parseInt(sc.querySelector('#ac-start').value, 10) || 1), cells = [];
       for (var i = 1; i < start; i++) cells.push(null);
@@ -1549,7 +1580,23 @@
     var c = e.target.closest && e.target.closest('.ws-cell.filled');
     if (c) { drag = { ci: +c.dataset.c, row: +c.dataset.r }; e.dataTransfer.setData('text/plain', 'x'); e.dataTransfer.effectAllowed = 'move'; }
   }
-  function clearDrop() { Array.prototype.forEach.call(root.querySelectorAll('.ws-cell.dropok, .ws-hcell.dl, .ws-hcell.dr, .ws-addcell.dl'), function (x) { x.classList.remove('dropok', 'dl', 'dr'); }); }
+  function clearDrop() { Array.prototype.forEach.call(root.querySelectorAll('.ws-cell.dropok, .ws-cell.ins-top, .ws-cell.ins-bot, .ws-hcell.dl, .ws-hcell.dr, .ws-addcell.dl'), function (x) { x.classList.remove('dropok', 'ins-top', 'ins-bot', 'dl', 'dr'); }); }
+  // Where a dragged file would land (same copy only). On a file: it is INSERTED before it (upper half) or behind it (lower half), so
+  // the files in between move by one place. On an empty cell ("no page"): the file goes into that cell and leaves an empty cell behind.
+  function fileTarget(e) {
+    var c = e.target.closest && e.target.closest('.ws-cell'); if (!c || !drag || +c.dataset.c !== drag.ci) return null;
+    var row = +c.dataset.r;
+    if (!c.classList.contains('filled')) return { el: c, row: row, into: true };
+    var r = c.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+    return { el: c, row: row, into: false, at: row + (after ? 1 : 0), cls: after ? 'ins-bot' : 'ins-top' };      // at = the boundary between two rows
+  }
+  // the cells of a copy after moving the file of row `from` (pure: used by the drop and by the test)
+  function insertMove(cells, from, t) {
+    var out = cells.slice(), f = out[from];
+    out.splice(from, 1); if (t > from) t--;
+    out.splice(t, 0, f);
+    return { cells: out, row: t };
+  }
   // where a dragged heading would land: before or after the heading under the pointer (or at the end, over the "+" cell)
   function headTarget(e) {
     var h = e.target.closest && e.target.closest('.ws-hcell, .ws-addcell'); if (!h) return null;
@@ -1559,9 +1606,9 @@
   }
   function onDragOver(e) {
     if (hdrag) { clearDrop(); var t = headTarget(e); if (t) { e.preventDefault(); t.el.classList.add(t.cls); } return; }
-    var c = e.target.closest && e.target.closest('.ws-cell'); clearDrop();
-    if (!c || !drag) return;
-    if (+c.dataset.c === drag.ci) { e.preventDefault(); c.classList.add('dropok'); }
+    clearDrop(); var t = fileTarget(e); if (!t) return;
+    e.preventDefault();
+    if (t.into) t.el.classList.add('dropok'); else if (t.at !== drag.row && t.at !== drag.row + 1) t.el.classList.add(t.cls);      // no line where nothing would change
   }
   function onDrop(e) {
     if (hdrag) {
@@ -1569,13 +1616,19 @@
       if (t) { e.preventDefault(); moveCopy(from, t.idx > from ? t.idx - 1 : t.idx); }
       return;
     }
-    var c = e.target.closest && e.target.closest('.ws-cell'); clearDrop();
-    if (!c || !drag) return;
+    var t = fileTarget(e); clearDrop();
+    if (!t) { drag = null; return; }
     e.preventDefault();
-    var ci = +c.dataset.c, row = +c.dataset.r, cp = S.copies[ci];
-    if (ci !== drag.ci || row === drag.row) { drag = null; return; }
-    commit(); var a = cp.cells[drag.row], b = cp.cells[row] || null; while (cp.cells.length <= row) cp.cells.push(null); cp.cells[row] = a; cp.cells[drag.row] = b; trim(cp);
-    S.sel = { ci: ci, row: row }; drag = null; changed();
+    var ci = drag.ci, from = drag.row, cp = S.copies[ci]; drag = null;
+    if (t.into) {                                                      // onto an empty cell: the file moves there, an empty cell stays behind
+      if (t.row === from) return;
+      commit(); while (cp.cells.length <= t.row) cp.cells.push(null);
+      cp.cells[t.row] = cp.cells[from]; cp.cells[from] = null; trim(cp);
+      S.sel = { ci: ci, row: t.row }; changed(); return;
+    }
+    if (t.at === from || t.at === from + 1) return;                    // dropped next to its own place: nothing changes
+    commit(); var mv = insertMove(cp.cells, from, t.at); cp.cells = mv.cells; trim(cp);
+    S.sel = { ci: ci, row: mv.row }; changed();
   }
   async function quitHelper() {
     if (!(await confirmDialog('Quit the Book Compare helper?', 'Book Compare can then no longer read your scan folders. Start it again with “Start Book Compare” (or the Desktop shortcut or the icon near the clock).', 'Quit helper'))) return;

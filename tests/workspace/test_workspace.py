@@ -15,8 +15,23 @@ with sync_playwright() as p:
     def cell(ci, r): return pg.locator('#ws .ws-cell[data-c="%d"][data-r="%d"]' % (ci, r))
     # the name field of "Add a copy" stays empty and only shows an example
     pg.click('#ws .ws-addbtn'); pg.wait_for_timeout(150)
-    assert pg.get_attribute('#ac-name', 'placeholder') == 'Austria, Austrian National Library' and pg.input_value('#ac-name') == ''
+    assert pg.get_attribute('#ac-name', 'placeholder') == 'e. g. Austria, Austrian National Library' and pg.input_value('#ac-name') == ''
     pg.click('#ac-ok'); assert 'Austria, Austrian National Library' in pg.inner_text('#ac-err'); pg.click('[data-close]')
+    # a whole folder is the default; a folder can also be opened to take single pictures
+    pg.click('#ws .ws-addbtn'); pg.wait_for_timeout(150)
+    pg.evaluate("k=>window.__picks.push(window.__h[k])", 'B'); pg.click('#ac-folder'); pg.wait_for_timeout(500)
+    assert pg.is_checked('#ac-groups input[data-g="0"]') and 'already used by B-Test' in pg.inner_text('#ac-groups'), 'one folder: all of it is the default'
+    pg.locator('#ac-groups details summary').first.click(); pg.wait_for_timeout(200)
+    boxes = pg.locator('#ac-groups .flist input'); assert boxes.count() == 6 and all(boxes.nth(i).is_checked() for i in range(6))
+    for i in (0, 1, 2, 3, 5): boxes.nth(i).uncheck()
+    assert pg.evaluate("document.querySelector('#ac-groups input[data-g=\"0\"]').indeterminate") and '1 of 6' in pg.inner_text('#ac-groups')
+    pg.fill('#ac-name', 'B-One'); pg.click('#ac-ok'); pg.wait_for_timeout(600)
+    assert pg.locator('#ws .ws-hname').count() == 4 and [x for x in col(pg, 3) if x != '-'] == ['img_11.JPG'], col(pg, 3)
+    pg.keyboard.press('Control+z'); pg.wait_for_timeout(200); assert pg.locator('#ws .ws-hname').count() == 3, 'Undo takes the extra copy away again'
+    pg.click('#ws .ws-addbtn'); pg.wait_for_timeout(150)
+    pg.evaluate("k=>window.__picks.push(window.__h[k])", 'B'); pg.click('#ac-folder'); pg.wait_for_timeout(500)
+    pg.uncheck('#ac-groups input[data-g="0"]'); pg.fill('#ac-name', 'B-None'); pg.click('#ac-ok')
+    assert 'Tick at least one folder or picture' in pg.inner_text('#ac-err'); pg.click('[data-close]')
     # folders were read, natural file-name order, start row, several sub-folders, TIFF ignored
     assert col(pg, 0)[:2] == ['scan_001.jpg', 'scan_002.jpg']
     assert col(pg, 1) == ['-', 'img_1.JPG', 'img_2.JPG', 'img_3.JPG', 'img_10.JPG', 'img_11.JPG', 'img_12.JPG', '-']

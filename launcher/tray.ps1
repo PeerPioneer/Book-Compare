@@ -50,8 +50,8 @@ try {
   $ni.ContextMenuStrip = $menu
   $ni.Visible = $true
 
-  $open.add_Click({ try { Start-Process $url } catch { } })
-  $ni.add_DoubleClick({ try { Start-Process $url } catch { } })
+  $open.add_Click({ try { Open-InBrowser $url } catch { } })
+  $ni.add_DoubleClick({ try { Open-InBrowser $url } catch { } })
   $auto.add_Click({
     Set-Autostart $auto.Checked
     $s = Read-Settings; $s.autostart = [bool]$auto.Checked; $s.asked = $true; Save-Settings $s

@@ -24,6 +24,27 @@ function Write-Log([string]$text) {
   } catch { }
 }
 
+# ---- the browser: Microsoft Edge if it is installed (Book Compare works best there), otherwise the browser set as default ---
+function Get-EdgePath {
+  if (-not $script:IsWin) { return '' }
+  $cands = @()
+  foreach ($k in @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe', 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe')) {
+    try { $v = (Get-ItemProperty -LiteralPath $k -ErrorAction Stop).'(default)'; if ($v) { $cands += [string]$v } } catch { }
+  }
+  foreach ($base in @(${env:ProgramFiles(x86)}, $env:ProgramFiles, $env:LOCALAPPDATA)) {
+    if ($base) { $cands += (Join-Path $base 'Microsoft\Edge\Application\msedge.exe') }
+  }
+  foreach ($c in $cands) { try { if ($c -and (Test-Path -LiteralPath $c -PathType Leaf)) { return $c } } catch { } }
+  return ''
+}
+function Open-InBrowser([string]$address) {
+  $edge = Get-EdgePath
+  if ($edge) {
+    try { Start-Process -FilePath $edge -ArgumentList ('"' + $address + '"'); return } catch { Write-Log ('Edge could not be started: ' + $_.Exception.Message) }
+  }
+  try { Start-Process $address } catch { Write-Log ('browser: ' + $_.Exception.Message) }
+}
+
 # ---- settings (what you answered on the first start, the folder windows start where you chose last) ----------------------
 function Read-Settings {
   $h = @{ asked = $false; autostart = $false; desktop = $false; lastScans = ''; lastProject = '' }

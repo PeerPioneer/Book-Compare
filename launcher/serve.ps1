@@ -53,7 +53,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $appDir 'index.html'))) {
 
 function Open-App {
   if ($NoBrowser) { return }
-  try { Start-Process $url } catch { Write-Log ('browser: ' + $_.Exception.Message) }
+  Open-InBrowser $url                                               # Microsoft Edge if it is installed, else the default browser
 }
 function Test-AlreadyRunning {
   try {

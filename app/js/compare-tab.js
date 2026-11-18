@@ -4,13 +4,15 @@
    left, copy 1 and copy 2 on the right) and adds what is needed to go through a whole book:
    - a left panel with the two copies (menus, swap button) and the list of pages, with a search box
    - the tabs COMPARE | PAGES at the top (PAGES = back to the grid of copies and pages)
-   - a bar with "previous page / next page" above the teal bar, and the keys  ← →  (page),  ↑ ↓  (copy 2),  Shift + ↑ ↓  (copy 1)
+   - ONE bar at the bottom (the teal bar): previous page / where you are / next page and the flag button on the left, the view switcher
+     (Difference, Toggle, ...) in the middle, "Linked" and "More" as small symbols on the right. The keys are  Page Up / Page Down  (page),
+     1 to 6 (view) and F (flag); the arrow keys are NOT used: they move the picture inside the panel, as they always did
    - the two pages are aligned automatically whenever the page or a copy changes (a moment after the last key press)
    - flags: a colour mark on a page (button "Flag page" or the key F; six colours); flagged pages show in the page list, which can be
      filtered to the flagged ones, and in the book map. Flags belong to the page of the book, not to a pair of copies, and are saved in the project.
    - annotations (circle, rectangle, text note with a comment, in the six flag colours) on the superimposed picture: see js/compare-annot.js
    - focus mode (button at the top right, Esc leaves it): everything except the pictures is hidden; the keys keep working and a short
-     message at the bottom says which page you are on and what a key did
+     message at the bottom says which page you are on and what a key did (short messages always appear at the bottom of the pictures)
    - the book map: a thin strip at the bottom edge that opens when the pointer comes near; one tick per page of the book (grey = a copy lacks
      the page, colour = flag), a mark for the page on screen, a click jumps there, and a small picture of the page appears while you hover.
 
@@ -60,8 +62,8 @@
       '<div class="ct-copy c1"><span class="ct-lab">Copy 1</span><select id="ct_c1" aria-label="Copy 1"></select><span class="ct-n" id="ct_n1"></span></div>' +
       '<button class="ct-swap" id="ct_swap" title="Swap copy 1 and copy 2" aria-label="Swap copy 1 and copy 2">&#8645;</button>' +
       '<div class="ct-copy c2"><span class="ct-lab">Copy 2</span><div class="ct-row"><select id="ct_c2" aria-label="Copy 2"></select>' +
-      '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2 (↑)" aria-label="Previous copy">&#9650;</button>' +
-      '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2 (↓)" aria-label="Next copy">&#9660;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
+      '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2" aria-label="Previous copy">&#9650;</button>' +
+      '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2" aria-label="Next copy">&#9660;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
       '</div>' +
       '<label class="ct-align"><span>Alignment</span><select id="ct_tf" title="How the second page is bent onto the first. Perspective is a good start.">' +
       TRANSFORMS.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('') + '</select></label>' +
@@ -70,20 +72,27 @@
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
       '<ul class="ct-list" id="ct_list" role="listbox" aria-label="Pages"></ul>' +
       '<label class="ct-foot"><input type="checkbox" id="ct_skip" checked><span>Skip pages that one of the two copies lacks</span></label>' +
-      '<div class="ct-keys"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>↑</kbd> <kbd>↓</kbd> copy 2<br><kbd>Shift</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> copy 1 · <kbd>F</kbd> flag</div>';
+      '<div class="ct-keys"><kbd>Page Up</kbd> <kbd>Page Down</kbd> page<br><kbd>1</kbd>–<kbd>6</kbd> view · <kbd>F</kbd> flag<br>Arrow keys move the picture (click it first)</div>';
 
     ui.busy = el('div', 'ct-busy');
     ui.busy.hidden = true;
     ui.busy.innerHTML = '<div class="ct-busybox"><div class="ct-spin" id="ct_spin"></div><p id="ct_busytxt"></p><div class="ct-busyacts" id="ct_busyacts"></div></div>';
 
-    ui.bar = el('div', 'ct-pagebar');
+    // the left part of the ONE bar at the bottom: page turning and the flag
+    ui.bar = el('div', 'ct-barleft');
     ui.bar.innerHTML =
-      '<button class="ct-nav" id="ct_prev" title="Previous page (←)"><span>&#8249;</span> Page</button>' +
+      '<button class="ct-bb" id="ct_prev" title="Previous page (Page Up)" aria-label="Previous page"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>' +
       '<div class="ct-where" id="ct_where" aria-live="polite"></div>' +
-      '<button class="ct-nav" id="ct_next" title="Next page (→)">Page <span>&#8250;</span></button>' +
-      '<span class="ct-flagwrap"><button class="ct-nav ct-flagbtn" id="ct_flag" aria-pressed="false" aria-haspopup="true" title="Flag this page (F). Click again to change the colour."><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path id="ct_flagpath" fill="currentColor"></path></svg><span id="ct_flagtxt">Flag page</span></button>' +
-      '<div class="ct-flagpal" id="ct_flagpal" role="group" aria-label="Flag colour" hidden></div></span>' +
-      '<div class="ct-note" id="ct_note"></div>';
+      '<button class="ct-bb" id="ct_next" title="Next page (Page Down)" aria-label="Next page"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>' +
+      '<span class="ct-flagwrap"><button class="ct-bb ct-flagbtn" id="ct_flag" aria-pressed="false" aria-haspopup="true" aria-label="Flag page" title="Flag this page (F). Click again to change the colour."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path id="ct_flagpath" fill="currentColor"></path></svg></button>' +
+      '<div class="ct-flagpal" id="ct_flagpal" role="group" aria-label="Flag colour" hidden></div></span>';
+
+    // the middle part: the view switcher. Only the name of the view on screen is shown (with one dot for each of the six views);
+    // the six names unfold when the pointer rests on it (or when it is clicked or tapped), a click on a name switches.
+    ui.view = el('div', 'ct-view');
+    ui.view.innerHTML =
+      '<button class="ct-vpill" id="ct_vpill" aria-haspopup="true" aria-expanded="false" title="Change the view (keys 1 to 6)"><span id="ct_vlab">Difference</span><span class="ct-vdots" id="ct_vdots" aria-hidden="true"></span></button>' +
+      '<div class="ct-vpop" id="ct_vpop" role="menu" aria-label="Views" hidden></div>';
 
     ui.map = el('div', 'ct-map'); ui.map.id = 'ct_map';
     ui.map.hidden = true;
@@ -97,13 +106,17 @@
     ui.leave = el('button', 'ct-leave', 'Leave focus mode'); ui.leave.hidden = true; ui.leave.title = 'Bring back the panel, tabs and bars (Esc)';
     ui.toast = el('div', 'ct-toast'); ui.toast.hidden = true; ui.toast.setAttribute('role', 'status');
     rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.busy); rc.appendChild(ui.leave); rc.appendChild(ui.toast);
-    footer.insertBefore(ui.bar, footer.querySelector('.bar'));
-    footer.insertBefore(ui.map, ui.bar);
+    var tealbar = footer.querySelector('.bar');                                             // the dark teal bar: the only bar below the pictures
+    tealbar.insertBefore(ui.bar, tealbar.firstChild);
+    tealbar.insertBefore(ui.view, tealbar.querySelector('.bar_right'));
+    footer.insertBefore(ui.map, tealbar);
+    ui.tealbar = tealbar;
     ui.rc = rc;
-    [ui.top, ui.side, ui.bar].forEach(function (e) { e.hidden = true; });
+    [ui.top, ui.side, ui.bar, ui.view].forEach(function (e) { e.hidden = true; });
 
     var $ = function (id) { return document.getElementById(id); };
-    ui.c1 = $('ct_c1'); ui.c2 = $('ct_c2'); ui.list = $('ct_list'); ui.q = $('ct_q'); ui.where = $('ct_where'); ui.note = $('ct_note');
+    ui.c1 = $('ct_c1'); ui.c2 = $('ct_c2'); ui.list = $('ct_list'); ui.q = $('ct_q'); ui.where = $('ct_where');
+    ui.vpill = $('ct_vpill'); ui.vpop = $('ct_vpop'); ui.vlab = $('ct_vlab'); ui.vdots = $('ct_vdots');
     ui.tf = $('ct_tf'); ui.skip = $('ct_skip');
     ui.filters = $('ct_filters'); ui.fcols = $('ct_fcols'); ui.flag = $('ct_flag'); ui.pal = $('ct_flagpal');
     ui.svg = $('ct_mapsvg'); ui.tip = $('ct_tip'); ui.hov = $('ct_maphov'); ui.pin = $('ct_pin');
@@ -157,7 +170,9 @@
     document.addEventListener('click', function (e) {
       if (!ui.pal.hidden && !e.target.closest('.ct-flagwrap')) closePalette();
       if (!e.target.closest('.ct-map')) ui.map.classList.remove('open');                  // (opened by a tap on a touch screen)
+      if (!e.target.closest('.ct-view')) closeView();
     });
+    wireViews();
     ui.svg.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse' || e.pointerType === 'pen') showTip(e); });
     ui.svg.addEventListener('pointerleave', hideTip);
     ui.svg.addEventListener('click', function (e) {
@@ -182,8 +197,8 @@
     ui.rc.classList.toggle('ct-noside', st.on && !st.side);
     var f = st.on && st.focus;                                                               // focus mode: only the pictures
     ui.rc.classList.toggle('ct-focus', f); document.body.classList.toggle('ct-focus', f);
-    ui.top.hidden = !st.on || f; ui.side.hidden = !st.on || !st.side || f; ui.bar.hidden = !st.on; ui.map.hidden = !st.on; ui.leave.hidden = !f;
-    if (!f) ui.toast.hidden = true;
+    ui.top.hidden = !st.on || f; ui.side.hidden = !st.on || !st.side || f; ui.bar.hidden = !st.on; ui.view.hidden = !st.on; ui.map.hidden = !st.on; ui.leave.hidden = !f;
+    if (!st.on) ui.toast.hidden = true;
     ui.map.style.setProperty('--ct-map-left', (st.on && st.side ? 300 : 0) + 'px');           // the opened map does not cover the left panel
     document.body.classList.toggle('ct-active', st.on);
     renderPin();
@@ -240,7 +255,7 @@
   }
   function render() {
     var s = W().state();
-    renderCopies(s); renderList(); renderBar(s); renderMap(s); layout();
+    renderCopies(s); renderList(); renderBar(s); renderMap(s); renderView(); layout();
     ui.tf.value = st.transform;
   }
 
@@ -249,7 +264,6 @@
     var f = r.flag;
     ui.flag.setAttribute('aria-pressed', f != null ? 'true' : 'false');
     ui.flag.style.setProperty('--ct-flag', f != null ? W().flagColors[f] : 'currentColor');
-    document.getElementById('ct_flagtxt').textContent = 'Flag page';
     ui.flag.title = f != null ? 'Flagged (' + W().flagNames[f] + '). Click to change the colour or remove the flag (F removes it).' : 'Flag this page (F). Click again to change the colour.';
   }
   function setFlag(row, c) {
@@ -336,10 +350,10 @@
     ui.hov.style.display = 'block'; ui.hov.style.left = x + 'px';
   }
   function hideTip() { tipRow = -1; tipTok++; clearTimeout(tipTimer); ui.tip.hidden = true; ui.hov.style.display = 'none'; }
-  function note(msg) { ui.note.textContent = msg || ''; clearTimeout(note.t); if (msg) { note.t = setTimeout(function () { ui.note.textContent = ''; }, 3500); toast(msg); } }
-  // in focus mode the bar with the notes is hidden: the same words appear for a moment at the bottom of the pictures
+  function note(msg) { toast(msg); }
+  // short messages ("Page 11 flagged.", "This is the last page to compare.") appear for a moment at the bottom of the pictures
   function toast(msg) {
-    if (!st.focus || !msg) return;
+    if (!msg) return;
     ui.toast.textContent = msg; ui.toast.hidden = false;
     clearTimeout(toast.t); toast.t = setTimeout(function () { ui.toast.hidden = true; }, 2600);
   }
@@ -361,6 +375,91 @@
   }
   function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (ui.busy.classList.contains('bad')) setBusy(null); }   // a new wish makes an old message obsolete
   function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale'); }
+
+
+  /* ---------------------------------------------------------------- the view switcher (middle of the bar) */
+  var VIEWS = [['diff', 'Difference'], ['toggle', 'Toggle'], ['topbottom', 'Top and bottom'], ['leftright', 'Left and right'], ['onlyimage1', 'Copy 1'], ['onlyimage2', 'Copy 2']];
+  var vt = { open: 0, close: 0 };
+  function viewIndex() { var m = E && E.action_bar ? E.action_bar.MODE : 'diff'; for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i][0] === m) return i; return 0; }
+  function copyName(slot) {
+    var s = W().state(), n = '';
+    s.copies.forEach(function (c) { if (c.id === s.pair[slot]) n = c.name; });
+    return n;
+  }
+  function renderView() {
+    if (!ui || !ui.vpill || !st.on) return;                                                  // (the two-image screens have no copies and no switcher)
+    var cur = viewIndex();
+    ui.vlab.textContent = VIEWS[cur][1];
+    var dots = ''; VIEWS.forEach(function (v, i) { dots += '<i' + (i === cur ? ' class="on"' : '') + '></i>'; });
+    ui.vdots.innerHTML = dots;
+    var h = '';
+    VIEWS.forEach(function (v, i) {
+      var tip = i === 4 ? copyName(0) : i === 5 ? copyName(1) : '';
+      h += '<button role="menuitemradio" aria-checked="' + (i === cur) + '" data-i="' + i + '"' + (i === cur ? ' class="on"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '><span class="k">' + (i + 1) + '</span>' + esc(v[1]) + '</button>';
+    });
+    ui.vpop.innerHTML = h;
+  }
+  function openView() {
+    clearTimeout(vt.close); clearTimeout(vt.open);
+    if (!ui.vpop.hidden) return;
+    closePalette();
+    var bar = ui.tealbar, lk = document.getElementById('link_toggle');
+    var left = ui.bar.offsetLeft + ui.bar.offsetWidth + 10;                                  // the free middle of the bar lies between the left part ...
+    var right = (lk && lk.offsetParent ? lk.offsetLeft : bar.clientWidth - 100) - 10;         // ... and the symbols on the right
+    ui.vpop.hidden = false; ui.vpop.classList.remove('col'); ui.vpop.style.cssText = '';
+    // the six names in one row, over the middle of the bar, if they fit there; else one under the other above the view name
+    var free = right - left;
+    ui.vpop.style.left = left + 'px'; ui.vpop.style.right = (bar.clientWidth - right) + 'px';
+    var need = 0; [].forEach.call(ui.vpop.children, function (b) { need += b.offsetWidth + 2; });
+    if (need + 24 > free) {
+      ui.vpop.classList.add('col'); ui.vpop.style.cssText = '';
+      var pr = ui.vpill.getBoundingClientRect(), br = bar.getBoundingClientRect();
+      var cx = pr.left + pr.width / 2 - br.left, w = ui.vpop.offsetWidth;
+      ui.vpop.style.left = Math.max(6, Math.min(bar.clientWidth - w - 6, cx - w / 2)) + 'px';
+    }
+    ui.vpill.setAttribute('aria-expanded', 'true');
+    ui.view.classList.add('open'); ui.view.classList.toggle('rowopen', !ui.vpop.classList.contains('col'));      // in a row the names take the place of the pill
+  }
+  function closeView() {
+    clearTimeout(vt.close); clearTimeout(vt.open);
+    if (!ui || !ui.vpop || ui.vpop.hidden) return;
+    ui.vpop.hidden = true; ui.vpill.setAttribute('aria-expanded', 'false'); ui.view.classList.remove('open', 'rowopen');
+  }
+  function setView(i, says) {
+    var v = VIEWS[i]; if (!v || !E) return;
+    E.compare.visualisation_select.MDCSelect.setValue(v[0]);                                // the base app reacts to this menu (hidden in the Compare tab)
+    renderView(); closeView();
+    if (says && st.focus) toast('View: ' + v[1]);
+  }
+  function wireViews() {
+    ui.vpill.onclick = function (e) {
+      if (ui.vpop.hidden) { openView(); if (e.detail === 0) { var c = ui.vpop.querySelector('.on'); if (c) c.focus(); } }
+      else closeView();
+    };
+    ui.view.addEventListener('pointerenter', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      clearTimeout(vt.close); clearTimeout(vt.open); vt.open = setTimeout(openView, 180);       // rests for a moment: the others unfold (a quick pass does nothing)
+    });
+    ui.view.addEventListener('pointerleave', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      clearTimeout(vt.open); vt.close = setTimeout(closeView, 350);
+    });
+    ui.vpop.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-i]'); if (b) setView(+b.dataset.i);
+    });
+    ui.view.addEventListener('keydown', function (e) {
+      if (ui.vpop.hidden) return;
+      var bs = [].slice.call(ui.vpop.querySelectorAll('button')), i = bs.indexOf(document.activeElement);
+      if (e.key === 'Escape') { closeView(); ui.vpill.focus(); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') bs[(i + 1) % bs.length].focus();
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') bs[(i + bs.length - 1) % bs.length].focus();
+      else if (e.key === 'Home') bs[0].focus();
+      else if (e.key === 'End') bs[bs.length - 1].focus();
+      else return;
+      e.preventDefault(); e.stopPropagation();
+    });
+    document.addEventListener('modechange', renderView);
+  }
 
   /* ---------------------------------------------------------------- moving around */
   function comparable(i) { var r = W().rowInfo(i); return r.a && r.b && !r.skip; }
@@ -397,10 +496,9 @@
     if (window.CompareAnnot && CompareAnnot.key(e)) { e.preventDefault(); return; }
     if (e.key === 'Escape' && st.focus) { setFocus(false); e.preventDefault(); return; }
     if (e.key === 'f' || e.key === 'F') { if (e.shiftKey) return; closePalette(); toggleFlag(); }
-    else if (e.key === 'ArrowRight') stepPage(1);
-    else if (e.key === 'ArrowLeft') stepPage(-1);
-    else if (e.key === 'ArrowDown') stepCopy(e.shiftKey ? 0 : 1, 1);
-    else if (e.key === 'ArrowUp') stepCopy(e.shiftKey ? 0 : 1, -1);
+    else if (e.key === 'PageDown') stepPage(1);                                              // (the arrow keys are left alone: they move the picture)
+    else if (e.key === 'PageUp') stepPage(-1);
+    else if (/^[1-6]$/.test(e.key) && !e.shiftKey) setView(+e.key - 1, true);
     else return;
     e.preventDefault();
   }
@@ -420,6 +518,7 @@
     await frames(2);
     if (my !== st.token) return;
     var done = false;
+    window.BC_COPY_NAMES = [copyName(0), copyName(1)];                                       // the colour note of the Difference view names the copies (js/panes.js)
     try { done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; }); }
     catch (e) {
       if (my === st.token) setBusy('Book Compare could not align these two pages (' + ((e && e.message) || e) + '). Try another alignment (left panel) or another page.', true,
@@ -465,7 +564,8 @@
   }
   function toPages() {
     st.token++; clearTimeout(st.timer); setBusy(null); closePalette(); hideTip();
-    st.focus = false; st.on = false; layout();
+    st.focus = false; st.on = false; layout(); closeView();
+    window.BC_COPY_NAMES = null;
     W().showPages();
   }
 

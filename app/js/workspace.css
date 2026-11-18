@@ -90,6 +90,9 @@
 .ws-row .ws-cell.rng { background: var(--ws-sel); outline: 1px solid var(--ws-teal); outline-offset: -1px; }
 .ws-cell.sel { outline: 2px solid var(--ws-teal); outline-offset: -2px; background: var(--ws-sel); }
 .ws-cell.dropok { outline: 2px dashed var(--ws-teal); outline-offset: -2px; }
+.ws-cell.ins-top::before, .ws-cell.ins-bot::before { content: ""; position: absolute; left: 0; right: 0; height: 4px; background: var(--ws-teal); z-index: 6; pointer-events: none; }
+.ws-cell.ins-top::before { top: -2px; }
+.ws-cell.ins-bot::before { bottom: -2px; }
 .ws-cell .ico { flex: 0 0 14px; height: 18px; border-radius: 2px; border: 1px solid var(--ws-line); background: var(--ws-line); }
 .ws-cell .fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-family: var(--ws-mono); }
 .ws-cell .gap { font-size: 12px; font-style: italic; }

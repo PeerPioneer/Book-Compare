@@ -29,8 +29,8 @@ Double-click the file  "Start Book Compare.bat"
  * The very first time, Book Compare asks two questions:
      - Start automatically when Windows starts? (Recommended: Yes. Then it is always ready.)
      - Put a shortcut on the Desktop?
- * There is no black window. Book Compare opens in your default browser (set Firefox as the
-   default browser in Windows if you prefer it). The helper has a small icon near the clock
+ * There is no black window. Book Compare opens in Microsoft Edge, where it works best. If Edge is
+   not installed, it opens in your default browser instead. The helper has a small icon near the clock
    (click the little arrow next to the clock if you do not see it). Right-click it for:
    Open Book Compare / Start with Windows / Quit Book Compare.
 

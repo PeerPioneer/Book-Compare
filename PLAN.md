@@ -374,8 +374,8 @@ the user decides whether to use it.
 ### 5.5 Splitting double-page scans inside Book Compare
 
 Many libraries scan two pages in one picture. For now the owner splits them with a Photoshop
-script (`tools/photoshop/Split-double-pages.jsx`), which is a stopgap for his own work and
-**not part of Book Compare**. Later Book Compare should do this itself. The grid was already
+script of his own, which is a stopgap for his own work and **not part of Book Compare** (it was
+removed from the project on 19 Nov 2026; it stays in the git history, commit before 19 Nov). Later Book Compare should do this itself. The grid was already
 designed for it: a cell can be a region of a file rather than a whole file.
 
 ### 5.6 Further out
@@ -847,19 +847,19 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V16 | **Shifts are absorbed by the tile alignment — now measured (15 Nov, §4.4 music tests).** One whole line moved by 4–32 px is pulled back and invisible (0.6–2.4 % unmatched); only 64 px shows. Melopoiae p. 9: half-staff-space differences are not visible. The movement applied equals the shift, so it can be shown. **Decision: part of version 1** — (1) movement map next to the overlay, (2) the rough, unbent alignment as a second view, (3) a cautious automatic hint for sharp-edged movements of about 15 px or more (false alarms below about 10 px). Small shifts remain undetectable; say so in the help text | **firm, version 1** | needs V3 |
 | V14 | Release housekeeping: README (ORCID, year, version), CITATION.cff, CHANGELOG, licences list (OpenCV.js Apache-2.0 is in) | per release | — |
 
-### 11.1a Small changes for the next release (owner, 18 Nov 2026; not to be built now, only with the next new version)
+### 11.1a Small changes for the next release (owner, 18 Nov 2026; **built 19 Nov 2026, version "Book-Compare-002"**)
 
 | ID | Change | Note |
 |----|--------|------|
-| S1 | Grid view, "add new copy" name box: change the example text from "Austria, Austrian National Library" to "e. g. Austria, Austrian National Library" | wording only |
-| S2 | Grid view, moving a file: instead of swapping with an existing file, the moved file is **inserted between two adjacent files** (the files after it shift by one place) | owner confirmed the meaning; check how a gap or the end of the row is handled |
-| S3 | Adding files: besides adding a whole folder, **select individual files** (e.g. one picture); the default stays "add a whole folder" | |
-| S4 | "Start Book Compare.bat" should open **Microsoft Edge** instead of the default browser (Firefox on the owner's PC), because the app works best in Edge | `launcher/serve.ps1` (line 56, `Start-Process $url`) and `launcher/tray.ps1` (lines 53–54): try Edge first, fall back to the default browser if Edge is not found; the new desktop program (V5) brings its own browser engine and makes this obsolete |
-| S5 | **Remove the Photoshop split script** from Book Compare (owner: it was only for his own work): `tools/photoshop/`, `tests/photoshop/`, the CI step that tests it, the README paragraph; plan notes P5/T1 updated | it stays in the project history and can be handed out as a single file at any time |
-| S6 | **Fix:** the book map strip (the thin line above the page bar) lies on top of the opened view menu and cuts through it (owner's screenshot, 18 Nov) | layering: menus must always be above the map |
-| S7 | **Arrow keys:** no longer change page or copy; they move the picture inside the superimposed panel again, as before the Compare tab; the key hints in the left panel change accordingly | **owner 19 Nov:** Page Up / Page Down turn the page; no keys for switching copies (the ▲ ▼ buttons stay); F for flag stays |
-| S8 | **Difference view legend:** "Orange = A-Wn1 / Blue = A-Z" with the copy names from the grid instead of "image 1 / image 2" | if a copy has no name: "Copy 1" / "Copy 2" |
-| S9 | **One bar at the bottom:** the light teal page bar is merged into the dark teal bar; the design is being discussed (18 Nov, on Opus); build on Sonnet once decided | **owner 19 Nov:** option B preferred (one dark teal bar: page turning and flag on the left, the six views as a row of buttons in the middle, Linked and More as icons on the right; when the window is too narrow for the buttons, e.g. half the screen, they fold into one menu automatically); the **Back** button is removed (the PAGES tab does the same); short messages move to a note at the bottom of the picture; Toggle speed appears only in Toggle view. **The final decision on the view buttons is still the owner's: do not build before he confirms** |
+| S1 | **done 19 Nov:** Grid view, "add new copy" name box: change the example text from "Austria, Austrian National Library" to "e. g. Austria, Austrian National Library" | wording only |
+| S2 | **done 19 Nov:** Grid view, moving a file: instead of swapping with an existing file, the moved file is **inserted between two adjacent files** (the files after it shift by one place) | owner confirmed the meaning. As built: dropping on the **upper half** of a file puts the moved file in front of it, on the **lower half** behind it (a teal line shows the place); the files in between move by one place, the rest of the column stays. Dropping next to its own place changes nothing. Dropping on an empty cell ("no page") moves the file into that cell and leaves an empty cell behind (rows are page positions, so a gap is kept on purpose). One undo step. |
+| S3 | **done 19 Nov:** Adding files: besides adding a whole folder, **select individual files** (e.g. one picture); the default stays "add a whole folder" | |
+| S4 | **done 19 Nov:** "Start Book Compare.bat" should open **Microsoft Edge** instead of the default browser (Firefox on the owner's PC), because the app works best in Edge | `launcher/serve.ps1` (line 56, `Start-Process $url`) and `launcher/tray.ps1` (lines 53–54): try Edge first, fall back to the default browser if Edge is not found; the new desktop program (V5) brings its own browser engine and makes this obsolete |
+| S5 | **done 19 Nov:** **Remove the Photoshop split script** from Book Compare (owner: it was only for his own work): `tools/photoshop/`, `tests/photoshop/`, the CI step that tests it, the README paragraph; plan notes P5/T1 updated | it stays in the project history and can be handed out as a single file at any time |
+| S6 | **done 19 Nov:** **Fix:** the book map strip (the thin line above the page bar) lies on top of the opened view menu and cuts through it (owner's screenshot, 18 Nov) | layering: menus must always be above the map |
+| S7 | **done 19 Nov:** **Arrow keys:** no longer change page or copy; they move the picture inside the superimposed panel again, as before the Compare tab; the key hints in the left panel change accordingly | **owner 19 Nov:** Page Up / Page Down turn the page; no keys for switching copies (the ▲ ▼ buttons stay); F for flag stays |
+| S8 | **done 19 Nov:** **Difference view legend:** "Orange = A-Wn1 / Blue = A-Z" with the copy names from the grid instead of "image 1 / image 2" | if a copy has no name: "Copy 1" / "Copy 2" |
+| S9 | **done 19 Nov (sketch 1 chosen):** **One bar at the bottom:** the light teal page bar is merged into the dark teal bar; the design is being discussed (18 Nov, on Opus); build on Sonnet once decided | **owner 19 Nov:** option B preferred (one dark teal bar: page turning and flag on the left, the six views as a row of buttons in the middle, Linked and More as icons on the right; when the window is too narrow for the buttons, e.g. half the screen, they fold into one menu automatically); the **Back** button is removed (the PAGES tab does the same); short messages move to a note at the bottom of the picture; Toggle speed appears only in Toggle view. **Decided 19 Nov (owner chose "sketch 1"):** the middle of the bar shows only the **current view name in a framed pill with six dots** (the current view is the bigger white dot); when the pointer rests on it for about 0.18 s the six names unfold (they close about 0.35 s after the pointer leaves); a click or tap opens them too (touch screens have no hovering); a click on a name switches; keys 1–6 choose the views (Difference, Toggle, Top and bottom, Left and right, copy 1, copy 2); if the window is too narrow the names stand one under the other above the pill. As built; the page-turning part, flag, Linked and More are in the same bar; Back is gone; short messages are a note at the bottom of the pictures. |
 
 ### 11.2 After version 1
 
@@ -869,7 +869,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | P2 | DOI via Zenodo on release (§5.2) | later |
 | P3 | One outside tester installs it once (§5.3) | later |
 | P4 | Automatic page matching (§5.4) — only if cheap | later, optional |
-| P5 | Splitting double-page scans inside Book Compare (§5.5) — Photoshop script v1.1 is the stopgap | later |
+| P5 | Splitting double-page scans inside Book Compare (§5.5) — the owner's own Photoshop script is the stopgap (not part of the project) | later |
 | P6 | Other visualization modes, quality dots, wrong-page check, look and feel (§5.6) | later |
 | P7 | Mac version from the same code, if colleagues ask | later |
 

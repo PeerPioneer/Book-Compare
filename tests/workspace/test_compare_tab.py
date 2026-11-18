@@ -117,9 +117,13 @@ def scenario(p, kind):
     pg.click('#ct_next'); wait_aligned(pg, 'next page'); assert 'Page 2' in where(pg), where(pg)
     pg.click('#ct_c1'); pg.keyboard.press('Escape'); pg.locator('body').click(position={'x': 700, 'y': 450}) if False else None
     pg.evaluate("document.activeElement && document.activeElement.blur()")
-    pg.keyboard.press('ArrowRight'); wait_aligned(pg, 'key right'); assert 'Page 3' in where(pg), where(pg)
-    pg.keyboard.press('ArrowLeft'); pg.keyboard.press('ArrowLeft'); wait_aligned(pg, 'key left x2'); assert 'Page 1' in where(pg), where(pg)
-    pg.click('#ct_prev'); assert 'first page to compare' in pg.inner_text('#ct_note'), 'no page before the first'
+    pg.keyboard.press('PageDown'); wait_aligned(pg, 'key page down'); assert 'Page 3' in where(pg), where(pg)
+    pg.keyboard.press('PageUp'); pg.keyboard.press('PageUp'); wait_aligned(pg, 'key page up x2'); assert 'Page 1' in where(pg), where(pg)
+    # the arrow keys no longer turn pages or change copies (they move the picture, as in the base app)
+    for k in ('ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'): pg.keyboard.press(k)
+    pg.wait_for_timeout(500)
+    assert 'Page 1' in where(pg) and pg.evaluate("document.getElementById('ct_c1').selectedOptions[0].text") == 'A-Test' and pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test', 'arrow keys leave page and copies alone'
+    pg.click('#ct_prev'); assert 'first page to compare' in pg.inner_text('.ct-toast'), 'no page before the first'
     # the page list: click a row, search
     pg.fill('#ct_q', '4'); assert pg.locator('#ct_list li[data-i]').count() == 1, pg.inner_text('#ct_list')
     pg.click('#ct_list li[data-i="3"]'); wait_aligned(pg, 'list click'); assert 'Page 4' in where(pg), where(pg)
@@ -131,15 +135,47 @@ def scenario(p, kind):
     assert 'C-Test has no page' in pg.inner_text('.ct-busy'), pg.inner_text('.ct-busy')      # page 4 does not exist in copy C
     assert pg.locator('#ct_list li.miss').count() == 2, pg.locator('#ct_list li.miss').count()
     pg.click('#ct_list li[data-i="0"]'); wait_aligned(pg, 'row 1 with C'); pg.click('#ct_next'); wait_aligned(pg, 'row 2 with C'); assert 'Page 2' in where(pg), where(pg)
-    pg.click('#ct_next'); assert 'last page to compare' in pg.inner_text('#ct_note'), 'rows 3 and 4 lack a page in C: skipped'
+    pg.click('#ct_next'); assert 'last page to compare' in pg.inner_text('.ct-toast'), 'rows 3 and 4 lack a page in C: skipped'
     pg.evaluate("document.getElementById('ct_skip').click()")                       # no skipping: the next row is shown even if C lacks it
     pg.click('#ct_next'); pg.wait_for_timeout(400)
     assert pg.locator('.ct-busy.bad:visible').count() == 1 and 'no page' in pg.inner_text('.ct-busy').lower(), pg.inner_text('.ct-busy')
     pg.evaluate("document.getElementById('ct_skip').click()")
-    # copy 2 menu by key, then back to B
+    # copy 2: the up arrow button of the panel goes back to B (there are no keys for switching copies any more)
     pg.click('#ct_list li[data-i="0"]'); wait_aligned(pg, 'row 1 again')
-    pg.evaluate("document.activeElement && document.activeElement.blur()")
-    pg.keyboard.press('ArrowUp'); wait_aligned(pg, 'copy 2 up'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
+    pg.click('#ct_c2up'); wait_aligned(pg, 'copy 2 up'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
+    # ---------------------------------------------------------------- ONE bottom bar and the view switcher
+    def vis(sel): return pg.evaluate("(s) => { const e = document.querySelector(s); return !!e && e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden'; }", sel)
+    assert pg.evaluate("[...document.querySelectorAll('#compare_screen > footer .bar')].filter(b => b.offsetParent !== null).length") == 1, 'only one bar at the bottom (the dark teal one)'
+    assert not vis('#back') and not vis('#compare') and not vis('#visualisation_select'), 'no Back button, no old menus in the Compare tab'
+    assert vis('#ct_prev') and vis('#ct_next') and vis('#ct_flag') and vis('#ct_vpill') and vis('#link_toggle') and vis('#more'), 'page turning, flag, view switcher, Linked and More are all in that bar'
+    tb = pg.locator('#compare_screen > footer .bar.step3').bounding_box(); pb = pg.locator('#ct_prev').bounding_box(); vb_ = pg.locator('#ct_vpill').bounding_box()
+    assert tb['y'] - 2 <= pb['y'] and pb['y'] + pb['height'] <= tb['y'] + tb['height'] + 2 and tb['y'] - 2 <= vb_['y'] and vb_['y'] + vb_['height'] <= tb['y'] + tb['height'] + 2, ('the controls sit inside the teal bar', tb, pb, vb_)
+    assert pg.inner_text('#ct_vlab').strip() == 'Difference' and pg.locator('#ct_vdots i').count() == 6 and pg.evaluate("document.getElementById('ct_vpop').hidden"), 'the pill shows only the current view; the others are folded away'
+    # a quick pass of the pointer opens nothing; resting on the pill unfolds the six names (after about 180 ms); leaving closes it again
+    pbx = pg.locator('#ct_vpill').bounding_box(); pg.mouse.move(pbx['x'] + pbx['width'] / 2, pbx['y'] + pbx['height'] / 2); pg.mouse.move(700, 300); pg.wait_for_timeout(500)
+    assert pg.evaluate("document.getElementById('ct_vpop').hidden"), 'a quick pass does not open the views'
+    pg.mouse.move(pbx['x'] + pbx['width'] / 2, pbx['y'] + pbx['height'] / 2); pg.wait_for_timeout(600)
+    assert not pg.evaluate("document.getElementById('ct_vpop').hidden") and pg.locator('#ct_vpop button').count() == 6, 'resting on the view name unfolds the six views'
+    assert [t.split('\n')[-1].strip() for t in pg.locator('#ct_vpop button').all_inner_texts()] == ['Difference', 'Toggle', 'Top and bottom', 'Left and right', 'Copy 1', 'Copy 2'], pg.locator('#ct_vpop button').all_inner_texts()
+    assert pg.get_attribute('#ct_vpop button[data-i="4"]', 'title') == 'A-Test' and pg.get_attribute('#ct_vpop button[data-i="5"]', 'title') == 'B-Test', 'the tip of Copy 1 / Copy 2 is the name the owner gave the copy'
+    pg.mouse.move(700, 300); pg.wait_for_timeout(800); assert pg.evaluate("document.getElementById('ct_vpop').hidden"), 'leaving closes the list'
+    pg.click('#ct_vpill'); assert not pg.evaluate("document.getElementById('ct_vpop').hidden"), 'a click opens it too (for touch)'
+    pg.click('#ct_vpop button[data-i="1"]'); pg.wait_for_timeout(300)
+    assert pg.inner_text('#ct_vlab').strip() == 'Toggle' and pg.evaluate("document.getElementById('ct_vpop').hidden"), 'a click on a name switches the view and folds the list away'
+    assert pg.is_visible('#toggle'), 'the toggle speed is shown in the Toggle view ...'
+    pg.keyboard.press('3'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vlab').strip() == 'Top and bottom', 'key 3 = Top and bottom'
+    assert not pg.is_visible('#toggle'), '... and only there'
+    pg.keyboard.press('5'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vlab').strip() == 'Copy 1', 'key 5 = only copy 1'
+    pg.keyboard.press('1'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vlab').strip() == 'Difference'
+    # the colour note of the Difference view names the copies the way the grid does (not "image 1" / "image 2")
+    wait_aligned(pg, 'difference again'); legend = pg.inner_text('#pane_main .pane__label') if pg.locator('#pane_main .pane__label').count() else ''
+    assert 'A-Test' in legend and 'B-Test' in legend and 'image 1' not in legend and 'image 2' not in legend, legend
+    # the thin book map never covers an opened menu: the More menu is on top
+    pg.click('#more'); pg.wait_for_timeout(300)
+    mb = pg.locator('#compare_screen > footer .mdc-menu-surface--open').first.bounding_box()
+    top_el = pg.evaluate("(p) => { const e = document.elementFromPoint(p[0], p[1]); return e ? (e.closest('.mdc-menu-surface') ? 'menu' : e.className) : 'none'; }", [mb['x'] + mb['width'] / 2, mb['y'] + mb['height'] - 4])
+    assert top_el == 'menu', 'the menu is above the book map: ' + str(top_el)
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     # ---------------------------------------------------------------- flags
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     assert pg.is_hidden('#ct_filters') and pg.is_hidden('#ct_fcols'), 'nothing flagged yet: no filter chips'
@@ -271,34 +307,35 @@ def scenario(p, kind):
     def row_now(): return pg.evaluate("BookWorkspace.tab.state().row")
     wait_aligned(pg, 'focus mode start'); assert row_now() == 1
     h0 = pg.locator('#pane_main').bounding_box()
-    assert pg.is_visible('#ct_focusbtn') and pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#back')
+    assert pg.is_visible('#ct_focusbtn') and pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#ct_vpill')
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(500)
-    for sel in ('.ct-top', '#ct_list', '#ct_prev', '#ct_flag', '#ct_map', '#back', '.ct-side'):
+    for sel in ('.ct-top', '#ct_list', '#ct_prev', '#ct_flag', '#ct_map', '#ct_vpill', '.ct-side'):
         assert not pg.is_visible(sel), 'focus mode hides ' + sel
     assert pg.is_visible('.ct-leave') and pg.is_visible('#pane_main') and pg.is_visible('#pane_o1') and pg.is_visible('#pane_o2') and pg.is_visible('.ct-atools'), 'the pictures and the annotation tools stay'
     h1 = pg.locator('#pane_main').bounding_box(); assert h1['height'] > h0['height'] + 60 and h1['x'] < 5 and h1['y'] < 5, (h0, h1)      # the pictures got the room
     assert pg.is_visible('.ct-toast') and 'Focus mode' in pg.inner_text('.ct-toast')
-    pg.keyboard.press('ArrowRight'); wait_aligned(pg, 'focus: key right'); assert row_now() == 2
+    pg.keyboard.press('PageDown'); wait_aligned(pg, 'focus: key page down'); assert row_now() == 2
     assert 'Page 3' in pg.inner_text('.ct-toast'), pg.inner_text('.ct-toast')
     pg.keyboard.press('f'); assert pg.evaluate("BookWorkspace.tab.rowInfo(2).flag") == 0 and 'flagged' in pg.inner_text('.ct-toast'), pg.inner_text('.ct-toast')
     pg.keyboard.press('f'); assert pg.evaluate("BookWorkspace.tab.rowInfo(2).flag") is None
-    pg.keyboard.press('ArrowLeft'); wait_aligned(pg, 'focus: key left'); assert row_now() == 1 and 'Page 2' in pg.inner_text('.ct-toast') and 'flagged' in pg.inner_text('.ct-toast')
+    pg.keyboard.press('PageUp'); wait_aligned(pg, 'focus: key page up'); assert row_now() == 1 and 'Page 2' in pg.inner_text('.ct-toast') and 'flagged' in pg.inner_text('.ct-toast')
     pg.keyboard.press('Escape'); pg.wait_for_timeout(500)
-    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#back') and not pg.is_visible('.ct-leave'), 'Esc brings everything back'
+    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#ct_vpill') and not pg.is_visible('.ct-leave'), 'Esc brings everything back'
     h2 = pg.locator('#pane_main').bounding_box(); assert abs(h2['height'] - h0['height']) < 3, (h0, h2)
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(300); pg.click('.ct-leave'); pg.wait_for_timeout(400); assert pg.is_visible('.ct-top') and not pg.is_visible('.ct-leave'), 'the Leave button works too'
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(300); pg.evaluate("CompareTab.leave()"); pg.wait_for_timeout(400)       # leaving the tab ends focus mode
     assert not pg.evaluate("document.getElementById('ws').hidden")
     pg.locator('#ws .ws-lbl[data-r="1"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'focus: back from the pages')
-    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#back'), 'Compare opens normally again'
+    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_vpill'), 'Compare opens normally again'
     # the Pages tab and back: the same pair and row are shown again without aligning anew
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'Pages layer visible'
     assert pg.locator('#ws .ws-hname').count() == 3
     pg.click('#ws-compare'); pg.wait_for_timeout(700)
     assert pg.is_visible('.ct-top') and not pg.is_visible('.ct-busy'), 'same pair and row: shown at once'
-    # the Back button of the teal bar also returns to the pages
-    pg.click('#back'); pg.wait_for_timeout(500); assert not pg.evaluate("document.getElementById('ws').hidden")
+    # the teal bar has no Back button any more: the Pages tab is the way back
+    assert not pg.is_visible('#back'), 'no Back button in the Compare tab'
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(500); assert not pg.evaluate("document.getElementById('ws').hidden")
     # ---------------------------------------------------------------- speed test
     add_copy(pg, 'Copy-D', 'D-Broken')
     pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300)

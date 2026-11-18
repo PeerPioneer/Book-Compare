@@ -67,6 +67,26 @@ def run(pg, col, read_proj=None):
     assert names() == start_names
     pg.click('#ws-more'); pg.click('[data-m=colw]'); pg.wait_for_timeout(150)
 
+    # ---- moving a file inside its copy: it is INSERTED between two files, the files in between move by one place -------------
+    c0 = start_cols[0]; assert all(x != '-' for x in c0[:5]), c0
+    def drop_on(src_r, dst_r, half):                                            # half: the upper or the lower half of the target cell
+        h = cell(0, dst_r).bounding_box()['height']
+        cell(0, src_r).drag_to(cell(0, dst_r), target_position={'x': 40, 'y': 3 if half == 'upper' else h - 4}); pg.wait_for_timeout(250)
+    drop_on(0, 2, 'lower'); assert col(pg, 0)[:5] == [c0[1], c0[2], c0[0], c0[3], c0[4]], col(pg, 0)       # behind the third file: the two between move up
+    drop_on(3, 0, 'upper'); assert col(pg, 0)[:5] == [c0[3], c0[1], c0[2], c0[0], c0[4]], col(pg, 0)       # in front of the first file: the others move down
+    assert pg.evaluate("document.querySelector('#ws .ws-cell.sel').dataset.r") == '0', 'the moved file stays selected'
+    before = col(pg, 0); drop_on(1, 1, 'upper'); drop_on(1, 0, 'lower'); assert col(pg, 0) == before, 'dropped next to its own place: nothing changes'
+    assert allcols()[1:] == start_cols[1:], 'the other copies are not touched'
+    for _ in range(2): pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
+    assert allcols() == start_cols, 'Undo puts the files back'
+    # onto an empty cell ("no page"): the file moves there and an empty cell stays behind (rows are page positions)
+    cell(0, 3).click(); pg.fill('#gapN', '1'); pg.click('[data-act=gap]'); pg.wait_for_timeout(200)
+    g = col(pg, 0); assert g[3] == '-' and g[4] == c0[3], g
+    cell(0, 0).drag_to(cell(0, 3)); pg.wait_for_timeout(250)
+    g2 = col(pg, 0); assert g2[0] == '-' and g2[3] == g[0] and g2[1:3] == g[1:3] and g2[4:] == g[4:], g2
+    for _ in range(2): pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
+    assert allcols() == start_cols, 'Undo puts the files back (gap too)'
+
     # ---- several files at once: Shift + click, Shift + arrow --------------------------------------------------------------
     c2 = start_cols[2]; assert all(x != '-' for x in c2[:6])
     cell(2, 0).click(); assert delbtn() == 'Delete file'

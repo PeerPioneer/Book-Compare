@@ -481,8 +481,14 @@
         if (current_mode === 'diff') {
             const preset = DIFF_PRESETS.find((p) => p.c1 === DIFF_COLOR_1 && p.c2 === DIFF_COLOR_2);
             const nm = (name) => (name ? ' ' + name : '');
-            note = `\n[[${DIFF_COLOR_1}]]${nm(preset && preset.n1)} = image 1` +
-                   `\n[[${DIFF_COLOR_2}]]${nm(preset && preset.n2)} = image 2`;
+            // In the Compare tab the two copies are named as in the grid ("Orange = A-Wn1"); the two-image screens still say image 1 / image 2.
+            const copy = (i) => {
+                const n = window.BC_COPY_NAMES && window.BC_COPY_NAMES[i];
+                if (!n) return 'image ' + (i + 1);
+                return n.length > 38 ? n.slice(0, 37) + '…' : n;
+            };
+            note = `\n[[${DIFF_COLOR_1}]]${nm(preset && preset.n1)} = ${copy(0)}` +
+                   `\n[[${DIFF_COLOR_2}]]${nm(preset && preset.n2)} = ${copy(1)}`;
         }
         main.set_label('Superimposed' + note);
     };
