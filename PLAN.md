@@ -682,7 +682,7 @@ more than two or three institutions except the one below; most German chant prin
   "must differ" check here; it stays a good negative control: nothing may be reported). The **signature is on H1r, not H2r** (Boorman's "Har" is the OCR of "H1r"):
   H2r carries "H ij" in Paris and New York alike. **H1r done 18 Nov** (owner staged all three: Paris Page_115, New York Page_113, Washington Page_119):
   Boorman's note reads "H1r signature: [nil] H [US-NYp, US-Wc]" (nil in the other copies, i.e. F-Pc), but **all three scans show the same small mark at the lower right
-  (a gothic H with a hook; Paris 1373 px wide, so the form is only roughly readable) — no difference in this spot either.** In the overlay (margin shown, PAD=0.35) the mark
+  (a gothic H with a hook; Paris 1373 px wide, so the form is only roughly readable) — no difference in this spot either.** *Owner, 18 Nov: the letter "H" is present on H1r and on H2r of the Paris copy; Boorman's "nil" is an error in his catalogue.* In the overlay (margin shown, PAD=0.35) the mark
   appears as a red/blue pair about 10–15 px apart, because it lies outside the printed-area box and is only carried along by the rough alignment: **a margin
   item that exists in both copies shows up as a false difference when the margin is shown (supports A2, B8).** What the pairs DO show on H1r is a real difference that Boorman describes
   elsewhere ("the sixth stave is increasingly seldom inked as the book progresses ... on the following rectos: G4, H1,2,4,7, ..."): **Paris prints six staves, New York and
@@ -855,6 +855,11 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | S2 | Grid view, moving a file: instead of swapping with an existing file, the moved file is **inserted between two adjacent files** (the files after it shift by one place) | owner confirmed the meaning; check how a gap or the end of the row is handled |
 | S3 | Adding files: besides adding a whole folder, **select individual files** (e.g. one picture); the default stays "add a whole folder" | |
 | S4 | "Start Book Compare.bat" should open **Microsoft Edge** instead of the default browser (Firefox on the owner's PC), because the app works best in Edge | `launcher/serve.ps1` (line 56, `Start-Process $url`) and `launcher/tray.ps1` (lines 53–54): try Edge first, fall back to the default browser if Edge is not found; the new desktop program (V5) brings its own browser engine and makes this obsolete |
+| S5 | **Remove the Photoshop split script** from Book Compare (owner: it was only for his own work): `tools/photoshop/`, `tests/photoshop/`, the CI step that tests it, the README paragraph; plan notes P5/T1 updated | it stays in the project history and can be handed out as a single file at any time |
+| S6 | **Fix:** the book map strip (the thin line above the page bar) lies on top of the opened view menu and cuts through it (owner's screenshot, 18 Nov) | layering: menus must always be above the map |
+| S7 | **Arrow keys:** no longer change page or copy; they move the picture inside the superimposed panel again, as before the Compare tab; the key hints in the left panel change accordingly | replacement keys for page turning: to be decided (proposal: Page Up / Page Down) |
+| S8 | **Difference view legend:** "Orange = A-Wn1 / Blue = A-Z" with the copy names from the grid instead of "image 1 / image 2" | if a copy has no name: "Copy 1" / "Copy 2" |
+| S9 | **One bar at the bottom:** the light teal page bar is merged into the dark teal bar; the design is being discussed (18 Nov, on Opus); build on Sonnet once decided | see the options in the conversation of 18 Nov; decision to be recorded here |
 
 ### 11.2 After version 1
 
