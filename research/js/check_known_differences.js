@@ -24,7 +24,8 @@
    "Odhecaton A. Petrucci 1504. Digitalisate", "Canti C, Petrucci 1504. Digitalisate", "Graduale Romanum. Giunta. Digitalisate",
    "Opusculum musices. Digitalisate"; results of the tests D3 and D4 of 17-18 Nov 2026, PLAN.md section 10). Whole-page values only:
    same setting = matching, different setting = clearly different. Each pair is aligned with the reference named first.
-   Case 5: Liber f.8r and f.8v. CZ-Pu and GB-Lbl1 (group B) agree (< 3 %), CZ-Pu against US-CA (group A) is re-set (> 10 %).
+   Case 5: Liber f.8r and f.8v. CZ-Pu and GB-Lbl1 (group B) agree (< 3 %), CZ-Pu against US-CA (group A) is re-set (> 10 %);
+           D-ARk and US-CA (both group A) agree (< 3 %) although the movement is large, D-ARk against CZ-Pu is re-set (> 10 %).
    Case 6: Petrucci controls: Odhecaton A1v, Paris against Washington and New York (< 3 %), Canti C Q4r Paris against Vienna (< 3 %).
    Case 7: Giunta Graduale: CCXIXv and CLVv agree between the copies (< 3 %), the lower part of CCXXv differs in all three copies (> 8 %).
    Case 8: Opusculum musices p. 30: D-Mbs against B-Br (< 3 %), D-Mbs against D-B (> 15 %, real difference of setting). D-Mbs is the reference
@@ -157,6 +158,9 @@ function liber8Case(cv, scans, rows) {
   for (const [fol, cz, gb, ca] of [['8r', 'NK4134_R.jpg', 'K9a24_010_R.jpg', 'Harvard_0022.jpg'], ['8v', 'NK4135_L.jpg', 'K9a24_011_L.jpg', 'Harvard_0023.jpg']]) {
     const f = (d, n) => findScan(path.join(L, d), new RegExp('^' + n.replace('.', '\.') + '$'));
     list.push([`f.${fol} CZ-Pu (B) vs GB-Lbl1 (B)`, f('CZ-Pu', cz), f('GB-Lbl1', gb), 'same', 3], [`f.${fol} CZ-Pu (B) vs US-CA (A)`, f('CZ-Pu', cz), f('US-CA', ca), 'different', 10]);
+    // control inside group A (D-ARk, Arnstadt 2105, is group A on f.8): same setting although photographed differently (the movement is large, the unmatched ink is not)
+    const ar = findScan(path.join(L, 'D-ARk'), new RegExp('fol 00' + fol + '\\.', 'i'));
+    list.push([`f.${fol} D-ARk (A) vs US-CA (A)`, ar, f('US-CA', ca), 'same', 3], [`f.${fol} D-ARk (A) vs CZ-Pu (B)`, ar, f('CZ-Pu', cz), 'different', 10]);
   }
   return pairsCase(cv, scans, rows, 'Liber ', list);
 }
