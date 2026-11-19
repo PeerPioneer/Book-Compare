@@ -7,7 +7,7 @@ Step 2: refine with ECC (an iterative method that maximises the correlation of t
 Step 3: two extra refinements that look only at places where both copies agree (so that parts that differ - a wrongly
         set letter, a stain - cannot pull the result away).
 Known weak point: Step 1 can fail when the reference crop contains a lot of non-print (the D-W title page); the printed-area
-box must therefore be right. This is on the to-do list (see ROADMAP.md).
+box must therefore be right. This is on the to-do list (see PLAN.md, item V2).
 """
 import numpy as np, cv2
 
