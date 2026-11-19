@@ -16,6 +16,6 @@ What it shows (all with made-up pages, no real scans):
 What it does **not** do: read folders, match pages, align, or save anything. Everything on screen is invented.
 Fonts are loaded from Google Fonts; without internet the browser uses a fallback font.
 
-Design decisions behind it are listed in `../../research/ROADMAP.md`.
+Design decisions behind it are listed in `../../PLAN.md` (§6 and §11).
 
 **Status 5 November 2026:** the Pages grid (columns = copies, rows = positions, manual fixing, project saving, hand-over of a pair to the two-image screen) now exists for real in `app/js/workspace.js`. Still only in this mock-up: the Compare tab with the superimposed picture, flags and annotations, the book map, and automatic page matching.

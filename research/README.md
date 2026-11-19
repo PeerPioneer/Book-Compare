@@ -1,8 +1,9 @@
-# research/: alignment and printed-area detection (Python, not yet part of the app)
+# research/: alignment and printed-area detection (Python prototype and its JavaScript rewrite)
 
 These scripts are the code behind the tests described in `FINDINGS.md`. They run on a normal computer with Python 3
-and `pip install numpy opencv-python scipy`. **The Book Compare app does not use them yet**; the app's own alignment is the
-sealed WebAssembly module in `app/js/transform.js`, so everything here still has to be rewritten in JavaScript (see `ROADMAP.md`).
+and `pip install numpy opencv-python scipy`. The Book Compare app does not use the Python files; they were rewritten in
+JavaScript in `js/` (see its README), and that rewrite already runs in the app's speed test. Building it into the Compare tab
+is items V2 and V3 of the plan, [`PLAN.md`](../PLAN.md) §11.
 
 | file | what it does |
 |---|---|

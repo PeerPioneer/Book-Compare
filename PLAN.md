@@ -1,6 +1,6 @@
 # Book Compare — the plan
 
-Last revised: 14 November 2026 (second revision, same day).
+Last revised: 19 November 2026.
 
 This file is the plan for Book Compare, written in plain language. It exists so that the
 plan lives next to the code instead of only in someone's memory: the owner of the project
@@ -860,6 +860,12 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | S7 | **done 19 Nov:** **Arrow keys:** no longer change page or copy; they move the picture inside the superimposed panel again, as before the Compare tab; the key hints in the left panel change accordingly | **owner 19 Nov:** Page Up / Page Down turn the page; no keys for switching copies (the ▲ ▼ buttons stay); F for flag stays |
 | S8 | **done 19 Nov:** **Difference view legend:** "Orange = A-Wn1 / Blue = A-Z" with the copy names from the grid instead of "image 1 / image 2" | if a copy has no name: "Copy 1" / "Copy 2" |
 | S9 | **done 19 Nov (sketch 1 chosen):** **One bar at the bottom:** the light teal page bar is merged into the dark teal bar; the design is being discussed (18 Nov, on Opus); build on Sonnet once decided | **owner 19 Nov:** option B preferred (one dark teal bar: page turning and flag on the left, the six views as a row of buttons in the middle, Linked and More as icons on the right; when the window is too narrow for the buttons, e.g. half the screen, they fold into one menu automatically); the **Back** button is removed (the PAGES tab does the same); short messages move to a note at the bottom of the picture; Toggle speed appears only in Toggle view. **Decided 19 Nov (owner chose "sketch 1"):** the middle of the bar shows only the **current view name in a framed pill with six dots** (the current view is the bigger white dot); when the pointer rests on it for about 0.18 s the six names unfold (they close about 0.35 s after the pointer leaves); a click or tap opens them too (touch screens have no hovering); a click on a name switches; keys 1–6 choose the views (Difference, Toggle, Top and bottom, Left and right, copy 1, copy 2); if the window is too narrow the names stand one under the other above the pill. As built; the page-turning part, flag, Linked and More are in the same bar; Back is gone; short messages are a note at the bottom of the pictures. |
+
+### 11.1b Small changes for the release after 002 (owner, 19 Nov 2026)
+
+| ID | Change | Note |
+|----|--------|------|
+| S10 | **Add single pictures with the ordinary Windows "Open" window**: a button "Add single pictures…" opens the same file window as in any Windows program; one or several pictures are chosen there (Ctrl- or Shift-click) and go into the copy. The tick boxes in "Add a folder" (S3) stay | **decided 19 Nov (owner)**, to be built in the next coding round (on Sonnet). With the helper the window is opened by the helper, like its folder window today (`launcher/pickfolder.ps1`); the desktop program (V5) has such a window built in, so the button carries over. On the website without the helper the tick boxes remain the way, because a browser can reopen pictures later only from a folder it was given |
 
 ### 11.2 After version 1
 
