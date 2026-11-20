@@ -1,6 +1,6 @@
 # Book Compare — the plan
 
-Last revised: 19 November 2026.
+Last revised: 20 November 2026.
 
 This file is the plan for Book Compare, written in plain language. It exists so that the
 plan lives next to the code instead of only in someone's memory: the owner of the project
@@ -191,11 +191,30 @@ extrapolates to a whole book. To be run by the owner on his usual PC.
 
 When reading its numbers:
 
-- It measures the alignment Book Compare has **today**, not the tile method. The app says so
-  itself. Once the experiment (§4.3) works, its timing is added to the speed test so that it
-  can be measured again at any time and on other people's computers.
+- It measures the alignment Book Compare has today and, with a tick box that is on by default,
+  the new tile method too (in the background, the page does not freeze). So it can be measured
+  again at any time and on other people's computers.
 - The "opening the scan" figures do **not** change when the alignment method changes. That
   half of the numbers is permanent knowledge. An external drive affects only this column.
+
+**Result on the owner's PC (20 November 2026)** — Edge, Windows, 8 processor threads, 8 GB or more;
+f.4r, CH-E as copy 1 against 9 copies from 1.5 to 37 megapixels (D-FUl, D-Sl, D-ARk, GB-Lbl2, F-Pm,
+A-Wn, D-Mbs, SK-Mmf split page `00006_R.jpg`, D-Tu `10014.jpg`); scans on his internal D: drive.
+
+- **Tile method: median 6.1 s per additional copy (5.7–7.1 s), 8 of 9 under the 10 s target.** Of that,
+  the tile step about 3.1 s whatever the size, the rough step 2.1–3.1 s, opening and ink map 0.3–1 s.
+  Copy 1 is prepared once per page: 2.6 s (printed area 2.1 s).
+- **The one copy over target, F-Pm (13.0 s), is a re-set page:** on f.4r F-Pm is in group B and CH-E in A1
+  (`Dissertation_Verlag.pdf`, p. 197). The rough step needed 9.5 s instead of 2–3 s, most likely because its
+  refinement (ECC, up to 300 rounds per stage) does not settle when the pages disagree. The result is right:
+  15.9 % unmatched ink after the tiles, against 0.2–2.0 % for the others, i.e. the differences stay visible.
+  → proposed engine fix A7 (§10).
+- Opening a scan is fast on this PC: under 1.3 s even for the 37-megapixel split SK-Mmf page (the
+  unsplit 70-megapixel double page could not be opened in the earlier test on Claude's computer).
+- Today's alignment: 2.1–3.5 s per pair, but the page freezes for up to 3 s each time.
+- What it means for a whole book, one worker: one copy of the Liber (544 pages) about 55 minutes;
+  all 19 against copy 1 about 17 hours. The PC has 8 threads and one copy uses one, so several copies at
+  once (V8) could cut this several times; to be measured (memory).
 
 ### 4.6 How the computing is organised — decided
 
@@ -598,7 +617,7 @@ What the tests showed, across Liber, Melopoiae, printed-area set (116 scans), pa
 
 Plan (IDs used in the register, §11):
 - **A — alignment engine** (A1 box extended over sparse staves; A2 align a margin around the box; A3 near-empty page → rough
-  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs; **proposed 18 Nov:** A6 ink choice dark / red / both). Each must keep every
+  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs; **proposed 18 Nov:** A6 ink choice dark / red / both; **proposed 20 Nov:** A7 cap the time of the rough step when the two pages disagree — F-Pm f.4r took 9.5 s instead of 2–3 s, §4.5). Each must keep every
   check that passes today. **Done only AFTER the tests D (owner, 17 Nov: the tests may change A).**
 - **B — what the user sees, version 1**: B1 box visible and correctable (see V2b); B2 **small shifted-page warning** (owner: version 1):
   when a page matches badly, compare with the copy's neighbouring pages and, if one fits clearly better, suggest moving the column
@@ -835,10 +854,10 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a decide framework (Electron vs Tauri) — see D3; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
 | V6 | Website, kept current automatically | done (live) | — |
 | V7 | **Reference copy** (§4.7): proposal from measurable criteria, user confirms, stand-in per page, never switches by itself, old results kept until new ones are ready | **open** — design confirmed in prose only; not built; needs owner confirmation of the last point | V7a scoring of copies; V7b UI to confirm/choose; V7c per-page stand-in; V7d "better copy found" hint with cost |
-| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3 |
+| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3; idea 20 Nov: several pages at once in parallel on PCs with many processor threads (owner's PC: 8), to be measured (§4.5) |
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
-| V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | to be measured Thursday 19 Nov on his PC | speed test already includes the tile method |
+| V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | **measured 20 Nov on his PC: median 6.1 s, 8 of 9 copies under 10 s**; F-Pm 13 s on a re-set page (rough step) → A7 (§4.5) | — |
 | V12 | Known-differences checks (§4.4), all pass (15 Nov): Melopoiae TOC (16); woodcut p.19 B-Br vs D-Mu (7 assertable lines of 8); p.8, five copies against B-Br (25); Liber f.19v, CH-E vs D-FUl and US-CA, whole page and the single notes of the apparatus (11). **Source for the Liber:** the critical apparatus in `Dissertation_Verlag.pdf`, 4.6, pp. 195–224 (PDF page = printed page), with Table 1 of the 20 extant copies on p. 15; for the Melopoiae: `Mein Artikel\\List of Differences.odt`. Music tests added 15 Nov (re-set folios 7r/7v/9r/9v, f.8r/8v control, f.19v A1 against A2, Melopoiae pairs 05 and 09, artificial shifts; see §4.4). **Still open:** the B copies of f.8r/8v (CZ-Pu, GB-Lbl1 and others, once split), other Liber folios with single notes, other Melopoiae pairs | partly done | T3, T4 |
 | V13 | Tests: workspace tests on Windows CI; desktop-program smoke test | partly done | — |
 | V15 | **Tile settings for a page that aligns badly** (owner's Aruspix idea). **Decided 17 Nov:** plain presets shown by default (stiffer / standard / more flexible); a button opens an advanced panel with the two numbers — *main tiles* (how many large tiles cover the page height, today about 8) and *sub-tiles* (how many times each is split again, today 3); the pair is aligned again at once, with overlay, movement map and unmatched figure; a note that more flexible settings can hide real differences; "standard" button; **applies only to this copy on this page** and is saved in the project. Safe range of the numbers comes from tests D(a) | **decided, version 1** | needs V3 |
@@ -884,7 +903,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | ID | Item | Status |
 |----|------|--------|
 | T1 | Split double-page copies (CZ-Pu, D-SHk, GB-Lbl1, SK-Mmf) with `Split-double-pages.jsx` into a *different* folder (never into the protected scan folders) | **done 16 Nov** (owner): all split; the single-page folders are now sub-folders of the original copy folders. Paths for the B copies of f.8r/8v still to be looked up |
-| T2 | Run the speed test on his PC, Thursday 19 Nov, and paste the text | his |
+| T2 | Run the speed test on his PC and paste the text | **done 20 Nov** (results in §4.5) |
 | T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
 | T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |
 | T5 | CZ-Pu split run with v1.0 (15 Nov): 163 double pages split, then every file from NK4288 to NK4405 failed with "Cannot open the file because the open options are incorrect" (112 files); NK4406 (a single page) opened fine. Cause unknown: the D: drive was no longer reachable when I tried to inspect the files. To do: inspect NK4287/NK4288 (format, colour mode, profile), then make the script robust | his drive; then me |
@@ -904,8 +923,8 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 ### 11.5 Order from here (17 November 2026)
 
 1. Tests D1–D5 with the extra measurements (a)–(c) (§10) — research only, on Sonnet.
-2. Thursday 19 Nov: speed test on his PC (V11/T2).
-3. Engine fixes A1–A5, checked against every earlier check.
+2. Speed test on his PC (V11/T2) — **done 20 Nov**.
+3. Engine fixes A1–A5 (and A7 if approved), checked against every earlier check.
 4. Desktop program (V5), starting with D3.
 5. Compare tab uses the new alignment (V2a, V3) with box correction (V2b), tile settings (V15), shifted-page warning (V18), movement map (V16).
 6. Reference copy (V7, D1), then background alignment, progress bar and stored results (V8–V10).
