@@ -21,13 +21,48 @@ function unmatchedShare(cv, a_, b_, box) {
   } finally { S.free(); }
 }
 
+/* ink pixels (ink map > 0.5) inside a box [x0, y0, x1, y1] */
+function inkIn(ink, box) {
+  const W = ink.cols, H = ink.rows, d = ink.data32F;
+  let n = 0;
+  for (let y = Math.max(0, box[1]); y < Math.min(H, box[3]); y++) for (let x = Math.max(0, box[0]); x < Math.min(W, box[2]); x++) if (d[y * W + x] > 0.5) n++;
+  return n;
+}
+
+/* A4 (20 Nov 2026): the printed-area box, with a second candidate for scans that have a dark border inside the picture.
+   Such a border (gilt edge, table, ruler; Opusculum musices, Brussels: 58 of 79 pages) makes the standard box either a small fragment of the page
+   (30 pages) or the whole scan (28 pages), which broke the fine alignment ("box too small") or made it meaningless. Second candidate: the same procedure
+   with the outer 5 % of the picture ignored (BORDER). The standard box stays unless it is evidently wrong: (1) it touches two or more edges of the
+   scan (a printed area never reaches the scan edge on two sides), or (2) the second box holds at least 8 % more ink (the standard box cuts through print).
+   Where the standard box is right the two boxes are the same or differ by a few pixels (every other scan tested), so nothing changes there.
+   Returns { box, which: 'standard' | 'border', standard, border, why, stretched } (stretched: A1, the box was extended over staves that hang on it). */
+const BORDER = 0.05, MORE_INK = 1.08;
+function chooseBox(cv, red, ink) {
+  const std = printedBox(cv, red), W = red.cols, H = red.rows;
+  const tx = Math.round(0.01 * W), ty = Math.round(0.01 * H);
+  const sides = (std[0] <= tx) + (std[2] >= W - tx) + (std[1] <= ty) + (std[3] >= H - ty);
+  const bor = printedBox(cv, red, { border: BORDER });
+  let which = 'standard', why = '';
+  if (sides >= 2) { which = 'border'; why = 'the standard box touches ' + sides + ' edges of the scan'; }
+  else if (inkIn(ink, bor) >= MORE_INK * Math.max(1, inkIn(ink, std))) { which = 'border'; why = 'the standard box cuts through print'; }
+  let box = which === 'border' ? bor : std, stretched = false;
+  if (!(typeof process !== 'undefined' && process.env && process.env.BC_NOSTAFF === '1')) {      // A1: a staff system hanging on the box (sparse staves) belongs to it (BC_NOSTAFF=1: research, switched off)
+    const ext = extendBoxByStaves(box, ink);
+    if (ext[1] !== box[1] || ext[3] !== box[3]) { box = ext; stretched = true; }
+  }
+  const density = inkIn(ink, box) / Math.max(1, (box[2] - box[0]) * (box[3] - box[1]));                // share of the box that is ink (real pages: 0.10-0.40)
+  return { box, which, standard: std, border: bor, why, stretched, density };
+}
+
 /* reference copy: printed area and ink map (kept for all copies that are aligned onto it) */
 function prepareReference(cv, red) {
   const t0 = now();
-  let box = printedBox(cv, red); const t1 = now();
-  const ref = inkMap(cv, red);                              // (a failure above leaves nothing behind: printedBox and inkMap free their own memory)
-  if (typeof process !== 'undefined' && process.env && process.env.STAFFBOX === '1') box = extendBoxByStaves(box, ref); // experiment (research notes, Odhecaton/Canti C tests): keep sparse staves inside the box
-  return { ref, box, times: { box_s: (t1 - t0) / 1000, ink_ref_s: (now() - t1) / 1000 } };
+  const ref = inkMap(cv, red), t1 = now();
+  let pick;
+  try { pick = chooseBox(cv, red, ref); } catch (e) { ref.delete(); throw e; }          // (a failure leaves nothing behind: printedBox and inkMap free their own memory)
+  const t2 = now();
+  const box = pick.box;
+  return { ref, box, boxInfo: pick, times: { box_s: (t2 - t1) / 1000, ink_ref_s: (t1 - t0) / 1000 } };
 }
 
 /* aligns one more copy (red channel Mat) onto the prepared reference. Set opts.measure to also compute the unmatched-ink shares
@@ -42,8 +77,11 @@ function alignCopyIn(cv, refState, red, opts, S) {
   const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true }); tm.rough_s = (now() - t) / 1000; t = now();
   const rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); tm.warp_s = (now() - t) / 1000;
   const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows;
-  const m = Math.max(60, Math.floor(0.02 * Math.max(x1 - x0, y1 - y0)));
-  const tbox = [Math.max(60, x0 - m), Math.min(w - 60, x1 + m), Math.max(60, y0 - m), Math.min(h - 60, y1 + m)];
+  const envRing = (typeof process !== 'undefined' && process.env && process.env.BC_RING) ? +process.env.BC_RING : null;     // research only (A2): ring width as a fraction of the longer box side
+  const envEdge = (typeof process !== 'undefined' && process.env && process.env.BC_EDGE) ? +process.env.BC_EDGE : null;     // research only (A2): strip along the scan edge that is never fine-aligned (px)
+  const m = Math.max(60, Math.floor((opts.ring != null ? opts.ring : envRing != null ? envRing : 0.02) * Math.max(x1 - x0, y1 - y0)));
+  const e = opts.edge != null ? opts.edge : envEdge != null ? envEdge : 60;
+  const tbox = [Math.max(e, x0 - m), Math.min(w - e, x1 + m), Math.max(e, y0 - m), Math.min(h - e, y1 + m)];
   t = now();
   const { aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField, levels: opts.levels }); S.add(aligned); tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;

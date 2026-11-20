@@ -231,16 +231,21 @@ function printedBoxIn(cv, r, S, opts) {
   return box;
 }
 
-/* Staves are long thin lines, so printedBox removes them and can lose staves that carry few notes (e.g. the top half of a page
-   whose lower staves are full). This stretches the box vertically over every row in which at least 45 % of the box width is ink
-   (a staff line, even if short notes sit on it), ignoring the outer 3 % of the image where page edges give long lines. ref = ink map. */
-function extendBoxByStaves(box, ref) {
-  const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows, d = ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h);
+/* A1 (20 Nov 2026): staves are long thin lines, so printedBox removes them and can lose staves that carry few notes (the lowest system of a page,
+   or the top half of a page whose lower staves are full). This stretches the box vertically over the rows in which at least 45 % of the box width is ink
+   (a staff line, even if short notes sit on it), ignoring the outer 3 % of the image where page edges give long lines (ref = ink map).
+   NEW: (1) only thin rows count (a run of such rows thicker than 12 px is a dark band, shadow or ruler at the page edge, not a staff line); (2) the stretch
+   only goes on while the next such row lies within `gap` pixels (3 % of the height) of the last one, so it follows a staff system that hangs on the box but
+   no longer jumps to a far-away row. The old version, which took every such row of the page, made the Antiphonarium pair worse (0.6 % -> 12.4 % unmatched);
+   a first contiguous version still reached the dark page edge on Liber f.8 D-ARk (1.1 % -> 9.8 % unmatched) until (1) was added. */
+function extendBoxByStaves(box, ref, gapFrac = 0.03) {
+  const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows, d = ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h), gap = Math.round(gapFrac * h);
+  const q = new Uint8Array(h);
+  for (let y = margin; y < h - margin; y++) { let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++; q[y] = c >= need ? 1 : 0; }
+  for (let y = 0; y < h;) { if (!q[y]) { y++; continue; } let e = y; while (e < h && q[e]) e++; if (e - y > 12) q.fill(0, y, e); y = e; }
   let sy0 = y0, sy1 = y1;
-  for (let y = margin; y < h - margin; y++) {
-    let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++;
-    if (c >= need) { if (y < sy0) sy0 = y; if (y > sy1) sy1 = y; }
-  }
+  for (let y = y0 - 1, last = y0; y >= margin && last - y <= gap; y--) if (q[y]) { sy0 = y; last = y; }
+  for (let y = y1 + 1, last = y1; y < h - margin && y - last <= gap; y++) if (q[y]) { sy1 = y; last = y; }
   return [x0, sy0, x1, sy1];
 }
 
@@ -553,13 +558,48 @@ function unmatchedShare(cv, a_, b_, box) {
   } finally { S.free(); }
 }
 
+/* ink pixels (ink map > 0.5) inside a box [x0, y0, x1, y1] */
+function inkIn(ink, box) {
+  const W = ink.cols, H = ink.rows, d = ink.data32F;
+  let n = 0;
+  for (let y = Math.max(0, box[1]); y < Math.min(H, box[3]); y++) for (let x = Math.max(0, box[0]); x < Math.min(W, box[2]); x++) if (d[y * W + x] > 0.5) n++;
+  return n;
+}
+
+/* A4 (20 Nov 2026): the printed-area box, with a second candidate for scans that have a dark border inside the picture.
+   Such a border (gilt edge, table, ruler; Opusculum musices, Brussels: 58 of 79 pages) makes the standard box either a small fragment of the page
+   (30 pages) or the whole scan (28 pages), which broke the fine alignment ("box too small") or made it meaningless. Second candidate: the same procedure
+   with the outer 5 % of the picture ignored (BORDER). The standard box stays unless it is evidently wrong: (1) it touches two or more edges of the
+   scan (a printed area never reaches the scan edge on two sides), or (2) the second box holds at least 8 % more ink (the standard box cuts through print).
+   Where the standard box is right the two boxes are the same or differ by a few pixels (every other scan tested), so nothing changes there.
+   Returns { box, which: 'standard' | 'border', standard, border, why, stretched } (stretched: A1, the box was extended over staves that hang on it). */
+const BORDER = 0.05, MORE_INK = 1.08;
+function chooseBox(cv, red, ink) {
+  const std = printedBox(cv, red), W = red.cols, H = red.rows;
+  const tx = Math.round(0.01 * W), ty = Math.round(0.01 * H);
+  const sides = (std[0] <= tx) + (std[2] >= W - tx) + (std[1] <= ty) + (std[3] >= H - ty);
+  const bor = printedBox(cv, red, { border: BORDER });
+  let which = 'standard', why = '';
+  if (sides >= 2) { which = 'border'; why = 'the standard box touches ' + sides + ' edges of the scan'; }
+  else if (inkIn(ink, bor) >= MORE_INK * Math.max(1, inkIn(ink, std))) { which = 'border'; why = 'the standard box cuts through print'; }
+  let box = which === 'border' ? bor : std, stretched = false;
+  if (!(typeof process !== 'undefined' && process.env && process.env.BC_NOSTAFF === '1')) {      // A1: a staff system hanging on the box (sparse staves) belongs to it (BC_NOSTAFF=1: research, switched off)
+    const ext = extendBoxByStaves(box, ink);
+    if (ext[1] !== box[1] || ext[3] !== box[3]) { box = ext; stretched = true; }
+  }
+  const density = inkIn(ink, box) / Math.max(1, (box[2] - box[0]) * (box[3] - box[1]));                // share of the box that is ink (real pages: 0.10-0.40)
+  return { box, which, standard: std, border: bor, why, stretched, density };
+}
+
 /* reference copy: printed area and ink map (kept for all copies that are aligned onto it) */
 function prepareReference(cv, red) {
   const t0 = now();
-  let box = printedBox(cv, red); const t1 = now();
-  const ref = inkMap(cv, red);                              // (a failure above leaves nothing behind: printedBox and inkMap free their own memory)
-  if (typeof process !== 'undefined' && process.env && process.env.STAFFBOX === '1') box = extendBoxByStaves(box, ref); // experiment (research notes, Odhecaton/Canti C tests): keep sparse staves inside the box
-  return { ref, box, times: { box_s: (t1 - t0) / 1000, ink_ref_s: (now() - t1) / 1000 } };
+  const ref = inkMap(cv, red), t1 = now();
+  let pick;
+  try { pick = chooseBox(cv, red, ref); } catch (e) { ref.delete(); throw e; }          // (a failure leaves nothing behind: printedBox and inkMap free their own memory)
+  const t2 = now();
+  const box = pick.box;
+  return { ref, box, boxInfo: pick, times: { box_s: (t2 - t1) / 1000, ink_ref_s: (t1 - t0) / 1000 } };
 }
 
 /* aligns one more copy (red channel Mat) onto the prepared reference. Set opts.measure to also compute the unmatched-ink shares
@@ -574,8 +614,11 @@ function alignCopyIn(cv, refState, red, opts, S) {
   const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true }); tm.rough_s = (now() - t) / 1000; t = now();
   const rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); tm.warp_s = (now() - t) / 1000;
   const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows;
-  const m = Math.max(60, Math.floor(0.02 * Math.max(x1 - x0, y1 - y0)));
-  const tbox = [Math.max(60, x0 - m), Math.min(w - 60, x1 + m), Math.max(60, y0 - m), Math.min(h - 60, y1 + m)];
+  const envRing = (typeof process !== 'undefined' && process.env && process.env.BC_RING) ? +process.env.BC_RING : null;     // research only (A2): ring width as a fraction of the longer box side
+  const envEdge = (typeof process !== 'undefined' && process.env && process.env.BC_EDGE) ? +process.env.BC_EDGE : null;     // research only (A2): strip along the scan edge that is never fine-aligned (px)
+  const m = Math.max(60, Math.floor((opts.ring != null ? opts.ring : envRing != null ? envRing : 0.02) * Math.max(x1 - x0, y1 - y0)));
+  const e = opts.edge != null ? opts.edge : envEdge != null ? envEdge : 60;
+  const tbox = [Math.max(e, x0 - m), Math.min(w - e, x1 + m), Math.max(e, y0 - m), Math.min(h - e, y1 + m)];
   t = now();
   const { aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField, levels: opts.levels }); S.add(aligned); tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
@@ -634,7 +677,7 @@ var handlers = {
     if (refState) { refState.ref.delete(); refState = null; }
     var d = await decodeRed(cv, m.file);
     try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
-    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
+    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
   },
   align: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');

@@ -42,7 +42,7 @@ var handlers = {
     if (refState) { refState.ref.delete(); refState = null; }
     var d = await decodeRed(cv, m.file);
     try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
-    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
+    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
   },
   align: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');

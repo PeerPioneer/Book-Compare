@@ -188,6 +188,33 @@ function opusculumCase(cv, scans, rows) {                                       
   return pairsCase(cv, scans, rows, 'Opusculum', [['p.30 D-Mbs vs B-Br', mbs, br, 'same', 3], ['p.30 D-Mbs vs D-B (other setting)', mbs, db, 'different', 15]]);
 }
 
+/* ---- Case 9 (A4 / A1, 20 Nov 2026): the printed-area box of the reference ---- */
+/* Opusculum musices, Brussels (dark gilt border inside the picture): with the standard box 22 of 68 pages failed ("box too small") and many others got a box
+   that covered the whole scan. The second candidate (outer 5 % ignored, pipeline.js chooseBox) must be taken on those pages, and must NOT be taken where the
+   standard box is right (Opusculum p.20, the Antiphonarium Bodleian scan, Liber f.8r of D-ARk: their boxes must stay as they were). No partner scan is needed. */
+function boxCase(cv, root, scans, rows) {
+  const { prepareReference } = require('./pipeline'), { loadRed } = require('./align_chain');
+  const O = path.join(scans, 'Opusculum musices. Digitalisate', 'B-Br. Opusculum musices');
+  const ant = findScan(path.join(scans, 'Antiphonarium Augustense. Ratdolt 1495. Digitalisate'), /\.jpe?g$/i);
+  const dark = n => findScan(O, new RegExp('^page_' + String(n).padStart(3, '0') + '\\.jpg$'));
+  const items = [];
+  for (const n of [7, 11, 14, 19, 22, 29, 32, 63]) items.push([`Opusculum p.${n} (standard box is a fragment)`, dark(n), 'border']);
+  for (const n of [9, 56, 68]) items.push([`Opusculum p.${n} (standard box is the whole scan)`, dark(n), 'border']);
+  items.push(['Opusculum p.20 (standard box right)', dark(20), 'standard'], ['Antiphonarium Bodleian (standard box right)', ant, 'standard']);
+  let fd = null; try { fd = findScan(path.join(root, 'Liber selectarum. f4r'), /D-FUl\.jpe?g$/i); } catch (e) { /* not staged */ }
+  if (fd) items.push(['Liber f.4r D-FUl (standard box is a fragment)', fd, 'border']);
+  let total = 0, failed = 0;
+  for (const [title, file, want] of items) {
+    const r = loadRed(cv, file), W = r.cols, H = r.rows, st = prepareReference(cv, r), b = st.box;
+    const area = (b[2] - b[0]) * (b[3] - b[1]) / (W * H), tx = 0.01 * W, ty = 0.01 * H;
+    const sides = (b[0] <= tx) + (b[2] >= W - tx) + (b[1] <= ty) + (b[3] >= H - ty);
+    r.delete(); st.ref.delete();
+    const ok = st.boxInfo.which === want && area > 0.2 && area < 0.9 && sides <= 1; total++; if (!ok) failed++;
+    rows.push(`${ok ? 'PASS' : 'FAIL'}  box  ${title.padEnd(52)} ${st.boxInfo.which.padEnd(8)} box ${(100 * area).toFixed(0).padStart(3)} % of the page, touches ${sides} edges   expected ${want} box, 20-90 % of the page, at most 1 edge`);
+  }
+  return { total, failed };
+}
+
 /* The cases run in SEPARATE processes: each one decodes big scans, and OpenCV.js (WebAssembly) would run out of memory when all cases share one
    process. "--only=3" runs just case 3 (cases: 1 table of contents, 2 woodcut, 3 page 8, 4 folio 19v). Without it all cases run, one process each. */
 function tocCase(cv, root, rows) {
@@ -212,7 +239,7 @@ function tocCase(cv, root, rows) {
   if (!root) { console.error('usage: node check_known_differences.js "<Example pages folder>" ["<Melopoiae folder>" or -] ["<folder with the digitised copies>"]'); process.exit(2); }
   if (!only) {                                                                               // parent: one child process per case
     const cp = require('child_process'); let failed = 0, total = 0;
-    for (const k of [...(mel ? ['1', '2', '3', '4'] : ['1', '4']), ...(scans ? ['5', '6', '7', '8'] : [])]) {
+    for (const k of [...(mel ? ['1', '2', '3', '4'] : ['1', '4']), ...(scans ? ['5', '6', '7', '8', '9'] : [])]) {
       const r = cp.spawnSync(process.execPath, [__filename, '--only=' + k, ...pos], { encoding: 'utf8', maxBuffer: 1 << 26 });
       process.stdout.write(r.stdout || ''); if (r.stderr) process.stderr.write(r.stderr);
       const m = /RESULT (\d+) (\d+)/.exec(r.stdout || ''); if (m) { total += +m[1]; failed += +m[2]; } else { failed++; total++; console.log(`FAIL  case ${k} did not finish (exit code ${r.status})`); }
@@ -224,7 +251,7 @@ function tocCase(cv, root, rows) {
   }
   const cv = await loadCv(), rows = [];
   const res = { 1: () => tocCase(cv, root, rows), 2: () => woodcutCase(cv, mel, rows), 3: () => pair08Case(cv, mel, rows), 4: () => folio19vCase(cv, root, rows),
-    5: () => liber8Case(cv, scans, rows), 6: () => petrucciCase(cv, scans, rows), 7: () => giuntaCase(cv, scans, rows), 8: () => opusculumCase(cv, scans, rows) }[only]();
+    5: () => liber8Case(cv, scans, rows), 6: () => petrucciCase(cv, scans, rows), 7: () => giuntaCase(cv, scans, rows), 8: () => opusculumCase(cv, scans, rows), 9: () => boxCase(cv, root, scans, rows) }[only]();
   console.log(rows.join('\n')); console.log(`RESULT ${res.total} ${res.failed}`);
   process.exit(0);
 })().catch(e => { console.error(e && e.message ? e : (typeof e === 'number' && typeof cvGlobal !== 'undefined' ? e : 'error ' + e)); process.exit(1); });

@@ -185,16 +185,21 @@ function printedBoxIn(cv, r, S, opts) {
   return box;
 }
 
-/* Staves are long thin lines, so printedBox removes them and can lose staves that carry few notes (e.g. the top half of a page
-   whose lower staves are full). This stretches the box vertically over every row in which at least 45 % of the box width is ink
-   (a staff line, even if short notes sit on it), ignoring the outer 3 % of the image where page edges give long lines. ref = ink map. */
-function extendBoxByStaves(box, ref) {
-  const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows, d = ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h);
+/* A1 (20 Nov 2026): staves are long thin lines, so printedBox removes them and can lose staves that carry few notes (the lowest system of a page,
+   or the top half of a page whose lower staves are full). This stretches the box vertically over the rows in which at least 45 % of the box width is ink
+   (a staff line, even if short notes sit on it), ignoring the outer 3 % of the image where page edges give long lines (ref = ink map).
+   NEW: (1) only thin rows count (a run of such rows thicker than 12 px is a dark band, shadow or ruler at the page edge, not a staff line); (2) the stretch
+   only goes on while the next such row lies within `gap` pixels (3 % of the height) of the last one, so it follows a staff system that hangs on the box but
+   no longer jumps to a far-away row. The old version, which took every such row of the page, made the Antiphonarium pair worse (0.6 % -> 12.4 % unmatched);
+   a first contiguous version still reached the dark page edge on Liber f.8 D-ARk (1.1 % -> 9.8 % unmatched) until (1) was added. */
+function extendBoxByStaves(box, ref, gapFrac = 0.03) {
+  const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows, d = ref.data32F, need = 0.45 * (x1 - x0), margin = Math.round(0.03 * h), gap = Math.round(gapFrac * h);
+  const q = new Uint8Array(h);
+  for (let y = margin; y < h - margin; y++) { let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++; q[y] = c >= need ? 1 : 0; }
+  for (let y = 0; y < h;) { if (!q[y]) { y++; continue; } let e = y; while (e < h && q[e]) e++; if (e - y > 12) q.fill(0, y, e); y = e; }
   let sy0 = y0, sy1 = y1;
-  for (let y = margin; y < h - margin; y++) {
-    let c = 0; for (let x = x0; x < x1; x++) if (d[y * w + x] > 0.5) c++;
-    if (c >= need) { if (y < sy0) sy0 = y; if (y > sy1) sy1 = y; }
-  }
+  for (let y = y0 - 1, last = y0; y >= margin && last - y <= gap; y--) if (q[y]) { sy0 = y; last = y; }
+  for (let y = y1 + 1, last = y1; y < h - margin && y - last <= gap; y++) if (q[y]) { sy1 = y; last = y; }
   return [x0, sy0, x1, sy1];
 }
 
