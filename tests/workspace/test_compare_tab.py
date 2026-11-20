@@ -345,6 +345,7 @@ def scenario(p, kind):
         pg.click('#ws-menu [data-m="speed"]'); pg.wait_for_selector('#ws-scrim .ws-dlg')
     open_speed()
     dlg = pg.inner_text('#ws-scrim .ws-dlg'); assert 'Measure speed' in dlg and 'Page 1' in dlg and '3 other copies' in dlg and 'A-Test' in dlg, dlg
+    assert pg.is_visible('#sp-par'), 'the speed test window offers the test with several helpers at the same time'
     pg.check('#sp-types'); pg.click('#sp-go')
     pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=240000)
     rows_ = pg.locator('#ws-scrim tr[data-copy]'); assert rows_.count() == 3, rows_.count()

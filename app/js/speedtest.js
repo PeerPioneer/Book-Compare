@@ -230,6 +230,154 @@
     return L.join('\n');
   }
 
+  /* ---------------------------------------------------------------- several alignments at the same time
+     The background alignment of a whole book is a long list of jobs. Here a job is: prepare the page of one copy (the reference), then align
+     the same page of another copy onto it. The same 16 jobs are done with 1, 2, 4 and 8 helpers (workers); a helper takes the next job
+     as soon as it has finished one, so no helper waits for a slow one. What is timed is the whole run of the jobs (loading the helpers
+     is timed apart). While a run is going, a clock ticks every 50 ms on the page; the longest delay of that tick shows how much the page
+     itself was held up. */
+  var PAR = { helpers: [1, 2, 4, 8], jobs: 16 };
+  async function runParallel(pool, cfg, ui) {
+    cfg = cfg || {};
+    var hw = navigator.hardwareConcurrency || 0, njobs = cfg.jobs || PAR.jobs, n = pool.length, i, k;
+    var list = (cfg.helpers || PAR.helpers).filter(function (x) { return x === 1 || !hw || x <= hw; });
+    var res = { when: new Date(), pool: pool.map(function (p) { return p.name; }), jobs: njobs, hw: hw, rows: [], stopped: false };
+    var jobs = [];
+    for (k = 0; k < njobs; k++) jobs.push({ a: pool[k % n], b: pool[(k + 1) % n] });
+    for (var li = 0; li < list.length; li++) {
+      if (ui.stopped()) { res.stopped = true; break; }
+      var N = list[li], row = { n: N, ok: false, jobsDone: 0, failed: 0, errors: [] }, engines = [];
+      res.rows.push(row);
+      ui.status('Loading ' + N + ' helper' + (N === 1 ? '' : 's') + ' (OpenCV) …', li / list.length); await frame();
+      try {
+        var t0 = now();
+        for (i = 0; i < N; i++) engines.push(window.AlignEngine.create());
+        await Promise.all(engines.map(function (e) { return e.init(); }));
+        row.init_s = (now() - t0) / 1000;
+      } catch (e) {
+        row.errors.push((e && e.message) || String(e)); engines.forEach(function (x) { x.terminate(); });
+        ui.row(res, row); continue;
+      }
+      ui.status('Aligning ' + njobs + ' page pairs with ' + N + ' helper' + (N === 1 ? '' : 's') + ' …', (li + 0.3) / list.length); await frame();
+      var next = 0, stall = 0, last = now(), jobMs = [];
+      var hb = setInterval(function () { var t = now(); stall = Math.max(stall, t - last - 50); last = t; }, 50);
+      var lane = async function (e) {
+        while (!ui.stopped()) {
+          var j = next++; if (j >= jobs.length) return;
+          var t = now();
+          try { await e.reference(jobs[j].a.file); await e.align(jobs[j].b.file, false); row.jobsDone++; jobMs.push(now() - t); }
+          catch (err) {
+            row.failed++; var m = (err && err.message) || String(err);
+            if (row.errors.indexOf(m) < 0) row.errors.push(m);
+            if (/alignment worker (stopped|was closed)/.test(m)) return;       // this helper is gone; the others carry on
+          }
+        }
+      };
+      var tj = now();
+      await Promise.all(engines.map(lane));
+      row.wall_s = (now() - tj) / 1000; row.stall_ms = stall; clearInterval(hb);
+      engines.forEach(function (x) { x.terminate(); });
+      row.jobMed_s = median(jobMs) / 1000; row.perPair_s = row.jobsDone ? row.wall_s / row.jobsDone : 0;
+      row.complete = row.jobsDone === njobs && !row.failed; row.ok = row.jobsDone > 0;
+      if (ui.stopped() && !row.complete) { row.partial = true; res.stopped = true; }
+      parFinish(res); ui.row(res, row);
+      await new Promise(function (r) { setTimeout(r, 400); });              // let the browser give back the memory of the closed helpers
+    }
+    parFinish(res);
+    return res;
+  }
+  function parFinish(res) {              // speed-up against one helper; which number of helpers is enough
+    var base = null, best = 0;
+    res.rows.forEach(function (r) { if (r.n === 1 && r.complete) base = r; });
+    res.rows.forEach(function (r) { r.speed = base && r.complete ? base.wall_s / r.wall_s : null; if (r.speed && r.speed > best) best = r.speed; });
+    res.base = base; res.best = best; res.enough = null;
+    res.rows.forEach(function (r) { if (!res.enough && r.speed && r.speed >= 0.9 * best) res.enough = r; });
+  }
+  function parRowHtml(res, r) {
+    var note = [];
+    if (r.partial) note.push('stopped early');
+    if (r.failed) note.push('<span class="err">' + r.failed + ' of ' + res.jobs + ' jobs failed' + (r.errors.length ? ': ' + esc(r.errors[0]) : '') + '</span>');
+    else if (!r.ok && r.errors.length) note.push('<span class="err">' + esc(r.errors[0]) + '</span>');
+    if (r.stall_ms > 500) note.push('the page was held up for ' + s1(r.stall_ms));
+    return '<tr data-par><td>' + r.n + '</td><td>' + (r.ok ? '<b>' + s1(r.wall_s * 1000) + '</b>' : '–') + '</td><td>' + (r.ok ? s1(r.perPair_s * 1000) : '–') + '</td><td>' +
+      (r.speed ? (r.n === 1 ? '(first)' : '<b>' + r.speed.toFixed(1) + ' times</b>') : '–') + '</td><td>' + (r.ok ? Math.round(r.stall_ms) + ' ms' : '–') + '</td><td>' + note.join('; ') + '</td></tr>';
+  }
+  function parHead() { return '<tr><th>Helpers</th><th>Time for all pairs</th><th>Per pair</th><th>Faster than 1 helper</th><th>Longest delay of the page</th><th></th></tr>'; }
+  function parSummary(res) {
+    var out = [], b = res.base, e = res.enough;
+    out.push('Each helper took one job at a time: it prepared the page of one copy and aligned the same page of another copy onto it, as the background alignment of a whole book would. ' + res.jobs + ' such jobs were done with each number of helpers. This computer reports ' + (res.hw ? res.hw + ' processor threads' : 'an unknown number of processor threads') + '.');
+    if (!b) { out.push('<span class="err">The run with one helper did not finish, so no comparison is possible.</span>'); return out; }
+    out.push('One helper needed <b>' + s1(b.wall_s * 1000) + '</b> for all ' + res.jobs + ' pairs, <b>' + s1(b.perPair_s * 1000) + '</b> per pair.');
+    if (e && e.n > 1) {
+      out.push('<b>' + e.n + ' helpers were ' + e.speed.toFixed(1) + ' times faster</b> (' + s1(e.perPair_s * 1000) + ' per pair)' + (res.best > e.speed * 1.12 ? '; more helpers gained a little more (best: ' + res.best.toFixed(1) + ' times).' : (res.rows.some(function (r) { return r.n > e.n && r.speed; }) ? '; more helpers than that gained almost nothing.' : '.')));
+    } else if (res.best && res.best < 1.15) out.push('More helpers did not make it faster on this computer.');
+    var bad = res.rows.filter(function (r) { return r.failed || (!r.ok && r.errors.length); });
+    if (bad.length) out.push('<span class="err">With ' + bad.map(function (r) { return r.n; }).join(' and ') + ' helpers something went wrong: ' + esc(bad[0].errors[0] || 'unknown problem') + '. This usually means the browser ran out of memory; the number of helpers would have to stay lower.</span>');
+    var worst = res.rows.reduce(function (a, r) { return r.ok && r.stall_ms > (a ? a.stall_ms : -1) ? r : a; }, null);
+    if (worst && worst.stall_ms > 300) out.push('The page itself was held up for up to <b>' + s1(worst.stall_ms) + '</b> with ' + worst.n + ' helpers (it should react at once); a clearly lower number of helpers would keep the screen smooth.');
+    else if (worst) out.push('The page stayed responsive: the longest delay was ' + Math.round(worst.stall_ms) + ' ms.');
+    if (res.plan && res.plan.pairsRef > 0 && e) out.push('Your project has ' + num(res.plan.pairsRef) + ' comparisons against ' + esc(res.plan.ref.name) + '. At about ' + s1(e.perPair_s * 1000) + ' per pair that is ' + dur(e.perPair_s * res.plan.pairsRef) + ', against ' + dur(b.perPair_s * res.plan.pairsRef) + ' with one helper (a rough estimate: it assumes every page needs its own reference, which is the slower case).');
+    return out;
+  }
+  function parText(res) {
+    var L = ['Book Compare speed test: several alignments at the same time, ' + res.when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC', 'Computer: ' + machine(), 'Copies used: ' + res.pool.join(', ') + '. Jobs per run: ' + res.jobs + ' (prepare the page of one copy, align the same page of another copy onto it).', '',
+      'Helpers | load ms | time for all jobs ms | per pair ms | median job ms | faster than 1 helper | longest delay of the page ms | done | failed'];
+    res.rows.forEach(function (r) { L.push(r.n + ' | ' + (r.init_s != null ? Math.round(r.init_s * 1000) : '-') + ' | ' + (r.ok ? Math.round(r.wall_s * 1000) : '-') + ' | ' + (r.ok ? Math.round(r.perPair_s * 1000) : '-') + ' | ' + (r.ok ? Math.round(r.jobMed_s * 1000) : '-') + ' | ' + (r.speed ? r.speed.toFixed(2) : '-') + ' | ' + (r.ok ? Math.round(r.stall_ms) : '-') + ' | ' + r.jobsDone + ' | ' + r.failed + (r.errors.length ? ' (' + r.errors[0] + ')' : '')); });
+    if (res.enough) L.push('Enough helpers (90 % of the best gain): ' + res.enough.n + '; best gain ' + res.best.toFixed(2) + ' times.');
+    if (res.stopped) L.push('(stopped early)');
+    return L.join('\n');
+  }
+  async function startParallel(sc, plan) {
+    busy = true;
+    var d = dlgFrame(sc), stopped = false;
+    d.innerHTML = '<h3>Speed test (several at once) is running …</h3><p id="sp-st">Reading the scans …</p><progress id="sp-pr" max="1" value="0" style="width:100%"></progress>' +
+      '<div class="sp-scroll"><table class="sp-tbl"><thead>' + parHead() + '</thead><tbody id="sp-rows"></tbody></table></div>' +
+      '<p class="note">This takes about five minutes. The computer may feel slow while it runs, and that is what is being measured. Nothing is saved and no scan is changed.</p>' +
+      '<div class="acts"><button class="ws-tb" id="sp-stop">Stop</button></div>';
+    d.querySelector('#sp-stop').onclick = function () { stopped = true; this.disabled = true; this.textContent = 'Stopping …'; };
+    var ui = {
+      stopped: function () { return stopped || !sc.isConnected; },
+      status: function (t, f) { var a = d.querySelector('#sp-st'), b = d.querySelector('#sp-pr'); if (a) a.textContent = t; if (b) b.value = f; },
+      row: function (res, r) { var b = d.querySelector('#sp-rows'); if (b) { b.innerHTML = res.rows.map(function (x) { return parRowHtml(res, x); }).join(''); } }
+    };
+    var res = null, fatal = null, pool = [], skipped = [], items = spread(plan.items, MAX_COPIES);
+    try {
+      pool.push({ name: plan.ref.name, file: await W().speedFile(plan.ref.id, plan.row) });
+      for (var i = 0; i < items.length; i++) {
+        ui.status('Reading the scans … (' + (i + 1) + ' of ' + items.length + ')', 0);
+        try { pool.push({ name: items[i].name, file: await W().speedFile(items[i].id, plan.row) }); } catch (e) { skipped.push(items[i].name); }
+      }
+      if (pool.length < 2) fatal = 'At least two scans have to open for this test. Pick another page or copy and try again.';
+      else if (!window.AlignEngine || !window.AlignEngine.supported()) fatal = 'This browser cannot run the background alignment (it needs Web Workers and OffscreenCanvas).';
+      else res = await runParallel(pool, PAR, ui);
+    } catch (e) { fatal = 'The test stopped because of an unexpected problem: ' + ((e && e.message) || e); }
+    busy = false;
+    if (res) { res.plan = plan; res.skipped = skipped; window.SpeedTest.lastParallel = { result: res, text: parText(res) }; }
+    if (!sc.isConnected) return;                                            // the window was closed meanwhile
+    var h = '<h3>Speed test (several at once): result</h3>';
+    if (fatal) h += '<p class="err" style="min-height:0">' + esc(fatal) + '</p>';
+    else {
+      h += '<p class="note">Computer: ' + esc(machine()) + '. Page tested: ' + esc(plan.rowLabel) + (res.stopped ? '. <b>Stopped early.</b>' : '.') + '</p>';
+      parSummary(res).forEach(function (t) { h += '<p>' + t + '</p>'; });
+      h += '<div class="sp-scroll"><table class="sp-tbl"><thead>' + parHead() + '</thead><tbody>' + res.rows.map(function (x) { return parRowHtml(res, x); }).join('') + '</tbody></table></div>';
+      if (skipped.length) h += '<p class="note">These copies could not be opened and were left out: ' + skipped.map(esc).join(', ') + '.</p>';
+      h += '<details><summary>Show the numbers as plain text</summary><textarea class="sp-text" readonly rows="10"></textarea></details>';
+    }
+    h += '<div class="acts"><button class="ws-tb" id="sp-copy"' + (fatal ? ' disabled' : '') + '>Copy the result</button><button class="ws-tb" id="sp-again">Run again</button><button class="ws-tb primary" data-close>Close</button></div><div class="note" id="sp-msg" role="status"></div>';
+    d.innerHTML = h;
+    var ta = d.querySelector('.sp-text'); if (ta && res) ta.value = parText(res);
+    d.querySelector('#sp-again').onclick = function () { open(); };
+    d.querySelector('#sp-copy').onclick = async function () {
+      var msg = d.querySelector('#sp-msg');
+      try { await navigator.clipboard.writeText(parText(res)); msg.textContent = 'Copied. You can paste it into the chat now.'; }
+      catch (e) {
+        var det = d.querySelector('details'); if (det) det.open = true;
+        if (ta) { ta.focus(); ta.select(); }
+        msg.textContent = 'The browser did not allow copying. The text is selected below: press Ctrl+C.';
+      }
+    };
+  }
+
   /* ---------------------------------------------------------------- dialog */
   function dlgFrame(sc) { var d = sc.querySelector('.ws-dlg'); d.style.width = 'min(780px, 100%)'; return d; }
   var tileCol = false;                 // show the column of the new method (set per test)
@@ -323,14 +471,20 @@
       (window.AlignEngine && window.AlignEngine.supported() ? '<label class="chk"><input type="checkbox" id="sp-tiles" checked> Also measure the new tile-based alignment (it runs in the background; the first time the browser downloads about 13 MB; about 10 seconds more per copy)</label>' : '<p class="note">This browser cannot run the new tile-based alignment (it needs Web Workers and OffscreenCanvas), so only the current alignment is measured.</p>') +
       '<label class="chk"><input type="checkbox" id="sp-types"> Also try the three alignment types on one pair (about 30 seconds more; the thin plate spline is slow)</label>';
     if (plan.locked.length) h += '<p class="err" style="min-height:0">The browser still blocks the scan folder' + (plan.locked.length > 1 ? 's' : '') + ' ' + plan.locked.map(function (x) { return '“' + esc(x) + '”'; }).join(', ') + '. Close this window, click <b>Allow access to scans</b> at the top, and start again.</p>';
-    h += '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="sp-go"' + (plan.locked.length ? ' disabled' : '') + '>Start the test</button></div>';
+    if (window.AlignEngine && window.AlignEngine.supported()) h += '<p class="note"><b>Or:</b> test whether several alignments at the same time are faster. The same page pairs are aligned with 1, 2, 4 and 8 helpers (as many as this computer has processor threads). It takes about five minutes, uses most of the computer while it runs, and replaces the test above.</p>';
+    h += '<div class="acts"><button class="ws-tb" data-close>Cancel</button>' + (window.AlignEngine && window.AlignEngine.supported() ? '<button class="ws-tb" id="sp-par"' + (plan.locked.length ? ' disabled' : '') + '>Several at once …</button>' : '') + '<button class="ws-tb primary" id="sp-go"' + (plan.locked.length ? ' disabled' : '') + '>Start the test</button></div>';
     d.innerHTML = h;
     d.querySelector('#sp-go').onclick = function () { var tl = d.querySelector('#sp-tiles'); start(sc, plan, d.querySelector('#sp-types').checked, !!(tl && tl.checked)); };
+    var pb = d.querySelector('#sp-par'); if (pb) pb.onclick = function () { startParallel(sc, plan); };
   }
 
   window.SpeedTest = {
     init: function (parts) { E = parts; },
     open: open,
-    last: null
+    last: null,
+    lastParallel: null,
+    parallelConfig: PAR,                 // the helpers tried and the number of jobs (a test lowers them)
+    parallel: runParallel,               // (pool = [{name, file}], {helpers, jobs}, ui) and the texts made from its result: used by the tests
+    parallelReport: function (res) { return { text: parText(res), summary: parSummary(res), rows: res.rows.map(function (r) { return parRowHtml(res, r); }) }; }
   };
 })();
