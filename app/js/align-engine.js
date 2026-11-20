@@ -4,6 +4,7 @@
      await engine.init();                    // loads OpenCV.js (about 13 MB, cached by the browser after the first time)
      await engine.reference(file);           // the copy all others are aligned onto
      var r = await engine.align(file, true); // one more copy: times of every step and (measure = true) how well the ink matches
+     var c = await engine.alignColor(file);  // the same, and the copy itself bent onto the reference in colour: c.pixels (RGBA), c.w, c.h
      engine.terminate();
    `file` is a File or Blob with the scan. Nothing is written anywhere. */
 (function () {
@@ -30,6 +31,7 @@
       init: function () { return call('init'); },
       reference: function (file) { return call('reference', { file: file }); },
       align: function (file, measure) { return call('align', { file: file, measure: !!measure }); },
+      alignColor: function (file) { return call('alignColor', { file: file }); },
       terminate: function () { failAll('The alignment worker was closed.'); worker.terminate(); }
     };
   }

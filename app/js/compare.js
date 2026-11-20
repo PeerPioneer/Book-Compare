@@ -182,8 +182,15 @@ class Compare {
     // Loads two scans and aligns the second onto the first. Resolves true when the result is shown, false when `is_current()` says
     // meanwhile that another page was asked for. Rejects if a picture cannot be read or the alignment fails.
     async align_images (urls, names, transform, is_current) {
+        const v = await this.load_images(urls, names);
+        if (is_current && !is_current()) return false;
+        this.result.set_filename_list(names);
+        this.result.process(v[0], v[1], transform || this.current_transform);
+        return true;
+    }
+    // Puts the two scans into the picture elements and waits until both are loaded (listening starts before the new addresses are set).
+    async load_images (urls, names) {
         const v = this.v_image_list.querySelectorAll('img');
-        // wait for the "loaded" signal of both pictures (listening starts before the new addresses are set)
         const loaded = [0, 1].map((i) => new Promise((resolve, reject) => {
             v[i].addEventListener('load', () => resolve(), { once: true });
             v[i].addEventListener('error', () => reject(new Error('a picture could not be read')), { once: true });
@@ -191,10 +198,13 @@ class Compare {
         this.set_image(urls);
         this.set_filename(names);
         await Promise.all(loaded);
-        if (is_current && !is_current()) return false;
+        return v;
+    }
+    // The tile alignment (V3): copy 2 arrives already bent onto copy 1 (ImageData); the pictures must have been loaded with load_images.
+    show_aligned (names, aligned) {
+        const v = this.v_image_list.querySelectorAll('img');
         this.result.set_filename_list(names);
-        this.result.process(v[0], v[1], transform || this.current_transform);
-        return true;
+        this.result.process_aligned(v[0], aligned);
     }
 
     show_compare_screen () {

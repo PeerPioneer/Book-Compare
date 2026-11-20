@@ -319,6 +319,30 @@ class Visualization {
         })
     }
 
+    // The Compare tab's tile alignment (V3): image 2 comes already bent onto image 1, in colour and as big as image 1 (from js/align-worker.js).
+    process_aligned(img1, aligned) {
+        const im1Data = this.getImageData(img1);
+        this.ocanvas.width = im1Data.width;
+        this.ocanvas.height = im1Data.height;
+        this.octx.putImageData(im1Data, 0, 0);
+        this.input_image = this.ocanvas;
+        this.tcanvas.width = this.bcanvas.width = this.canvas.width = im1Data.width;
+        this.tcanvas.height = this.bcanvas.height = this.canvas.height = im1Data.height;
+        if (aligned.width === im1Data.width && aligned.height === im1Data.height) {
+            this.resultData = aligned;
+            this.tctx.putImageData(aligned, 0, 0);
+        } else {                                                // (should not happen: the worker opens the same file; kept safe anyway)
+            const tmp = document.createElement('canvas');
+            tmp.width = aligned.width; tmp.height = aligned.height;
+            tmp.getContext('2d').putImageData(aligned, 0, 0);
+            this.tctx.clearRect(0, 0, im1Data.width, im1Data.height);
+            this.tctx.drawImage(tmp, 0, 0, im1Data.width, im1Data.height);
+            this.resultData = this.tctx.getImageData(0, 0, im1Data.width, im1Data.height);
+        }
+        this.canvas.dispatchEvent(new CustomEvent('transform', { bubbles: true }));
+        window.requestAnimationFrame(() => { this._measure_canvas(); });
+    }
+
     getImageData (img) {
         const { width: cw, height: ch } = this.bcanvas;
         this.bctx.clearRect(0, 0, cw, ch);

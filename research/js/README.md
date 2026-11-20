@@ -52,6 +52,9 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
   (85-99 %), exactly as the list of differences describes (group B sets them much further right).
 * Limits: only one page type so far. The thin white fracture lines of the Concert of Gods woodcut (pair 19) could not be located reliably
   without exact positions; the Folio 19v music table needs the other copies. Thresholds were set after looking at the measured values.
+* Movement map (Compare tab, 20 Nov 2026): `alignCopy(..., { composeMap: true })` also returns `map` (mx, my): for every pixel of the
+  result, where it was taken from after the rough step (all tile levels and moved margin items combined). The worker job `alignColor`
+  uses it to bend the full-size colour scan. `node test_map.js ref.jpg other.jpg` checks that the map reproduces the engine's result.
 * `align_chain.js` holds the whole chain for one pair and is shared by the run and check scripts.
 
 ## How to run
@@ -61,6 +64,7 @@ working height of 3000 px). Time per scan in Node.js: about 2.7 s for the box pl
     node test_rectmorph.js
     node run_printed_area.js scan1.jpg scan2.jpg ...      # prints box and times per scan
     node run_rough.js reference.jpg other.jpg 4 fast       # rough alignment, refinement at a quarter size
+    node test_map.js reference.jpg other.jpg               # the movement map gives the same result as the engine
     node run_full.js reference.jpg other.jpg out/name      # the whole chain, with a picture of the result (reference red, other copy blue, agreement dark)
     node check_known_differences.js "<Example pages folder>" "<Melopoiae folder>"   # the known-differences check (50 checks, about 5 minutes)
 

@@ -113,8 +113,17 @@ def scenario(p, kind):
     assert pg.evaluate("document.getElementById('ct_c1').selectedOptions[0].text") == 'A-Test' and pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
     labs = labels(pg); assert any('A-Test' in l for l in labs) and any('B-Test' in l for l in labs), labs
     assert pg.evaluate("document.querySelector('#result canvas').width") > 100, 'the superimposed picture should be drawn'
+    # the tile alignment (V3) is the default: it runs in the background helper and sends copy 2 back bent onto copy 1, as big as copy 1
+    assert pg.evaluate("document.getElementById('ct_tf').value") == 'tiles', 'Tiles should be the default alignment'
+    t = pg.evaluate("CompareTab.lastTiles()"); assert t and t['w'] > 100 and t['unmatched_tiles'] is not None, t
+    assert pg.evaluate("document.querySelector('#result canvas').width") == t['w'], 'the result is as big as copy 1'
     # next page by the button, then by the key, then back
     pg.click('#ct_next'); wait_aligned(pg, 'next page'); assert 'Page 2' in where(pg), where(pg)
+    t = pg.evaluate("CompareTab.lastTiles()"); assert t['unmatched_tiles'] <= t['unmatched_rough'] + 0.01, ('music page: the tiles do not make it worse', t)
+    # an older type still works, and back to Tiles
+    pg.select_option('#ct_tf', 'perspective'); wait_aligned(pg, 'perspective')
+    assert pg.evaluate("document.querySelector('#result canvas').width") > 100
+    pg.select_option('#ct_tf', 'tiles'); wait_aligned(pg, 'tiles again')
     pg.click('#ct_c1'); pg.keyboard.press('Escape'); pg.locator('body').click(position={'x': 700, 'y': 450}) if False else None
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     pg.keyboard.press('PageDown'); wait_aligned(pg, 'key page down'); assert 'Page 3' in where(pg), where(pg)

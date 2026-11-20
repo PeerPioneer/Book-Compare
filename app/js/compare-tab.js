@@ -16,8 +16,10 @@
    - the book map: a thin strip at the bottom edge that opens when the pointer comes near; one tick per page of the book (grey = a copy lacks
      the page, colour = flag), a mark for the page on screen, a click jumps there, and a small picture of the page appears while you hover.
 
-   It never reads or writes a scan file itself: the workspace (js/workspace.js) hands it two pictures through BookWorkspace.tab,
-   and the usual alignment code of the app (js/viz.js) does the work. The two-image screens that start from the first page of the
+   It never reads or writes a scan file itself: the workspace (js/workspace.js) hands it two pictures through BookWorkspace.tab.
+   The alignment (V3, 20 Nov 2026): by default Book Compare's own tile alignment (printed area, rough step, tiles, items in the margin), which runs
+   in a background helper (js/align-engine.js + js/align-worker.js) and sends back copy 2 already bent onto copy 1, in colour and at full size;
+   the three older types (Perspective, Affine, Thin Plate Spline) remain in the menu and use the usual alignment code of the app (js/viz.js). The two-image screens that start from the first page of the
    app are not changed by this file. */
 (function () {
   'use strict';
@@ -25,7 +27,7 @@
   var E = null;                         // pieces of the base app: { compare, result, action_bar, go_to_screen }
   var ui = null;                        // our own elements
   var st = {
-    on: false, token: 0, timer: 0, skip: true, q: '', side: true, transform: 'perspective',
+    on: false, token: 0, timer: 0, skip: true, q: '', side: true, transform: (window.AlignEngine && AlignEngine.supported()) ? 'tiles' : 'perspective',
     shown: null,                        // which pair and row the pictures on screen belong to
     stale: false,
     focus: false,                       // focus mode: only the pictures are shown
@@ -33,7 +35,8 @@
     filter: 'all', fcol: null,          // page list: all pages / flagged pages, and one flag colour only
     pin: false                          // the book map stays open
   };
-  var TRANSFORMS = [['perspective', 'Perspective'], ['affine', 'Affine'], ['tps', 'Thin Plate Spline']];
+  var TRANSFORMS = [['perspective', 'Perspective (older)'], ['affine', 'Affine (older)'], ['tps', 'Thin Plate Spline (older)']];
+  if (window.AlignEngine && AlignEngine.supported()) TRANSFORMS.unshift(['tiles', 'Tiles (recommended)']);
 
   function W() { return window.BookWorkspace.tab; }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
@@ -65,7 +68,7 @@
       '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2" aria-label="Previous copy">&#9650;</button>' +
       '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2" aria-label="Next copy">&#9660;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
       '</div>' +
-      '<label class="ct-align"><span>Alignment</span><select id="ct_tf" title="How the second page is bent onto the first. Perspective is a good start.">' +
+      '<label class="ct-align"><span>Alignment</span><select id="ct_tf" title="How the second page is bent onto the first. Tiles is the alignment made for printed pages (best in most cases); the older types bend the whole page at once.">' +
       TRANSFORMS.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('') + '</select></label>' +
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
@@ -505,6 +508,39 @@
 
   /* ---------------------------------------------------------------- aligning */
   function schedule(ms) { clearTimeout(st.timer); st.timer = setTimeout(align, ms); }
+  // The background helper for the tile alignment. One job at a time (a job that is no longer wanted when its turn comes is skipped);
+  // the reference page (copy 1) is kept, so changing copy 2 does not prepare it again. A helper that failed, or has done many pages,
+  // is replaced: OpenCV.js keeps some memory after a failed step (A5), and a fresh helper gives all of it back.
+  var eng = null, chain = Promise.resolve(), MAX_JOBS = 40;
+  function serial(fn) { var p = chain.then(fn, fn); chain = p.catch(function () { }); return p; }
+  function dropEngine() { if (eng) { try { eng.e.terminate(); } catch (x) { /* ignore */ } } eng = null; }
+  async function tileJob(d, my) {
+    if (my !== st.token) { d.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (x) { /* ignore */ } }); return null; }   // no longer wanted: let the pictures go
+    if (eng && eng.jobs >= MAX_JOBS) dropEngine();
+    if (!eng) eng = { e: AlignEngine.create(), ref: null, jobs: 0, ready: false };
+    var g = eng, loading = E.compare.load_images(d.urls, d.names);
+    loading.catch(function () { });
+    try {
+      if (!g.ready) { setBusy('Starting the alignment helper … (the first time, the browser loads about 13 MB)'); await g.e.init(); g.ready = true; }
+      if (my !== st.token) return null;
+      if (g.ref !== d.key) {
+        setBusy('Preparing copy 1 (finding the printed area) …');
+        g.ref = null; await g.e.reference(d.files[0]); g.ref = d.key;
+      }
+      if (my !== st.token) return null;
+      setBusy('Aligning copy 2 onto copy 1 … (rough position, then the fine alignment in tiles; a few seconds)');
+      g.jobs++;
+      var r = await g.e.alignColor(d.files[1]);
+      await loading;
+      if (my !== st.token) return null;
+      E.compare.show_aligned(d.names, new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h));
+      r.pixels = null;
+      return r;
+    } catch (e) {
+      if (eng === g) dropEngine();
+      throw e;
+    }
+  }
   async function align(first) {
     var my = ++st.token, s = W().state();
     if (!s.pair[0] || !s.pair[1]) { setBusy('Choose two copies to compare.', true); return; }
@@ -517,19 +553,25 @@
     setBusy('Aligning the two pages … this can take a few seconds.');
     await frames(2);
     if (my !== st.token) return;
-    var done = false;
+    var done = false, tiles = st.transform === 'tiles' && d.files, info = null;
     window.BC_COPY_NAMES = [copyName(0), copyName(1)];                                       // the colour note of the Difference view names the copies (js/panes.js)
-    try { done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; }); }
+    try {
+      if (tiles) { info = await serial(function () { return tileJob(d, my); }); done = !!info; }
+      else done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; });
+    }
     catch (e) {
       if (my === st.token) setBusy('Book Compare could not align these two pages (' + ((e && e.message) || e) + '). Try another alignment (left panel) or another page.', true,
-        [['Try Affine', function () { ui.tf.value = 'affine'; ui.tf.onchange(); }], ['Go to the pages', toPages]]);
+        tiles ? [['Try Perspective', function () { ui.tf.value = 'perspective'; ui.tf.onchange(); }], ['Go to the pages', toPages]]
+          : [['Try Affine', function () { ui.tf.value = 'affine'; ui.tf.onchange(); }], ['Go to the pages', toPages]]);
       return;
     }
     if (!done || my !== st.token) return;
+    st.lastTiles = info;                                                                     // (for the tests and for the movement map later: unmatched ink, near-empty page)
     st.shown = key(s); st.shownRow = s.row; st.shownPair = s.pair.slice();
     E.compare.back_btn.onclick = toPages;                                                    // "Back" in the teal bar returns to the pages
     labelPanels(s);
     clearStale(); setBusy(null);
+    if (info && info.sparse) note('This page has almost no ink: only the whole-page alignment was used, without the fine alignment in tiles.');
     if (window.CompareAnnot) CompareAnnot.refresh();
   }
   // the panels say which copy and page they show (the file names stay the names of the exported files)
@@ -575,6 +617,7 @@
     leave: toPages,
     isOpen: function () { return st.on; },
     inFocus: function () { return st.on && st.focus; },
-    transform: function () { return st.transform; }                                          // the alignment type chosen in the left panel (the speed test uses it)
+    transform: function () { return st.transform === 'tiles' ? 'perspective' : st.transform; },   // the OLDER alignment type to time in the speed test (it measures the tiles separately)
+    lastTiles: function () { return st.lastTiles || null; }                                  // what the tile alignment of the picture on screen reported (tests)
   };
 })();

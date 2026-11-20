@@ -114,7 +114,26 @@ function denseField(cv, cx, cy, S, rows, cols, W, H) {
   return out;
 }
 
-/* bend `mov` onto `ref` (ink maps of the same size, already roughly aligned). box = [x0, x1, y0, y1]. Returns a new Mat. */
+/* The whole movement as ONE map (Compare tab, V3): map.mx / map.my (CV_32F, size of the reference) say, for every pixel of the result, where it was
+   taken from in the picture before the tile step. Each level takes the result of the level before at x + f(x), so the map is the old map read at
+   that place: new(x) = old(x + f(x)). Pixels taken from outside the picture get a far-away place (they stay empty, as in the ink map). */
+const OUTSIDE = -1e6;
+function composeMap(cv, map, mapx, mapy) {
+  const nx = new cv.Mat(), ny = new cv.Mat();
+  try {
+    cv.remap(map.mx, nx, mapx, mapy, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(OUTSIDE));
+    cv.remap(map.my, ny, mapx, mapy, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(OUTSIDE));
+  } catch (e) { nx.delete(); ny.delete(); throw e; }
+  map.mx.delete(); map.my.delete(); map.mx = nx; map.my = ny;
+}
+function identityMap(cv, W, H) {
+  const mx = new cv.Mat(H, W, cv.CV_32F), my = new cv.Mat(H, W, cv.CV_32F), a = mx.data32F, b = my.data32F;
+  for (let y = 0, p = 0; y < H; y++) for (let x = 0; x < W; x++, p++) { a[p] = x; b[p] = y; }
+  return { mx, my };
+}
+
+/* bend `mov` onto `ref` (ink maps of the same size, already roughly aligned). box = [x0, x1, y0, y1]. Returns a new Mat.
+   opts.map (optional): a map from identityMap(), brought up to date with every level (see composeMap). */
 function tileAlign(cv, ref, mov, box, opts = {}) {
   const envLevels = (typeof process !== 'undefined' && process.env && process.env.BC_LEVELS) ? LEVELS.slice(0, +process.env.BC_LEVELS) : null;   // research only: use just the first N levels (a stiffer alignment)
   const levels = opts.levels || envLevels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
@@ -135,6 +154,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
     { const mx = mapx.data32F, my = mapy.data32F; for (let y = 0, p = 0; y < H; y++) for (let x = 0; x < W; x++, p++) { mx[p] = x + fx[p]; my[p] = y + fy[p]; } }
     const next = S.add(new cv.Mat());
     cv.remap(cur, next, mapx, mapy, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(0));
+    if (opts.map) composeMap(cv, opts.map, mapx, mapy);
     mapx.delete(); mapy.delete();
     if (cur !== mov) cur.delete();
     cur = next;
@@ -193,8 +213,13 @@ function alignMarginItems(cv, ref, aligned, box, opts = {}) {
     const patches = jobs.map(j => { const p = new Float32Array(j.tw * j.th); for (let r = 0; r < j.th; r++) p.set(ad.subarray((j.ty + j.dy + r) * W + j.tx + j.dx, (j.ty + j.dy + r) * W + j.tx + j.dx + j.tw), r * j.tw); return p; });
     for (const j of jobs) for (let r = 0; r < j.th; r++) od.fill(0, (j.ty + j.dy + r) * W + j.tx + j.dx, (j.ty + j.dy + r) * W + j.tx + j.dx + j.tw);
     jobs.forEach((j, n) => { for (let r = 0; r < j.th; r++) od.set(patches[n].subarray(r * j.tw, (r + 1) * j.tw), (j.ty + r) * W + j.tx); moved.push({ x: j.tx, y: j.ty, w: j.tw, h: j.th, dx: j.dx, dy: j.dy, corr: j.corr }); });
+    if (opts.map) for (const m of [opts.map.mx.data32F, opts.map.my.data32F]) {             // the same moves in the movement map (Compare tab)
+      const ps = jobs.map(j => { const p = new Float32Array(j.tw * j.th); for (let r = 0; r < j.th; r++) p.set(m.subarray((j.ty + j.dy + r) * W + j.tx + j.dx, (j.ty + j.dy + r) * W + j.tx + j.dx + j.tw), r * j.tw); return p; });
+      for (const j of jobs) for (let r = 0; r < j.th; r++) m.fill(OUTSIDE, (j.ty + j.dy + r) * W + j.tx + j.dx, (j.ty + j.dy + r) * W + j.tx + j.dx + j.tw);
+      jobs.forEach((j, n) => { for (let r = 0; r < j.th; r++) m.set(ps[n].subarray(r * j.tw, (r + 1) * j.tw), (j.ty + r) * W + j.tx); });
+    }
     return { aligned: S.release(out), moved, seen };
   } finally { S.free(); }
 }
 
-module.exports = { tileAlign, alignMarginItems, LEVELS };
+module.exports = { tileAlign, alignMarginItems, identityMap, LEVELS, OUTSIDE };

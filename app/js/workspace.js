@@ -1336,7 +1336,7 @@
     var f1, f2;
     try { f1 = await getScan(a, a.cells[r]); f2 = await getScan(b, b.cells[r]); }
     catch (e) { if (HELPER && e && e.name === 'Lost') throw refusal(e.message); throw refusal(e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e)); }
-    return { urls: [URL.createObjectURL(f1), URL.createObjectURL(f2)], names: [f1.name, f2.name] };
+    return { urls: [URL.createObjectURL(f1), URL.createObjectURL(f2)], names: [f1.name, f2.name], files: [f1, f2], key: a.id + '#' + a.cells[r] };
   }
   // COMPARE in the Pages view: check that the two scans can be read (errors stay here as a message), then open the Compare tab.
   async function compareNow() {

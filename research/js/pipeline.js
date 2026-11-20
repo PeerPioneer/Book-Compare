@@ -3,7 +3,7 @@
    Input: the red channel of a scan scaled to 3000 px height as a 32-bit float Mat (see printed_area.js: redScaled). */
 const { inkMap, printedBox, extendBoxByStaves, scope } = require('./printed_area');
 const { roughAlign, warp } = require('./rough_align');
-const { tileAlign, alignMarginItems } = require('./tile_align');
+const { tileAlign, alignMarginItems, identityMap } = require('./tile_align');
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -90,20 +90,23 @@ function alignCopyIn(cv, refState, red, opts, S) {
   const everything = [0, 0, w, h], density = Math.min(inkIn(ref, everything), inkIn(rough, everything)) / (w * h), sparse = density < NEAR_EMPTY;
   t = now();
   let aligned, stats = [], field = null;
+  const map = opts.composeMap ? identityMap(cv, w, h) : null;                 // Compare tab (V3): the whole tile movement as one map, see tile_align.js
+  const mapHolder = map ? S.add({ delete() { map.mx.delete(); map.my.delete(); } }) : null;     // (the two Mats are replaced level by level: this frees whichever are current)
   if (sparse) { aligned = rough.clone(); S.add(aligned); }
-  else ({ aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField, levels: opts.levels }));
+  else ({ aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField, levels: opts.levels, map }));
   S.add(aligned);
   let margin = null;
   if (!sparse && !opts.noMargin && !(typeof process !== 'undefined' && process.env && process.env.BC_NOMARGIN === '1')) {      // A2: headline, folio number, signature, catchword
-    const m = alignMarginItems(cv, ref, aligned, box); aligned.delete(); aligned = S.add(m.aligned); margin = { moved: m.moved, seen: m.seen };
+    const m = alignMarginItems(cv, ref, aligned, box, { map }); aligned.delete(); aligned = S.add(m.aligned); margin = { moved: m.moved, seen: m.seen };
   }
   tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
   mov.delete();
-  const out = { field, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
+  const out = { field, map, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
   if (opts.measure) out.unmatched = { rough: unmatchedShare(cv, ref, rough, box).share, tiles: unmatchedShare(cv, ref, aligned, box).share };
   if (!opts.keepRough) { rough.delete(); out.rough = null; }
   S.release(aligned); if (out.rough) S.release(rough);                          // handed to the caller, who deletes them
+  if (mapHolder) S.release(mapHolder);
   return out;
 }
 
