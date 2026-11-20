@@ -208,7 +208,14 @@ A-Wn, D-Mbs, SK-Mmf split page `00006_R.jpg`, D-Tu `10014.jpg`); scans on his in
   (`Dissertation_Verlag.pdf`, p. 197). The rough step needed 9.5 s instead of 2–3 s, most likely because its
   refinement (ECC, up to 300 rounds per stage) does not settle when the pages disagree. The result is right:
   15.9 % unmatched ink after the tiles, against 0.2–2.0 % for the others, i.e. the differences stay visible.
-  → proposed engine fix A7 (§10).
+  → engine fix A7 (done 20 Nov, next bullet).
+- **A7 done (20 Nov, `research/js/rough_align.js`, worker rebuilt):** the refinement of the rough step now stops a round
+  when it improves the match by less than 0.0001 (it was 0.000001). Before, it ran about 60 rounds of 55 ms in each of the
+  three whole-page stages when the pages disagree. On Claude's computer (not his PC): F-Pm rough step 11.1 s → 4.4 s,
+  D-Rs 7.6 s → 4.4 s, A-Wn 3.5 s → 2.2 s; unmatched ink after the tiles the same or slightly better (F-Pm 16.0 → 14.9 %,
+  D-Rs 21.5 → 21.5 %, others unchanged). The stop is a count of rounds, not a clock, so the result is the same on every
+  computer. All earlier checks give the same result (`check_known_differences.js`, 8 cases; the values moved by at most
+  0.2 percentage points). To be confirmed on his PC in the next speed test (expected: F-Pm about 7–8 s in total).
 - Opening a scan is fast on this PC: under 1.3 s even for the 37-megapixel split SK-Mmf page (the
   unsplit 70-megapixel double page could not be opened in the earlier test on Claude's computer).
 - Today's alignment: 2.1–3.5 s per pair, but the page freezes for up to 3 s each time.
@@ -617,7 +624,7 @@ What the tests showed, across Liber, Melopoiae, printed-area set (116 scans), pa
 
 Plan (IDs used in the register, §11):
 - **A — alignment engine** (A1 box extended over sparse staves; A2 align a margin around the box; A3 near-empty page → rough
-  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs; **proposed 18 Nov:** A6 ink choice dark / red / both; **proposed 20 Nov:** A7 cap the time of the rough step when the two pages disagree — F-Pm f.4r took 9.5 s instead of 2–3 s, §4.5). Each must keep every
+  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs; **proposed 18 Nov:** A6 ink choice dark / red / both; **A7 done 20 Nov:** the rough step stops refining sooner when the two pages disagree — F-Pm f.4r took 9.5 s instead of 2–3 s, §4.5). Each must keep every
   check that passes today. **Done only AFTER the tests D (owner, 17 Nov: the tests may change A).**
 - **B — what the user sees, version 1**: B1 box visible and correctable (see V2b); B2 **small shifted-page warning** (owner: version 1):
   when a page matches badly, compare with the copy's neighbouring pages and, if one fits clearly better, suggest moving the column
@@ -854,7 +861,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a decide framework (Electron vs Tauri) — see D3; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
 | V6 | Website, kept current automatically | done (live) | — |
 | V7 | **Reference copy** (§4.7): proposal from measurable criteria, user confirms, stand-in per page, never switches by itself, old results kept until new ones are ready | **open** — design confirmed in prose only; not built; needs owner confirmation of the last point | V7a scoring of copies; V7b UI to confirm/choose; V7c per-page stand-in; V7d "better copy found" hint with cost |
-| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3; idea 20 Nov: several pages at once in parallel on PCs with many processor threads (owner's PC: 8), to be measured (§4.5) |
+| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3; idea 20 Nov: several pages at once in parallel on PCs with many processor threads (owner's PC: 8), to be measured (§4.5). Design to test: a work queue with a few helper workers; when one pair is finished the next pair starts, so no worker waits. Limits: memory per worker, 8 threads are probably 4 real cores, and the screen needs some capacity |
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | **measured 20 Nov on his PC: median 6.1 s, 8 of 9 copies under 10 s**; F-Pm 13 s on a re-set page (rough step) → A7 (§4.5) | — |
@@ -924,7 +931,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 
 1. Tests D1–D5 with the extra measurements (a)–(c) (§10) — research only, on Sonnet.
 2. Speed test on his PC (V11/T2) — **done 20 Nov**.
-3. Engine fixes A1–A5 (and A7 if approved), checked against every earlier check.
+3. Engine fixes A1–A5, checked against every earlier check (A7 done 20 Nov).
 4. Desktop program (V5), starting with D3.
 5. Compare tab uses the new alignment (V2a, V3) with box correction (V2b), tile settings (V15), shifted-page warning (V18), movement map (V16).
 6. Reference copy (V7, D1), then background alignment, progress bar and stored results (V8–V10).

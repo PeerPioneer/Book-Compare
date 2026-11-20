@@ -261,13 +261,20 @@ function localCorrelation(cv, a, b, s) {
   return out;
 }
 
+/* A7 (20 Nov 2026): stop a refinement round when it improves the match (the correlation coefficient) by less than ECC_EPS.
+   It used to be 1e-6. On two copies whose page is set differently from the reference (F-Pm, D-Rs on Liber f.4r) the refinement then
+   ran for about 60 rounds of 55 ms in each of the three whole-page stages (8-9 s); with 1e-4 the rough step takes 4-5 s and the
+   result is the same or slightly better (unmatched ink after the tiles: F-Pm 16.0 -> 14.9 %, D-Rs 21.5 -> 21.5 %, A-Wn, D-ARk unchanged).
+   A count of rounds (not a clock) is used on purpose, so that the result is the same on every computer. */
+const ECC_EPS = 1e-4;
+
 /* ECC refinement in several stages [(sigma, iterations), ...]; returns [W, cc] (cc = -1 on failure) */
 function ecc(cv, ref, mov, W, mask, stages, w, h) {
   let cc = -1;
   for (const [sigma, iterations] of stages) {
     const warped = warp(cv, mov, W, w, h), br = gauss(cv, ref, sigma), bw = gauss(cv, warped, sigma);
     const C = cv.Mat.eye(2, 3, cv.CV_32F);
-    const crit = new cv.TermCriteria(cv.TermCriteria_EPS | cv.TermCriteria_COUNT, iterations, 1e-6);
+    const crit = new cv.TermCriteria(cv.TermCriteria_EPS | cv.TermCriteria_COUNT, iterations, ECC_EPS);
     let ok = true;
     try { cc = cv.findTransformECC(br, bw, C, cv.MOTION_AFFINE, crit, mask, 5); }
     catch (e) { ok = false; }
