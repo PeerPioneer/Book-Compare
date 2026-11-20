@@ -221,7 +221,27 @@ A-Wn, D-Mbs, SK-Mmf split page `00006_R.jpg`, D-Tu `10014.jpg`); scans on his in
 - Today's alignment: 2.1–3.5 s per pair, but the page freezes for up to 3 s each time.
 - What it means for a whole book, one worker: one copy of the Liber (544 pages) about 55 minutes;
   all 19 against copy 1 about 17 hours. The PC has 8 threads and one copy uses one, so several copies at
-  once (V8) could cut this several times; to be measured (memory).
+  once (V8) could cut this several times; **measured 20 Nov (T2b): about 3.5 times with 4 helpers, 4.2 times with 8** (below).
+- **Several at once, measured on the owner's PC (20 Nov 2026, T2b; Edge 157, 8 threads, 10 copies of f.4r, 16 jobs per run, each job =
+  prepare the page of one copy + align the same page of another copy onto it, helpers take the next job from a waiting line):**
+
+  | Helpers | all 16 jobs | per pair | faster than 1 | median job | longest delay of the page |
+  |---|---|---|---|---|---|
+  | 1 | 134.8 s | 8.4 s | 1.0 × | 8.5 s | 18 ms |
+  | 2 | 69.5 s | 4.3 s | 1.94 × | 8.7 s | 14 ms |
+  | 4 | 38.1 s | 2.4 s | 3.54 × | 9.3 s | 24 ms |
+  | 8 | 32.0 s | 2.0 s | 4.21 × | 15.6 s | 15 ms |
+
+  Nothing failed (no memory problem up to 8 helpers with scans up to 37 MP); the page never stood still (longest delay 24 ms); loading
+  8 helpers took 0.8 s. 1 → 2 → 4 helpers scales almost perfectly (1.94 ×, 3.54 ×); from 4 to 8 only 19 % more, and each single job
+  takes 1.8 times as long (8.5 → 15.6 s): the 8 threads are most likely 4 real cores with 2 threads each, so the last 4 helpers
+  mostly wait for each other. **Decision for V8: default number of helpers = half the processor threads (4 here), at least 1, at most
+  the number of threads minus 2; an "all threads" choice may be offered for an overnight run (4.2 × instead of 3.5 ×); the rest of the
+  PC stays free for other work.** Not measured: scans over 37 MP (the unsplit 70 MP double pages), memory use in the browser, the
+  gain when one reference page is reused for several copies (should be better than here, where every job prepares its own reference).
+  Rough estimates for the Liber (544 pages): one copy against one other copy (every job prepares its own reference) 76 minutes with
+  one helper, about 21 minutes with 4; all 19 copies against copy 1 (the reference page is prepared once and reused for the copies of
+  that page, so about 6.1 s per pair): 17 hours with one helper, about 5 hours with 4 (4.2 hours with 8).
 
 ### 4.6 How the computing is organised — decided
 
@@ -861,7 +881,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a decide framework (Electron vs Tauri) — see D3; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
 | V6 | Website, kept current automatically | done (live) | — |
 | V7 | **Reference copy** (§4.7): proposal from measurable criteria, user confirms, stand-in per page, never switches by itself, old results kept until new ones are ready | **open** — design confirmed in prose only; not built; needs owner confirmation of the last point | V7a scoring of copies; V7b UI to confirm/choose; V7c per-page stand-in; V7d "better copy found" hint with cost |
-| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3; idea 20 Nov: several pages at once in parallel on PCs with many processor threads (owner's PC: 8), to be measured (§4.5). Design to test (built as test T2b, 20 Nov): a work queue with a few helper workers; when one pair is finished the next pair starts, so no worker waits. Limits: memory per worker, 8 threads are probably 4 real cores, and the screen needs some capacity |
+| V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3; **measured 20 Nov (T2b, §4.5): a work queue with several helper workers works; 4 helpers 3.5 × faster, 8 helpers only 4.2 ×.** Design: when one pair is finished the next pair starts, so no worker waits; default helpers = half the processor threads, an "all threads" choice for overnight runs; each helper keeps its last reference page so jobs are ordered page by page; limits still to watch: memory with very large scans, the screen needs some capacity |
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
 | V11 | Speed target: not-yet-aligned page pair ready in < 10 s on an ordinary PC | **measured 20 Nov on his PC: median 6.1 s, 8 of 9 copies under 10 s**; F-Pm 13 s on a re-set page (rough step) → A7 (§4.5) | — |
@@ -911,7 +931,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 |----|------|--------|
 | T1 | Split double-page copies (CZ-Pu, D-SHk, GB-Lbl1, SK-Mmf) with `Split-double-pages.jsx` into a *different* folder (never into the protected scan folders) | **done 16 Nov** (owner): all split; the single-page folders are now sub-folders of the original copy folders. Paths for the B copies of f.8r/8v still to be looked up |
 | T2 | Run the speed test on his PC and paste the text | **done 20 Nov** (results in §4.5) |
-| T2b | **Several alignments at the same time** (built 20 Nov: speed-test window, button "Several at once …"): the same 16 jobs (prepare the page of one copy, align the same page of another copy onto it) with 1, 2, 4 and 8 helpers from a waiting line; shows the time per number of helpers, the gain against one helper and the longest delay of the page. The owner runs it on his PC and pastes the text; result decides how many helpers V8 uses | **run by the owner next** |
+| T2b | **Several alignments at the same time** (built 20 Nov: speed-test window, button "Several at once …"): the same 16 jobs (prepare the page of one copy, align the same page of another copy onto it) with 1, 2, 4 and 8 helpers from a waiting line; shows the time per number of helpers, the gain against one helper and the longest delay of the page. The owner runs it on his PC and pastes the text; result decides how many helpers V8 uses | **done 20 Nov** (results in §4.5): 4 helpers 3.5 ×, 8 helpers 4.2 ×; default for V8 = half the threads |
 | T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
 | T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |
 | T5 | CZ-Pu split run with v1.0 (15 Nov): 163 double pages split, then every file from NK4288 to NK4405 failed with "Cannot open the file because the open options are incorrect" (112 files); NK4406 (a single page) opened fine. Cause unknown: the D: drive was no longer reachable when I tried to inspect the files. To do: inspect NK4287/NK4288 (format, colour mode, profile), then make the script robust | his drive; then me |
