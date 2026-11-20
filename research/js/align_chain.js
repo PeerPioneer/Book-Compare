@@ -28,7 +28,7 @@ function alignPair(cv, refPath, movPath, refCache, opts = {}) {
   t = T();
   const rm = loadRed(cv, movPath); tm.decode_s = (T() - t) / 1000;
   const r = alignCopy(cv, cache.state, rm, { keepRough: true, trackField: opts.trackField }); rm.delete(); Object.assign(tm, r.times);
-  return { field: r.field, ref: cache.state.ref, rough: r.rough, aligned: r.aligned, box: cache.state.box, tbox: r.tbox, W: r.W, stats: r.stats, times: tm, cache };
+  return { field: r.field, ref: cache.state.ref, rough: r.rough, aligned: r.aligned, box: cache.state.box, tbox: r.tbox, W: r.W, stats: r.stats, times: tm, cache, sparse: r.sparse, density: r.density, margin: r.margin };
 }
 
 function overlayJpeg(cv, ref, aligned, path, scale = 0.3, crop = null) {

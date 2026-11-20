@@ -216,6 +216,38 @@ A-Wn, D-Mbs, SK-Mmf split page `00006_R.jpg`, D-Tu `10014.jpg`); scans on his in
   D-Rs 21.5 → 21.5 %, others unchanged). The stop is a count of rounds, not a clock, so the result is the same on every
   computer. All earlier checks give the same result (`check_known_differences.js`, 8 cases; the values moved by at most
   0.2 percentage points). To be confirmed on his PC in the next speed test (expected: F-Pm about 7–8 s in total).
+- **A1–A5 done (20 Nov 2026, `research/js`, worker rebuilt, service worker v22).** Each was tested against every earlier check (11 cases and 95 assertions now, 77 earlier assertions
+  unchanged; the values moved by at most 0.2 points) and against its own new check.
+  - **A5 memory:** every step that makes Mats now frees them also when it fails (a list of Mats, `scope`, in `printed_area.js`; `test_memory.js`). Six failing
+    pages ("box too small") grew the WebAssembly memory by 405 MB before, 0 MB now; normal pages 0 MB as before. **Limit found: OpenCV.js itself loses about
+    17 MB inside every FAILED call of its ECC step** (C++ exceptions do not clean up there), which our code cannot free. So V8 must restart a helper that has grown
+    too large (for example above 1.5 GB) and not rely on freeing alone.
+  - **A4 border-safe box:** second candidate box = same procedure with the outer 5 % of the picture ignored; taken when the standard box touches two or more scan
+    edges or holds 8 % less ink than the second one (the standard box cuts through print). Where the standard box is right nothing changes (every other scan measured: boxes
+    equal or a few pixels apart; Antiphonarium, Opusculum p.20, Liber f.4r/f.8 stay). Opusculum B-Br: the standard box was a fragment on 30 of 79 pages and the whole scan on
+    28; now 13 of 13 test pages get a sensible box (36–66 % of the page), and the seven pages tried against D-Mbs (p.9, 11, 14, 19, 22, 29, 56) give 0.8–1.5 % unmatched ink
+    (before: "box too small" or 30–90 %). A lowest-threshold lesson: 25 % more ink was too strict (p.16 lost its heading and first system at 14 %), 8 % works.
+    The Munich counterpart of the Antiphonarium page is not staged, so that pair was not rerun; its box is identical with and without the new rule (so 0.6 % stays).
+  - **A1 sparse staves:** the box is stretched over staff systems that hang on it. The first version (every row of the page with a long line) reached the dark page edge and
+    made Liber f.8 D-ARk against US-CA worse (1.1 % → 9.8 %); the version adopted counts only thin rows (a run thicker than 12 px is a dark band, not a staff line) and follows
+    them only while the next one is within 3 % of the height. It leaves the Antiphonarium box as it is (the old `STAFFBOX=1` made it worse, 0.6 → 12.4 %). On Canti C / Odhecaton
+    pages it changes little (one of nine pages tried), which is cautious on purpose; **Canti C B4r (half-page box) is solved by A4**, not by this.
+  - **A3 near-empty page:** if the ink is below 2 % of the whole picture, in the reference or in the other copy, only the rough alignment is used and the result says
+    so (`sparse`, `ink_density`). Real pages: 4–15 % (the emptiest, Canti C p.7, 1 %); a test page with one strip left: 0.5 %. The share is taken over the picture, not the box,
+    because the box shrinks around whatever is left. **Odhecaton F8r (Paris 097 against New York 095; two pages off, as noted) is NOT near-empty by ink (it has full staves, 9.6 % of
+    the picture) and is not caught:** the box is right now (no more "box too small"), rough alignment leaves 30.7 % unmatched, tiles 5.8 %, movement median 7.7 px, 48 % over 8 px
+    (a normal pair: 0.9–2.4 %, 1.6–3.9 px, 1–14 %). The number of matched tiles (98 %) does not tell it apart either. So F8r stays a case for the shifted-page / movement-map
+    items (B2, B4), not for A3.
+  - **A2 items in the margin:** a step after the tiles finds every ink blob outside the box (not within 60 px of the scan edge, not a speck, never touching the box) in the other copy
+    within ±60 px by template matching (correlation at least 0.5) and moves that patch onto its place; an item that is not found stays (a real difference). A wider tile ring alone did not help
+    (the signature is too small for the tiles: 98 % unmatched at ring 2, 6, 12 and 25 %). Odhecaton H1r signature (lower right of the page, outside the box), Paris against New York / Washington:
+    100 % / 98 % unmatched before, 26 % / 28 % now (the letter differs a little between copies). Seven margin items were looked at on that page, one moved (34, −50 px).
+  - **New checks in `check_known_differences.js`:** case 9 (13 assertions: the box of 11 Opusculum B-Br pages, Antiphonarium, Liber f.4r D-FUl), case 10 (near-empty page, 2), case 11 (H1r
+    signature, 2). `align_chain.alignPair` now also returns `sparse`, `density`, `margin`; the worker returns `box_which`, `box_why`, `sparse`, `ink_density`.
+  - **Found on the way, not fixed:** (1) a mismatched pair (Paris 097 against New York 097, a different page) needed 97 s for the rough step, because ECC runs to its limit when the
+    pages share nothing; a cap on rounds when the first stage correlates badly is the next speed item (call it **A8**; matters for V8, where wrong page numbers will happen). (2) `new cv.Mat(h, w, type)`
+    is not zeroed in OpenCV.js: a mask must be created with `cv.Mat.zeros`. (3) A view on a Mat's data (`.data`, `.data32F`) taken before another Mat is created can become empty when the WebAssembly memory
+    grows; take it after the last allocation. (4) `copyTo` into a region of a Mat wrote nothing in OpenCV.js; plain array copies are used.
 - Opening a scan is fast on this PC: under 1.3 s even for the 37-megapixel split SK-Mmf page (the
   unsplit 70-megapixel double page could not be opened in the earlier test on Claude's computer).
 - Today's alignment: 2.1–3.5 s per pair, but the page freezes for up to 3 s each time.
@@ -644,7 +676,7 @@ What the tests showed, across Liber, Melopoiae, printed-area set (116 scans), pa
 
 Plan (IDs used in the register, §11):
 - **A — alignment engine** (A1 box extended over sparse staves; A2 align a margin around the box; A3 near-empty page → rough
-  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs; **proposed 18 Nov:** A6 ink choice dark / red / both; **A7 done 20 Nov:** the rough step stops refining sooner when the two pages disagree — F-Pm f.4r took 9.5 s instead of 2–3 s, §4.5). Each must keep every
+  alignment only, said so; A4 dark borders must not distort the box; A5 release memory per page in long runs (**A1–A5 done 20 Nov**, next to the A7 bullet in 4.5); **proposed 18 Nov:** A6 ink choice dark / red / both; **A8 proposed 20 Nov:** cap the rough step when the first stage correlates badly (97 s on a mismatched pair); **A7 done 20 Nov:** the rough step stops refining sooner when the two pages disagree — F-Pm f.4r took 9.5 s instead of 2–3 s, §4.5). Each must keep every
   check that passes today. **Done only AFTER the tests D (owner, 17 Nov: the tests may change A).**
 - **B — what the user sees, version 1**: B1 box visible and correctable (see V2b); B2 **small shifted-page warning** (owner: version 1):
   when a page matches badly, compare with the copy's neighbouring pages and, if one fits clearly better, suggest moving the column
@@ -952,7 +984,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 
 1. Tests D1–D5 with the extra measurements (a)–(c) (§10) — research only, on Sonnet.
 2. Speed test on his PC (V11/T2) — **done 20 Nov**.
-3. Engine fixes A1–A5, checked against every earlier check (A7 done 20 Nov).
+3. Engine fixes A1–A5, checked against every earlier check (**done 20 Nov**, with A7; open: A6 ink choice, A8 cap on a mismatched pair).
 4. Desktop program (V5), starting with D3.
 5. Compare tab uses the new alignment (V2a, V3) with box correction (V2b), tile settings (V15), shifted-page warning (V18), movement map (V16).
 6. Reference copy (V7, D1), then background alignment, progress bar and stored results (V8–V10).

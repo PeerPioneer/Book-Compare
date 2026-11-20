@@ -3,7 +3,7 @@
    Input: the red channel of a scan scaled to 3000 px height as a 32-bit float Mat (see printed_area.js: redScaled). */
 const { inkMap, printedBox, extendBoxByStaves, scope } = require('./printed_area');
 const { roughAlign, warp } = require('./rough_align');
-const { tileAlign } = require('./tile_align');
+const { tileAlign, alignMarginItems } = require('./tile_align');
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -36,7 +36,7 @@ function inkIn(ink, box) {
    scan (a printed area never reaches the scan edge on two sides), or (2) the second box holds at least 8 % more ink (the standard box cuts through print).
    Where the standard box is right the two boxes are the same or differ by a few pixels (every other scan tested), so nothing changes there.
    Returns { box, which: 'standard' | 'border', standard, border, why, stretched } (stretched: A1, the box was extended over staves that hang on it). */
-const BORDER = 0.05, MORE_INK = 1.08;
+const BORDER = 0.05, MORE_INK = 1.08, NEAR_EMPTY = 0.02;
 function chooseBox(cv, red, ink) {
   const std = printedBox(cv, red), W = red.cols, H = red.rows;
   const tx = Math.round(0.01 * W), ty = Math.round(0.01 * H);
@@ -82,11 +82,25 @@ function alignCopyIn(cv, refState, red, opts, S) {
   const m = Math.max(60, Math.floor((opts.ring != null ? opts.ring : envRing != null ? envRing : 0.02) * Math.max(x1 - x0, y1 - y0)));
   const e = opts.edge != null ? opts.edge : envEdge != null ? envEdge : 60;
   const tbox = [Math.max(e, x0 - m), Math.min(w - e, x1 + m), Math.max(e, y0 - m), Math.min(h - e, y1 + m)];
+  /* A3 (20 Nov 2026): a page with almost no ink (title page, blank page, a few lines) gives the tile step nothing to hold on to: it would bend the copy
+     by whatever it finds and report a number that means nothing. Ink is 4-15 % of the picture on the real pages tested (blank staves included, because
+     staves are ink; the emptiest real page, Canti C p.7, has 1 %). Below NEAR_EMPTY of the whole picture, in the reference OR in the other copy,
+     only the rough (whole-page) alignment is used and the result says so (sparse: true). The share is taken over the whole picture, not the box,
+     because the box shrinks around whatever little there is. */
+  const everything = [0, 0, w, h], density = Math.min(inkIn(ref, everything), inkIn(rough, everything)) / (w * h), sparse = density < NEAR_EMPTY;
   t = now();
-  const { aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField, levels: opts.levels }); S.add(aligned); tm.tiles_s = (now() - t) / 1000;
+  let aligned, stats = [], field = null;
+  if (sparse) { aligned = rough.clone(); S.add(aligned); }
+  else ({ aligned, stats, field } = tileAlign(cv, ref, rough, tbox, { trackField: !!opts.trackField, levels: opts.levels }));
+  S.add(aligned);
+  let margin = null;
+  if (!sparse && !opts.noMargin && !(typeof process !== 'undefined' && process.env && process.env.BC_NOMARGIN === '1')) {      // A2: headline, folio number, signature, catchword
+    const m = alignMarginItems(cv, ref, aligned, box); aligned.delete(); aligned = S.add(m.aligned); margin = { moved: m.moved, seen: m.seen };
+  }
+  tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
   mov.delete();
-  const out = { field, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale };
+  const out = { field, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
   if (opts.measure) out.unmatched = { rough: unmatchedShare(cv, ref, rough, box).share, tiles: unmatchedShare(cv, ref, aligned, box).share };
   if (!opts.keepRough) { rough.delete(); out.rough = null; }
   S.release(aligned); if (out.rough) S.release(rough);                          // handed to the caller, who deletes them

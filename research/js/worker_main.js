@@ -53,7 +53,7 @@ var handlers = {
     var t = r.times;
     return { w: d.w0, h: d.h0, decode_s: d.decode_s, ink_s: t.ink_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s,
       total_s: d.decode_s + t.total_s, unmatched_rough: r.unmatched && r.unmatched.rough, unmatched_tiles: r.unmatched && r.unmatched.tiles,
-      scale: r.scale, ecc: r.ecc };
+      scale: r.scale, ecc: r.ecc, sparse: r.sparse, ink_density: r.density };
   }
 };
 

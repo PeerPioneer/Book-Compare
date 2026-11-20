@@ -25,6 +25,7 @@ function measureLevel(cv, ref, mov, box, tile, step, search, minInk = 0.04, minC
   const SX = new Float32Array(rows * cols).fill(NaN), SY = SX.slice();
   const W = ref.cols, rd = ref.data32F;
   const S = scope(), r = S.add(new cv.Mat());
+  let inked = 0, matched = 0;
   try {
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     const x = xs[i], y = ys[j];
@@ -32,18 +33,20 @@ function measureLevel(cv, ref, mov, box, tile, step, search, minInk = 0.04, minC
     let sum = 0;
     for (let yy = y; yy < y + tile; yy++) { const o = yy * W + x; for (let xx = 0; xx < tile; xx++) sum += rd[o + xx]; }
     if (sum / (tile * tile) < minInk) continue;
+    inked++;
     const t = S.add(ref.roi(new cv.Rect(x, y, tile, tile)));
     const s = S.add(mov.roi(new cv.Rect(x - search, y - search, tile + 2 * search, tile + 2 * search)));
     cv.matchTemplate(s, t, r, cv.TM_CCOEFF_NORMED);
     const mm = cv.minMaxLoc(r);
     t.delete(); s.delete();
     if (mm.maxVal < minCorr) continue;
+    matched++;
     const px = mm.maxLoc.x, py = mm.maxLoc.y, n = r.cols, m = r.rows, d = r.data32F;
     SX[j * cols + i] = subpixel(k => d[py * n + k], px, n) - search;
     SY[j * cols + i] = subpixel(k => d[k * n + px], py, m) - search;
   }
   } finally { S.free(); }
-  return { cx: xs.map(x => x + tile / 2), cy: ys.map(y => y + tile / 2), SX, SY, rows, cols };
+  return { cx: xs.map(x => x + tile / 2), cy: ys.map(y => y + tile / 2), SX, SY, rows, cols, inked, matched };
 }
 
 function median(a) { a.sort((p, q) => p - q); const n = a.length; return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2; }
@@ -122,7 +125,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
   for (const [tile, step, search, threshold] of levels) {
     const t0 = Date.now();
     const movB = S.add(new cv.Mat()); cv.GaussianBlur(cur, movB, new cv.Size(0, 0), 0.8);
-    const { cx, cy, SX, SY, rows, cols } = measureLevel(cv, refB, movB, box, tile, step, search);
+    const { cx, cy, SX, SY, rows, cols, inked, matched } = measureLevel(cv, refB, movB, box, tile, step, search);
     movB.delete();
     const t1 = Date.now();
     const fx = denseField(cv, cx, cy, repair(SX, rows, cols, threshold).S, rows, cols, W, H);
@@ -135,7 +138,7 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
     mapx.delete(); mapy.delete();
     if (cur !== mov) cur.delete();
     cur = next;
-    stats.push({ tile, tiles: rows * cols, measure_s: (t1 - t0) / 1000, field_s: (Date.now() - t1) / 1000 });
+    stats.push({ tile, tiles: rows * cols, inked, matched, measure_s: (t1 - t0) / 1000, field_s: (Date.now() - t1) / 1000 });
   }
   return { aligned: S.release(cur), stats, field: total };
   } finally {
@@ -143,4 +146,55 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
   }
 }
 
-module.exports = { tileAlign, LEVELS };
+/* A2 (20 Nov 2026): items outside the printed area (headline, folio number, signature, catchword) are too small for the tiles: a tile that holds only a
+   letter has far too little ink to be measured, and the rough alignment leaves such an item 10-50 px off, which shows as a false red/blue pair (Odhecaton H1r,
+   the signature). Here every ink blob outside the box (not within `edge` px of the scan edge, not a speck) is searched in the other copy within +-`search` px by
+   template matching; where it is found (correlation >= minCorr) the patch of the other copy is moved onto it. An item that is not found (a real difference:
+   Canti C folio "21" against a handwritten "12") stays where it is. ref, aligned: ink maps of the same size; box = [x0, y0, x1, y1] printed area.
+   Returns { aligned: new Mat (the caller deletes it and the old one), moved: [{x, y, w, h, dx, dy, corr}], seen: number of items looked at }. */
+function alignMarginItems(cv, ref, aligned, box, opts = {}) {
+  const S = scope();
+  try {
+    const W = ref.cols, H = ref.rows, edge = opts.edge || 60, search = opts.search || 60, minCorr = opts.minCorr || 0.5, pad = 8, minArea = opts.minArea || 60;
+    const [x0, y0, x1, y1] = box;
+    const bin = S.add(cv.Mat.zeros(H, W, cv.CV_8U)), rd = ref.data32F, bd = bin.data;      // (a new Mat is not zeroed)
+    for (let y = edge; y < H - edge; y++) for (let x = edge; x < W - edge; x++) if (rd[y * W + x] > 0.5 && !(x >= x0 && x < x1 && y >= y0 && y < y1)) bd[y * W + x] = 1;
+    const joined = S.add(new cv.Mat()), k = S.add(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(15, 15)));
+    cv.dilate(bin, joined, k);
+    const lab = S.add(new cv.Mat()), st = S.add(new cv.Mat()), cen = S.add(new cv.Mat());
+    const n = cv.connectedComponentsWithStats(joined, lab, st, cen, 8);
+    const out = S.add(aligned.clone()), moved = [], jobs = [];
+    let seen = 0;
+    for (let i = 1; i < n; i++) {
+      const bx = st.intAt(i, 0), by = st.intAt(i, 1), bw = st.intAt(i, 2), bh = st.intAt(i, 3);
+      // the ink of the blob itself (without the dilation), inside its bounding box
+      const bdNow = bin.data;                                                   // (a fresh view: the WebAssembly memory may have grown since the last one)
+      let ink = 0; for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++) ink += bdNow[y * W + x];
+      if (ink < minArea || bw > 0.5 * W || bh > 0.5 * H) continue;               // specks, and long things (frame lines, rules)
+      seen++;
+      const tx = Math.max(edge, bx - pad), ty = Math.max(edge, by - pad), tw = Math.min(W - edge, bx + bw + pad) - tx, th = Math.min(H - edge, by + bh + pad) - ty;
+      const sx = Math.max(0, tx - search), sy = Math.max(0, ty - search), sw = Math.min(W, tx + tw + search) - sx, sh = Math.min(H, ty + th + search) - sy;
+      if (tw < 8 || th < 8 || sw < tw || sh < th) continue;
+      const hitsBox = (a, b, c, d) => a < x1 && a + c > x0 && b < y1 && b + d > y0;            // a patch must never touch the printed area (its ink is aligned by the tiles)
+      if (hitsBox(tx, ty, tw, th)) continue;
+      const t = S.add(ref.roi(new cv.Rect(tx, ty, tw, th))), s = S.add(aligned.roi(new cv.Rect(sx, sy, sw, sh))), r = S.add(new cv.Mat());
+      cv.matchTemplate(s, t, r, cv.TM_CCOEFF_NORMED);
+      const mm = cv.minMaxLoc(r);
+      t.delete(); s.delete(); r.delete();
+      const dx = sx + mm.maxLoc.x - tx, dy = sy + mm.maxLoc.y - ty;
+      if (opts.debug) opts.debug.push({ x: tx, y: ty, w: tw, h: th, ink, dx, dy, corr: +mm.maxVal.toFixed(2) });               // where the item is in the other copy, relative to where it should be
+      if (hitsBox(tx + dx, ty + dy, tw, th)) continue;
+      if (mm.maxVal < minCorr || (Math.abs(dx) < 2 && Math.abs(dy) < 2) || Math.abs(dx) >= search - 1 || Math.abs(dy) >= search - 1) continue;
+      jobs.push({ tx, ty, tw, th, dx, dy, corr: mm.maxVal });
+    }
+    // first take every found patch out, then put them all at the place of the reference (patches may overlap their own old place).
+    // Plain array work (no allocations in between, so the views stay valid): copyTo into a region of a Mat did not write in OpenCV.js.
+    const od = out.data32F, ad = aligned.data32F;
+    const patches = jobs.map(j => { const p = new Float32Array(j.tw * j.th); for (let r = 0; r < j.th; r++) p.set(ad.subarray((j.ty + j.dy + r) * W + j.tx + j.dx, (j.ty + j.dy + r) * W + j.tx + j.dx + j.tw), r * j.tw); return p; });
+    for (const j of jobs) for (let r = 0; r < j.th; r++) od.fill(0, (j.ty + j.dy + r) * W + j.tx + j.dx, (j.ty + j.dy + r) * W + j.tx + j.dx + j.tw);
+    jobs.forEach((j, n) => { for (let r = 0; r < j.th; r++) od.set(patches[n].subarray(r * j.tw, (r + 1) * j.tw), (j.ty + r) * W + j.tx); moved.push({ x: j.tx, y: j.ty, w: j.tw, h: j.th, dx: j.dx, dy: j.dy, corr: j.corr }); });
+    return { aligned: S.release(out), moved, seen };
+  } finally { S.free(); }
+}
+
+module.exports = { tileAlign, alignMarginItems, LEVELS };

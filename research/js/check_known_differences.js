@@ -215,8 +215,48 @@ function boxCase(cv, root, scans, rows) {
   return { total, failed };
 }
 
+/* ---- Case 10 (A3, 20 Nov 2026): a page with almost no ink ---- */
+/* The tile step needs something to hold on to. On a page with (almost) no ink in the printed area only the rough alignment is used and the result says so
+   (sparse). Control: the real page, Odhecaton A1v Paris against New York (matching), must NOT be flagged. Test page: the same two scans with everything
+   but a strip of 4 % of the height painted white (a title page, a blank page with one line). */
+function sparseCase(cv, scans, rows) {
+  const jpeg = require('jpeg-js'), os = require('os');
+  const O = path.join(scans, 'Odhecaton A. Petrucci 1504. Digitalisate'), o = (d, n) => findScan(path.join(O, d), new RegExp('Page_' + String(n).padStart(3, '0') + '_'));
+  const paris = o('F-Pn. Odhecaton A. Petrucci 1504', 4), ny = o('US-NYp. Odhecaton A. Petrucci 1504', 4);
+  const blank = (file, name) => {
+    const i = jpeg.decode(fs.readFileSync(file), { useTArray: true, maxMemoryUsageInMB: 2048 }), keep0 = Math.round(0.30 * i.height), keep1 = Math.round(0.34 * i.height);
+    for (let y = 0; y < i.height; y++) if (y < keep0 || y >= keep1) i.data.fill(255, y * i.width * 4, (y + 1) * i.width * 4);
+    const out = path.join(os.tmpdir(), 'bc_sparse_' + name + '.jpg'); fs.writeFileSync(out, jpeg.encode(i, 85).data); return out;
+  };
+  let total = 0, failed = 0;
+  const run = (title, a, b, wantSparse) => {
+    const r = alignPair(cv, a, b), ok = r.sparse === wantSparse; total++; if (!ok) failed++;
+    rows.push(`${ok ? 'PASS' : 'FAIL'}  sparse  ${title.padEnd(44)} ink share of the picture ${(100 * r.density).toFixed(1).padStart(5)} %   flagged ${String(r.sparse).padEnd(5)}   expected ${wantSparse ? 'flagged (rough alignment only)' : 'not flagged'}`);
+    r.ref.delete(); r.aligned.delete(); if (r.rough) r.rough.delete();
+  };
+  run('Odhecaton A1v Paris vs New York (real page)', paris, ny, false);
+  run('same pages, all but a strip painted white', blank(paris, 'a'), blank(ny, 'b'), true);
+  return { total, failed };
+}
+
+/* ---- Case 11 (A2, 20 Nov 2026): an item outside the printed area ---- */
+/* Odhecaton H1r: the signature (a small gothic "H", lower right, outside the printed area) is present in all three scans (Paris, New York, Washington), so it
+   must NOT show as a difference. Before A2 it stood 10-15 px (in the overlay; 60 px in the working picture) from its partner: 100 % unmatched. Region in pixels
+   of the Paris scan at the working height of 3000 px. */
+function marginCase(cv, scans, rows) {
+  const dir = path.join(scans, 'Odhecaton A. Petrucci 1504. Digitalisate', 'H1r'), paris = findScan(dir, /btv1b/), ny = findScan(dir, /nyp/), wc = findScan(dir, /LC_sgmt/);
+  const SIG = [3080, 2480, 3230, 2650];
+  let cache, total = 0, failed = 0;
+  for (const [name, file] of [['New York', ny], ['Washington', wc]]) {
+    const r = alignPair(cv, paris, file, cache); cache = r.cache;
+    const pct = 100 * unmatchedShare(cv, r.ref, r.aligned, SIG).share, ok = pct < 45; total++; if (!ok) failed++;
+    rows.push(`${ok ? 'PASS' : 'FAIL'}  margin  H1r signature, Paris vs ${name.padEnd(10)} ${pct.toFixed(1).padStart(5)} % unmatched   expected matching (< 45 %; 100 % before A2)   items moved ${r.margin ? r.margin.moved.length : 0} of ${r.margin ? r.margin.seen : 0}`);
+  }
+  return { total, failed };
+}
+
 /* The cases run in SEPARATE processes: each one decodes big scans, and OpenCV.js (WebAssembly) would run out of memory when all cases share one
-   process. "--only=3" runs just case 3 (cases: 1 table of contents, 2 woodcut, 3 page 8, 4 folio 19v). Without it all cases run, one process each. */
+   process. "--only=3" runs just case 3 (cases: 1 table of contents, 2 woodcut, 3 page 8, 4 folio 19v, 5-8 digitised copies, 9 box, 10 near-empty page, 11 margin item). Without it all cases run, one process each. */
 function tocCase(cv, root, rows) {
   const dir = path.join(root, 'Melopoiae. Table of contents'), file = c => path.join(dir, 'Text. ' + c + '.jpg');
   let cache, failed = 0, total = 0;
@@ -239,19 +279,19 @@ function tocCase(cv, root, rows) {
   if (!root) { console.error('usage: node check_known_differences.js "<Example pages folder>" ["<Melopoiae folder>" or -] ["<folder with the digitised copies>"]'); process.exit(2); }
   if (!only) {                                                                               // parent: one child process per case
     const cp = require('child_process'); let failed = 0, total = 0;
-    for (const k of [...(mel ? ['1', '2', '3', '4'] : ['1', '4']), ...(scans ? ['5', '6', '7', '8', '9'] : [])]) {
+    for (const k of [...(mel ? ['1', '2', '3', '4'] : ['1', '4']), ...(scans ? ['5', '6', '7', '8', '9', '10', '11'] : [])]) {
       const r = cp.spawnSync(process.execPath, [__filename, '--only=' + k, ...pos], { encoding: 'utf8', maxBuffer: 1 << 26 });
       process.stdout.write(r.stdout || ''); if (r.stderr) process.stderr.write(r.stderr);
       const m = /RESULT (\d+) (\d+)/.exec(r.stdout || ''); if (m) { total += +m[1]; failed += +m[2]; } else { failed++; total++; console.log(`FAIL  case ${k} did not finish (exit code ${r.status})`); }
     }
-    if (!scans) console.log('(cases 5-8, Liber f.8, Petrucci, Giunta, Opusculum, skipped: give the folder with the digitised copies as third argument)');
+    if (!scans) console.log('(cases 5-11, Liber f.8, Petrucci, Giunta, Opusculum, box, near-empty page, margin item, skipped: give the folder with the digitised copies as third argument)');
     if (!mel) console.log('(cases 2 and 3, Melopoiae woodcut and page 8, skipped: give the Melopoiae folder as second argument)');
     console.log(failed ? `\nKNOWN-DIFFERENCES CHECK FAILED: ${failed} of ${total}` : `\nKNOWN-DIFFERENCES CHECK OK (${total} of ${total})`);
     process.exit(failed ? 1 : 0);
   }
   const cv = await loadCv(), rows = [];
   const res = { 1: () => tocCase(cv, root, rows), 2: () => woodcutCase(cv, mel, rows), 3: () => pair08Case(cv, mel, rows), 4: () => folio19vCase(cv, root, rows),
-    5: () => liber8Case(cv, scans, rows), 6: () => petrucciCase(cv, scans, rows), 7: () => giuntaCase(cv, scans, rows), 8: () => opusculumCase(cv, scans, rows), 9: () => boxCase(cv, root, scans, rows) }[only]();
+    5: () => liber8Case(cv, scans, rows), 6: () => petrucciCase(cv, scans, rows), 7: () => giuntaCase(cv, scans, rows), 8: () => opusculumCase(cv, scans, rows), 9: () => boxCase(cv, root, scans, rows), 10: () => sparseCase(cv, scans, rows), 11: () => marginCase(cv, scans, rows) }[only]();
   console.log(rows.join('\n')); console.log(`RESULT ${res.total} ${res.failed}`);
   process.exit(0);
 })().catch(e => { console.error(e && e.message ? e : (typeof e === 'number' && typeof cvGlobal !== 'undefined' ? e : 'error ' + e)); process.exit(1); });
