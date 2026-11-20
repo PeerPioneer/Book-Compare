@@ -81,6 +81,57 @@ public static string ListFor(uint pid) {
   if ($p.ExitCode -ne 1) { throw "expected 'cancelled' (exit code 1), got $($p.ExitCode)" }
 }
 
+Check 'the picture window (S10) opens, cancel counts as cancelled, two typed pictures are returned' {
+  Add-Type -Namespace BcPic -Name Native -MemberDefinition @'
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
+[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, string l);
+public delegate bool EnumProc(IntPtr h, IntPtr l);
+[DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc p, IntPtr l);
+[DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
+[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
+static string Cls(IntPtr h) { System.Text.StringBuilder c = new System.Text.StringBuilder(64); GetClassName(h, c, 64); return c.ToString(); }
+// the visible file-name box: an Edit inside a ComboBox
+public static IntPtr NameBox(IntPtr dlg) {
+  IntPtr found = IntPtr.Zero;
+  EnumChildWindows(dlg, delegate(IntPtr h, IntPtr l) {
+    if (Cls(h) == "Edit" && IsWindowVisible(h) && Cls(GetParent(h)) == "ComboBox") { found = h; return false; }
+    return true;
+  }, IntPtr.Zero);
+  return found;
+}
+'@
+  $dir = Join-Path $env:TEMP 'bc-pictures'; New-Item -ItemType Directory -Force $dir | Out-Null
+  foreach ($n in 'a.jpg', 'b.jpg', 'c.jpg') { [System.IO.File]::WriteAllBytes((Join-Path $dir $n), [byte[]](255, 216, 255, 217)) }
+  $script:picResult = @()
+  foreach ($round in 'cancel', 'choose') {
+    $out = Join-Path $env:TEMP 'bc-pic.txt'; Remove-Item $out -ErrorAction SilentlyContinue
+    $env:BC_PICK_OUT = $out; $env:BC_PICK_START = $dir; $env:BC_PICK_TITLE = 'Book Compare CI pictures'; $env:BC_PICK_MODE = 'files'
+    $p = Start-Process powershell -ArgumentList ('-NoProfile -STA -ExecutionPolicy Bypass -File "{0}"' -f (Join-Path $root 'launcher\pickfolder.ps1')) -PassThru -WindowStyle Hidden
+    [void](Wait-Until { $script:h = [BcPic.Native]::FindWindow([NullString]::Value, 'Book Compare CI pictures'); $script:h -ne [IntPtr]::Zero } 30)
+    Remove-Item Env:BC_PICK_TITLE, Env:BC_PICK_MODE
+    if ($script:h -eq [IntPtr]::Zero) { if (-not $p.HasExited) { $p.Kill() }; throw "the picture window did not appear ($round)" }
+    if ($round -eq 'cancel') {
+      [void][BcPic.Native]::PostMessage($script:h, 0x10, [IntPtr]::Zero, [IntPtr]::Zero)          # WM_CLOSE
+      if (-not $p.WaitForExit(20000)) { $p.Kill(); throw 'the picture window did not close' }
+      if ($p.ExitCode -ne 1) { throw "cancel: expected exit code 1, got $($p.ExitCode)" }
+    } else {
+      [void](Wait-Until { $script:box = [BcPic.Native]::NameBox($script:h); $script:box -ne [IntPtr]::Zero } 15)
+      if ($script:box -eq [IntPtr]::Zero) { $p.Kill(); throw 'the file-name box was not found' }
+      [void][BcPic.Native]::SendMessage($script:box, 0x0C, [IntPtr]::Zero, '"a.jpg" "c.jpg"')      # WM_SETTEXT: two names, as typed by hand
+      [void][BcPic.Native]::PostMessage($script:h, 0x111, [IntPtr]1, [IntPtr]::Zero)               # WM_COMMAND IDOK = the Open button
+      if (-not $p.WaitForExit(20000)) { $p.Kill(); throw 'the picture window did not close after Open' }
+      $text = ''; if (Test-Path $out) { $text = (Get-Content $out -Raw).Trim() }
+      if ($p.ExitCode -ne 0) { throw "choose: exit $($p.ExitCode): $text" }
+      $lines = @($text -split "`r?`n")
+      if ((Split-Path -Leaf $lines[0]) -ne 'bc-pictures' -or -not (Test-Path -LiteralPath (Join-Path $lines[0] 'a.jpg'))) { throw "choose: folder '$($lines[0])' instead of '$dir'" }   # (TEMP may be given in the short form RUNNER~1)
+      $names = @($lines[1..($lines.Count - 1)] | Sort-Object)
+      if (($names -join ',') -ne 'a.jpg,c.jpg') { throw "choose: got '$($names -join ',')'" }
+    }
+  }
+}
+
 Check 'the folder window opens IN FRONT of another program (not behind the browser)' {
   Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices; using System.Text; using System.Collections.Generic;

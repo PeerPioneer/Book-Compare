@@ -303,7 +303,7 @@ Ideas to make it faster on top of that, each to be tested, none promised:
 - *Perhaps later, the graphics card.* Powerful but complicated; only if the above is not
   enough.
 
-### 4.7 The reference copy — proposal, to be confirmed by the owner
+### 4.7 The reference copy — confirmed by the owner (20 November 2026, D1)
 
 Every copy is aligned to one reference copy; any two copies can then be shown against each
 other by going via the reference. The reference is like a central station: every copy has a
@@ -325,7 +325,7 @@ important copy in a scholarly sense, only a reliable one.
   directly. If the check against known differences (§4.4) shows that this matters, the pair on
   screen can be aligned directly on demand.
 
-### 4.8 The desktop program — after the experiment
+### 4.8 The desktop program — Electron (decided 20 November 2026, D3)
 
 Book Compare becomes an ordinary Windows program, built from the same web pages it consists
 of now. It brings its own browser engine — the same one Edge uses — so everything that exists
@@ -910,9 +910,9 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | V2 | Printed-area detection, automatic + manual correction | detection done in experiment (§4.3); **not yet in the Compare tab**; manual correction not built. **Owner, 17 Nov: the box is shown on both scans and has four FREE corners** (not only a rectangle): the automatic proposal is a rectangle, each corner can be dragged on its own, everything outside the shape is ignored by the alignment (main use: leave out a slanted dark binding edge or a sliver of the next page); the pair is aligned again at once; "back to automatic"; saved per scan. Engine fixes A1–A5 (§10) after the tests D | V2a make Compare tab use it; V2b correction by hand |
 | V3 | Tile-based alignment in the Compare tab | experiment done, runs in the speed test (worker); **not yet in the Compare tab** | needs V2a; Thursday speed test decides nothing about *whether*, only about expectations |
 | V4 | Difference view | done | — |
-| V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a decide framework (Electron vs Tauri) — see D3; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
+| V5 | **Desktop program** (§4.8): installer, project in one file, double-click opens, own browser engine, replaces helper/.bat, built on GitHub | **next** (does not depend on the speed test) | V5a framework: **Electron (D3, decided 20 Nov)**; V5b file access behind `workspace.js`; V5c installer built by GitHub Actions; V5d code-signing certificate decision at release |
 | V6 | Website, kept current automatically | done (live) | — |
-| V7 | **Reference copy** (§4.7): proposal from measurable criteria, user confirms, stand-in per page, never switches by itself, old results kept until new ones are ready | **open** — design confirmed in prose only; not built; needs owner confirmation of the last point | V7a scoring of copies; V7b UI to confirm/choose; V7c per-page stand-in; V7d "better copy found" hint with cost |
+| V7 | **Reference copy** (§4.7): proposal from measurable criteria, user confirms, stand-in per page, never switches by itself, old results kept until new ones are ready | **decided** (D1, owner 20 Nov), not built | V7a scoring of copies; V7b UI to confirm/choose; V7c per-page stand-in; V7d "better copy found" hint with cost |
 | V8 | **Background alignment** of one chosen copy at a time + computing on demand for the pair on screen | decided (§4.6), not built | needs V3; **measured 20 Nov (T2b, §4.5): a work queue with several helper workers works; 4 helpers 3.5 × faster, 8 helpers only 4.2 ×.** Design: when one pair is finished the next pair starts, so no worker waits; default helpers = half the processor threads, an "all threads" choice for overnight runs; each helper keeps its last reference page so jobs are ordered page by page; limits still to watch: memory with very large scans, the screen needs some capacity |
 | V9 | **Progress bar with time estimate** for V8 | decided, not built | needs V8 |
 | V10 | Storage of aligned results (what is kept, where, invalidation when the reference changes) | **open** — not designed in detail | V7, V8; decide with the desktop program's project file |
@@ -943,7 +943,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 
 | ID | Change | Note |
 |----|--------|------|
-| S10 | **Add single pictures with the ordinary Windows "Open" window**: a button "Add single pictures…" opens the same file window as in any Windows program; one or several pictures are chosen there (Ctrl- or Shift-click) and go into the copy. The tick boxes in "Add a folder" (S3) stay | **decided 19 Nov (owner)**, to be built in the next coding round (on Sonnet). With the helper the window is opened by the helper, like its folder window today (`launcher/pickfolder.ps1`); the desktop program (V5) has such a window built in, so the button carries over. On the website without the helper the tick boxes remain the way, because a browser can reopen pictures later only from a folder it was given |
+| S10 | **done 20 Nov:** **Add single pictures with the ordinary Windows "Open" window**: a button "Add single pictures…" opens the same file window as in any Windows program; one or several pictures are chosen there (Ctrl- or Shift-click) and go into the copy. The tick boxes in "Add a folder" (S3) stay | **decided 19 Nov (owner)**, to be built in the next coding round (on Sonnet). With the helper the window is opened by the helper, like its folder window today (`launcher/pickfolder.ps1`); the desktop program (V5) has such a window built in, so the button carries over. On the website without the helper the tick boxes remain the way, because a browser can reopen pictures later only from a folder it was given. **As built 20 Nov:** button "Add single pictures …" next to "Choose another folder …" in *Add a copy* and *Add files* (only with the helper); the helper's window (`pickfolder.ps1`, `BC_PICK_MODE=files`) returns the folder and the names; the folder is registered like a scan folder and the chosen pictures arrive ticked; the window opens in the folder of the last single pictures. Tested: helper API and the page (`test_helper.py`), the real Windows window on CI (`windows-checks.ps1`: cancel, and two names typed into the file-name box) |
 
 ### 11.2 After version 1
 
@@ -972,9 +972,9 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 
 | ID | Question | Needed by |
 |----|----------|-----------|
-| D1 | Reference copy: confirm the proposal in §4.7 (including "old results stay until new ones are ready") | before V7 |
+| D1 | ~~Reference copy: confirm the proposal in §4.7~~ **Decided 20 Nov 2026 (owner): yes**, the whole proposal in §4.7, including "old results stay in use until the new ones are ready" | done |
 | D2 | Pairs via the reference vs directly aligned on demand (§4.7 "Open") | after V12 results |
-| D3 | Desktop framework (Electron vs Tauri) — to be proposed with reasons in plain language | before V5 |
+| D3 | ~~Desktop framework (Electron vs Tauri)~~ **Decided 20 Nov 2026 (owner): Electron.** Reasons given: the alignment can run in separate Node helper programs that are closed and restarted (cures the OpenCV.js leak, no browser memory ceiling for 70 MP double pages); native OpenCV possible later (to be tested); the engine version is fixed per release, so CI tests what the owner runs (Playwright drives Electron); one language (JavaScript) for everything; a Mac version would use the same engine. Cost: installer about 100 MB, somewhat more memory, both negligible next to the scans. Also considered: installed web app from Edge (keeps permission clicks and memory ceiling), Tauri and Wails (system WebView, Rust/Go backend, engine changes with Edge, Safari engine on Mac), Neutralino (too thin), NW.js and Electrobun (nothing over Electron), Qt/Flutter/native (rewrite of the interface) | done |
 | D4 | Code-signing certificate for the installer (low hundreds of euros a year) | at release |
 | D5 | Grouping design (§5.1) | before P1 |
 | D7 | ~~Differences.pdf listed the line above Phoebus' head for D-Mu too~~ **Resolved 15 Nov:** the owner says that was an error in the old Differences.pdf; the line is in B-Br only. His current list is `Mein Artikel\List of Differences.odt` (Dropbox\Melopoiae), which already says so. **That file, not Differences.pdf, is the reference for all checks from now on** | done |
@@ -985,7 +985,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 1. Tests D1–D5 with the extra measurements (a)–(c) (§10) — research only, on Sonnet.
 2. Speed test on his PC (V11/T2) — **done 20 Nov**.
 3. Engine fixes A1–A5, checked against every earlier check (**done 20 Nov**, with A7; open: A6 ink choice, A8 cap on a mismatched pair).
-4. Desktop program (V5), starting with D3.
+4. **Owner, 20 Nov: D3 = Electron, D1 = yes. Next built: S10, then the Compare tab uses the new alignment (V2a, V3)**, because that is what his research uses at once and it does not depend on the desktop program; the desktop program (V5) follows.
 5. Compare tab uses the new alignment (V2a, V3) with box correction (V2b), tile settings (V15), shifted-page warning (V18), movement map (V16).
 6. Reference copy (V7, D1), then background alignment, progress bar and stored results (V8–V10).
 

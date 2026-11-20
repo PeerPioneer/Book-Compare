@@ -99,7 +99,7 @@
   // HDir / HFile imitate the folder and file objects of the browser's File System Access API, so the rest of this file does not
   // care where a folder comes from. A folder is a root (registered with the helper under a random id) plus a path inside it.
   var HELPER = null;                 // the helper's answer to /api/ping, or null when there is no helper
-  var helperStart = { scans: null, project: null };
+  var helperStart = { scans: null, project: null, files: null };
   var helperReady = detectHelper();
   async function detectHelper() {
     if (!/^https?:$/.test(location.protocol) || !window.fetch) return false;
@@ -538,6 +538,24 @@
     }
     var g = await scanLoc(loc.root, loc.path);
     return { root: loc.root, path: loc.path, name: dir.name, groups: g.groups, ignored: g.ignored };
+  }
+  // Single pictures (S10): the ordinary Windows "Open" window, opened by the helper; several pictures with Ctrl- or Shift-click.
+  // Result like pickScanFolder, with exactly the chosen pictures as the only group (they are ticked in the dialog).
+  function canPickFiles() { return !!(HELPER && (HELPER.pick === 'dialog' || HELPER.pick === 'test')); }
+  async function pickScanFiles() {
+    var j;
+    try { j = await hjson('/api/pick', { kind: 'files', start: helperStart.files || helperStart.scans || null }); }
+    catch (e) {
+      if (e && e.code === 'no-dialog') throw refusal('Book Compare could not open the Windows window for pictures. Use “Choose another folder …” instead and tick the pictures there.');
+      throw e;
+    }
+    if (j.cancelled) { var ab = new Error('cancelled'); ab.name = 'AbortError'; throw ab; }
+    var dir = new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name);
+    await checkNotProjectFolder(dir);
+    var loc = await rootFor(dir, true);
+    helperStart.files = j.path;                                                                   // next time the window opens in this folder again
+    var names = (j.files || []).slice().sort(nat), g = groupsFromKeys(names, 0);
+    return { root: loc.root, path: loc.path, name: dir.name, groups: g.groups, ignored: 0, only: names };
   }
   async function getScan(copy, key) {
     var sk = splitKey(key), loc = copy.locs && copy.locs[sk.n], r = loc && rootById(loc.root);
@@ -1044,7 +1062,8 @@
     return out;
   }
   function srcBlock(p) {
-    return '<div class="row2"><select id="' + p + '-known" aria-label="Folders used so far"></select><button class="ws-tb" id="' + p + '-folder">Choose another folder …</button></div>' +
+    return '<div class="row2"><select id="' + p + '-known" aria-label="Folders used so far"></select><button class="ws-tb" id="' + p + '-folder">Choose another folder …</button>' +
+      (canPickFiles() ? '<button class="ws-tb" id="' + p + '-files" title="Opens the ordinary Windows “Open” window: choose one picture, or several with Ctrl- or Shift-click">Add single pictures …</button>' : '') + '</div>' +
       '<div id="' + p + '-info" class="note">No folder chosen</div>';
   }
   function wireSrc(sc, p, extra, onPick) {
@@ -1073,6 +1092,15 @@
         rebuild(pk.root.id + '|' + pk.path);
         onPick(pk);
       }, function (e) { if (e && e.name === 'AbortError') return; err.textContent = niceError(e); info.textContent = 'No folder chosen'; });
+    };
+    var fb = sc.querySelector('#' + p + '-files');
+    if (fb) fb.onclick = function () {
+      err.textContent = '';
+      pickScanFiles().then(function (pk) {
+        extra.push({ root: pk.root.id, path: pk.path });
+        rebuild(pk.root.id + '|' + pk.path);
+        onPick(pk);
+      }, function (e) { if (e && e.name === 'AbortError') return; err.textContent = niceError(e); });
     };
     rebuild('');
     return { choose: choose, info: info };
@@ -1115,7 +1143,7 @@
       var info = sc.querySelector('#ac-info'), gr = sc.querySelector('#ac-groups');
       if (!pk.groups.length) { info.textContent = 'No JPG or PNG files found in “' + pk.name + '” or in the folders directly inside it.'; gr.innerHTML = ''; return; }
       var total = pictureCount(pk.groups), used = usedPictures(pk.root.id);
-      info.textContent = '“' + pk.name + '”: ' + total + ' picture' + (total === 1 ? '' : 's') + ignoredNote(pk.ignored);
+      info.textContent = pk.only ? total + ' single picture' + (total === 1 ? '' : 's') + ' chosen in “' + pk.name + '”' : '“' + pk.name + '”: ' + total + ' picture' + (total === 1 ? '' : 's') + ignoredNote(pk.ignored);
       pk.groups.forEach(function (g) {
         g.chosen = {}; if (pk.groups.length === 1) g.keys.forEach(function (k) { g.chosen[k] = true; });          // one folder: all of it is the default
         g.by = used[joinPath(pk.path, g.keys[0])] || '';
@@ -1204,7 +1232,13 @@
         h += '<details data-gi="' + gi + '"' + (groups.length === 1 ? ' open' : '') + '><summary><label><input type="checkbox" data-gall="' + gi + '"> ' + (g.path ? esc(g.path) : 'directly in “' + esc(p.name) + '”') + ' <span class="note">· ' + g.keys.length + '</span></label></summary><div class="flist" data-gl="' + gi + '"></div></details>';
       });
       listEl.innerHTML = h + '</div>';
+      if (p.only) {                                                     // single pictures chosen in the Windows window: they are ticked already
+        groups.forEach(function (g) { g.keys.forEach(function (rel) { checked[rel] = true; }); });
+        info.textContent = total + ' single picture' + (total === 1 ? '' : 's') + ' chosen in “' + p.name + '”' + (total < p.only.length ? ' (' + (p.only.length - total) + ' already in the grid of this copy)' : '');
+        Array.prototype.forEach.call(listEl.querySelectorAll('input[data-gall]'), function (x) { x.checked = true; });
+      }
       groups.forEach(function (g, gi) { if (groups.length === 1) fillGroup(gi); });
+      updCount();
     }
     function fillGroup(gi) {
       var box = listEl.querySelector('[data-gl="' + gi + '"]'); if (!box || box.dataset.done) return;

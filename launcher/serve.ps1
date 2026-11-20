@@ -270,11 +270,31 @@ function Finish-Pick($res, [string]$kind, [string]$chosen) {
   Save-Settings $s
   Send-Json $res 200 (Root-Json $reg.id $reg.root)
 }
+# Single pictures (S10): the answer of the window is the folder on the first line and one file name per line after it.
+# The folder is registered like a chosen scan folder; the answer carries the names of the chosen pictures in "files".
+function Finish-PickFiles($res, [string]$text) {
+  $lines = @($text -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
+  if ($lines.Count -lt 2) { Send-Json $res 200 '{"cancelled":true}'; return }
+  $reg = Register-Root $lines[0].Trim() 'scans'
+  if (-not $reg) { Send-Err $res 404 'not-found' 'That folder does not exist.'; return }
+  $names = @()
+  foreach ($n in $lines[1..($lines.Count - 1)]) {
+    $n = $n.Trim()
+    if ($n.IndexOfAny($script:BadName) -ge 0 -or $n -eq '.' -or $n -eq '..') { continue }
+    if (-not (Test-ImageName $n)) { continue }
+    if (-not (Test-Path -LiteralPath (Join-Path $reg.root.path $n) -PathType Leaf)) { continue }
+    $names += (ConvertTo-JsonString $n)
+  }
+  if ($names.Count -eq 0) { Send-Err $res 404 'not-found' 'None of the chosen files is a picture that Book Compare can read.'; return }
+  $s = Read-Settings; $s.lastScans = (Join-Path $reg.root.path 'x'); Save-Settings $s   # next time the window opens IN this folder
+  $j = Root-Json $reg.id $reg.root
+  Send-Json $res 200 ($j.Substring(0, $j.Length - 1) + ',"files":[' + ($names -join ',') + ']}')
+}
 function Start-Pick($ctx, $body) {
   $res = $ctx.Response
-  $kind = $(if ($body -and $body.kind -eq 'project') { 'project' } else { 'scans' })
+  $kind = $(if ($body -and $body.kind -eq 'project') { 'project' } elseif ($body -and $body.kind -eq 'files') { 'files' } else { 'scans' })
   $requested = $(if ($body -and $body.start) { [string]$body.start } else { '' })
-  $start = Get-StartDir $requested $kind
+  $start = Get-StartDir $requested $(if ($kind -eq 'files') { 'scans' } else { $kind })
   if ($TestPickFile) {                                               # automatic tests: hand out the next path from the file
     $lines = @()
     if (Test-Path -LiteralPath $TestPickFile) { $lines = @(Get-Content -LiteralPath $TestPickFile -Encoding UTF8 | Where-Object { $_.Trim() -ne '' }) }
@@ -283,21 +303,22 @@ function Start-Pick($ctx, $body) {
     if ($lines.Count -gt 1) { [System.IO.File]::WriteAllLines($TestPickFile, [string[]]$lines[1..($lines.Count - 1)]) } else { [System.IO.File]::WriteAllText($TestPickFile, '') }
     if ($first -eq 'FAIL') { Send-Err $res 501 'no-dialog' 'test: no folder window'; return $false }
     if ($first -eq 'CANCEL') { Send-Json $res 200 '{"cancelled":true}'; return $false }
+    if ($kind -eq 'files') { Finish-PickFiles $res (($first -split '\|') -join "`n"); return $false }   # test line: folder|name|name ...
     Finish-Pick $res $kind $first
     return $false
   }
   if (-not $script:IsWin) { Send-Err $res 501 'no-dialog' 'This computer cannot show a folder window.'; return $false }
   if ($script:Pending) { Send-Err $res 409 'busy' 'A folder window is already open.'; return $false }
-  $title = $(if ($kind -eq 'project') { 'Book Compare: choose the project folder (not one of your scan folders)' } else { 'Book Compare: choose the folder with the scans' })
+  $title = $(if ($kind -eq 'project') { 'Book Compare: choose the project folder (not one of your scan folders)' } elseif ($kind -eq 'files') { 'Book Compare: choose one or several pictures (Ctrl- or Shift-click for several)' } else { 'Book Compare: choose the folder with the scans' })
   $outFile = Join-Path $script:DataDirG ('pick-' + [System.Guid]::NewGuid().ToString('N') + '.txt')
   try {
-    $env:BC_PICK_START = $start; $env:BC_PICK_TITLE = $title; $env:BC_PICK_OUT = $outFile
+    $env:BC_PICK_START = $start; $env:BC_PICK_TITLE = $title; $env:BC_PICK_OUT = $outFile; $env:BC_PICK_MODE = $(if ($kind -eq 'files') { 'files' } else { 'folder' })
     $p = Start-Process -FilePath (Get-PsExe) -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}"' -f (Join-Path $PSScriptRoot 'pickfolder.ps1')) -WindowStyle Hidden -PassThru
   } catch {
     Write-Log ('folder window could not be started: ' + $_.Exception.Message)
     Send-Err $res 501 'no-dialog' 'The folder window could not be started.'; return $false
   } finally {
-    Remove-Item Env:BC_PICK_START, Env:BC_PICK_TITLE, Env:BC_PICK_OUT -ErrorAction SilentlyContinue
+    Remove-Item Env:BC_PICK_START, Env:BC_PICK_TITLE, Env:BC_PICK_OUT, Env:BC_PICK_MODE -ErrorAction SilentlyContinue
   }
   $script:Pending = @{ ctx = $ctx; proc = $p; out = $outFile; kind = $kind; started = Get-Date }
   return $true                                                       # the answer is sent when the window is closed
@@ -314,7 +335,8 @@ function Poll-Pick {
     $text = ''
     if (Test-Path -LiteralPath $pd.out) { $text = [System.IO.File]::ReadAllText($pd.out, [System.Text.Encoding]::UTF8).Trim() }
     $code = $(if ($pd.proc.HasExited) { $pd.proc.ExitCode } else { 2 })
-    if ($code -eq 0 -and $text) { Finish-Pick $res $pd.kind $text }
+    if ($code -eq 0 -and $text -and $pd.kind -eq 'files') { Finish-PickFiles $res $text }
+    elseif ($code -eq 0 -and $text) { Finish-Pick $res $pd.kind $text }
     elseif ($code -eq 1) { Send-Json $res 200 '{"cancelled":true}' }
     else { Write-Log ('folder window failed (exit ' + $code + '): ' + $text); Send-Err $res 501 'no-dialog' 'The folder window did not work.' }
   } catch { Write-Log ('pick: ' + $_.Exception.Message); try { Send-Err $res 500 'error' 'Something went wrong.' } catch { } }

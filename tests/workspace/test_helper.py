@@ -154,6 +154,13 @@ def api_tests():
     push_pick('FAIL'); assert jcall('POST', '/api/pick', {'kind': 'scans'})[0] == 501
     push_pick('CANCEL'); st, j = jcall('POST', '/api/pick', {'kind': 'scans'}); assert st == 200 and j.get('cancelled')
     push_pick(os.path.join(BOOKS, 'does not exist')); assert jcall('POST', '/api/pick', {'kind': 'scans'})[0] == 404
+    # single pictures (S10): the window gives the folder and the names; only existing pictures in that folder are passed on
+    push_pick('|'.join([os.path.join(BOOKS, 'Copy-C', 'JPG-1'), 'x_1.jpg', 'x_5.jpg', 'missing.jpg', '..', 'notes.txt']))
+    st, j = jcall('POST', '/api/pick', {'kind': 'files'})
+    assert st == 200 and j['name'] == 'JPG-1' and j['kind'] == 'scans' and j['files'] == ['x_1.jpg', 'x_5.jpg'], (st, j)
+    st, l = jcall('GET', '/api/list?root=%s&path=' % j['id']); assert st == 200 and len(l['entries']) == 3, (st, l)        # the folder is readable now
+    push_pick('CANCEL'); st, j = jcall('POST', '/api/pick', {'kind': 'files'}); assert st == 200 and j.get('cancelled')
+    push_pick('|'.join([os.path.join(BOOKS, 'Copy-C', 'JPG-1'), 'missing.jpg'])); assert jcall('POST', '/api/pick', {'kind': 'files'})[0] == 404
     assert BEFORE == snapshot(), 'scan folders must be unchanged'
 
 # ------------------------------------------------------------------------------------------------------------ the page
@@ -209,6 +216,16 @@ def scenario(p, kind):
     assert d['version'] == 2 and len(d['roots']) == 3 and all(os.path.normcase(r['path']).startswith(os.path.normcase(BOOKS)) for r in d['roots']), d['roots']
     pg.locator('#ws .ws-hname').first.click(); pg.keyboard.type('A-Renamed'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1500)      # changes are saved by themselves
     assert project_json()['copies'][0]['name'] == 'A-Renamed'
+    # single pictures with the Windows "Open" window (S10): a fourth copy with two pictures of Copy-C, then undone
+    push_pick('|'.join([os.path.join(BOOKS, 'Copy-C', 'JPG-2'), 'x_6.jpg', 'x_4.jpg']))
+    pg.click('#ws .ws-tb[data-act=add]' if pg.locator('#ws .ws-tb[data-act=add]').count() else '#ws .ws-addbtn'); pg.wait_for_timeout(200)
+    pg.click('#ac-files'); pg.wait_for_timeout(900)
+    assert '2 single pictures' in pg.inner_text('#ac-info'), pg.inner_text('#ac-info') + ' | ' + pg.inner_text('#ac-err')
+    pg.fill('#ac-name', 'D-Single'); pg.click('#ac-ok'); pg.wait_for_timeout(1500)
+    assert pg.locator('#ws .ws-hname').count() == 4 and col(pg, 3)[:2] == ['x_4.jpg', 'x_6.jpg'], col(pg, 3)
+    d = project_json(); assert len(d['copies']) == 4 and len(d['roots']) == 3, (len(d['copies']), d['roots'])          # the folder lies inside Copy-C: no new root
+    pg.keyboard.press('Control+z'); pg.wait_for_timeout(1500)
+    assert pg.locator('#ws .ws-hname').count() == 3 and len(project_json()['copies']) == 3, 'undo should remove the fourth copy'
     c.close(); stop_helper()
     # --- the helper and the browser were closed: start both again --------------------------------------------------------
     start_helper(); c, pg = session(); open_workspace(pg)

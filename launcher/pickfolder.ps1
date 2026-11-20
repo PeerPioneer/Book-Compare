@@ -1,6 +1,7 @@
-# Book Compare helper - shows the Windows "choose a folder" window.
+# Book Compare helper - shows the Windows "choose a folder" window, or (BC_PICK_MODE=files) the ordinary Windows "Open" window for single pictures.
 # Started by serve.ps1 as a separate small program, so that a problem in this window can never stop Book Compare itself.
-# The result is written to the file named in BC_PICK_OUT. Exit code: 0 = a folder was chosen, 1 = cancelled, 2 = failed.
+# The result is written to the file named in BC_PICK_OUT: the folder, or for pictures the folder on the first line and one file name per line.
+# Exit code: 0 = something was chosen, 1 = cancelled, 2 = failed.
 $ErrorActionPreference = 'Stop'
 $start = $env:BC_PICK_START
 $title = $env:BC_PICK_TITLE
@@ -173,6 +174,31 @@ namespace BookCompare {
   }
 }
 '@
+
+if ($env:BC_PICK_MODE -eq 'files') {
+  # The ordinary Windows "Open" window (the same as in any Windows program); several pictures with Ctrl- or Shift-click.
+  $haveFront = $false
+  try { Add-Type -TypeDefinition $frontCode; $haveFront = $true } catch { }
+  try {
+    if ($haveFront) { [BookCompare.Front]::Start() }
+    $dlg = New-Object System.Windows.Forms.OpenFileDialog
+    $dlg.Title = $title
+    $dlg.Multiselect = $true
+    $dlg.CheckFileExists = $true
+    $dlg.Filter = 'Pictures (*.jpg, *.jpeg, *.png)|*.jpg;*.jpeg;*.png|All files (*.*)|*.*'
+    if ($start -and (Test-Path -LiteralPath $start -PathType Container)) { $dlg.InitialDirectory = $start }
+    $r = $dlg.ShowDialog($owner)
+    try { $owner.Close() } catch { }
+    if ($r -ne [System.Windows.Forms.DialogResult]::OK -or -not $dlg.FileNames -or $dlg.FileNames.Count -eq 0) { Write-Result ''; exit 1 }
+    $folder = Split-Path -Parent $dlg.FileNames[0]
+    $lines = @($folder)
+    foreach ($f in $dlg.FileNames) { if ((Split-Path -Parent $f) -eq $folder) { $lines += (Split-Path -Leaf $f) } }   # all from one folder (a search result could mix folders)
+    Write-Result ($lines -join "`n")
+    exit 0
+  } catch {
+    Write-Result ('picture window failed: ' + $_.Exception.Message); exit 2
+  }
+}
 
 $chosen = $null; $cancelled = $false; $modernFailed = $null
 if ($env:BC_PICK_SELFTEST -eq '1') {                                # automatic Windows test: check the window code without showing a window
