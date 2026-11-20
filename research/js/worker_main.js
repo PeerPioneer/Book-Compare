@@ -41,14 +41,15 @@ var handlers = {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');
     if (refState) { refState.ref.delete(); refState = null; }
     var d = await decodeRed(cv, m.file);
-    refState = Pl.prepareReference(cv, d.red); d.red.delete();
+    try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
     return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
   },
   align: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');
     if (!refState) throw new Error('no reference copy has been set');
     var d = await decodeRed(cv, m.file);
-    var r = Pl.alignCopy(cv, refState, d.red, { measure: !!m.measure }); d.red.delete(); r.aligned.delete();
+    var r; try { r = Pl.alignCopy(cv, refState, d.red, { measure: !!m.measure }); } finally { d.red.delete(); }
+    r.aligned.delete();
     var t = r.times;
     return { w: d.w0, h: d.h0, decode_s: d.decode_s, ink_s: t.ink_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s,
       total_s: d.decode_s + t.total_s, unmatched_rough: r.unmatched && r.unmatched.rough, unmatched_tiles: r.unmatched && r.unmatched.tiles,

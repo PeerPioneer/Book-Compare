@@ -4,6 +4,7 @@
    the small shifts found are repaired (empty tiles and outliers get the median of their neighbours), smoothed into a
    movement field and used to bend the other copy onto the reference. Four levels with smaller and smaller tiles.
    Level = [tile size, step, search radius, outlier threshold] in pixels at the 3000 px working height. */
+const { scope } = require('./printed_area');
 const LEVELS = [[384, 192, 56, 8.0], [192, 96, 14, 3.0], [96, 48, 6, 2.0], [48, 24, 3, 1.5]];
 
 function subpixel(v, i, n) {          // v(k) for k = 0..n-1 given as function
@@ -23,15 +24,16 @@ function measureLevel(cv, ref, mov, box, tile, step, search, minInk = 0.04, minC
   const rows = ys.length, cols = xs.length;
   const SX = new Float32Array(rows * cols).fill(NaN), SY = SX.slice();
   const W = ref.cols, rd = ref.data32F;
-  const r = new cv.Mat();
+  const S = scope(), r = S.add(new cv.Mat());
+  try {
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     const x = xs[i], y = ys[j];
     // mean ink of the tile (cheap, directly on the array)
     let sum = 0;
     for (let yy = y; yy < y + tile; yy++) { const o = yy * W + x; for (let xx = 0; xx < tile; xx++) sum += rd[o + xx]; }
     if (sum / (tile * tile) < minInk) continue;
-    const t = ref.roi(new cv.Rect(x, y, tile, tile));
-    const s = mov.roi(new cv.Rect(x - search, y - search, tile + 2 * search, tile + 2 * search));
+    const t = S.add(ref.roi(new cv.Rect(x, y, tile, tile)));
+    const s = S.add(mov.roi(new cv.Rect(x - search, y - search, tile + 2 * search, tile + 2 * search)));
     cv.matchTemplate(s, t, r, cv.TM_CCOEFF_NORMED);
     const mm = cv.minMaxLoc(r);
     t.delete(); s.delete();
@@ -40,7 +42,7 @@ function measureLevel(cv, ref, mov, box, tile, step, search, minInk = 0.04, minC
     SX[j * cols + i] = subpixel(k => d[py * n + k], px, n) - search;
     SY[j * cols + i] = subpixel(k => d[k * n + px], py, m) - search;
   }
-  r.delete();
+  } finally { S.free(); }
   return { cx: xs.map(x => x + tile / 2), cy: ys.map(y => y + tile / 2), SX, SY, rows, cols };
 }
 
@@ -113,29 +115,32 @@ function denseField(cv, cx, cy, S, rows, cols, W, H) {
 function tileAlign(cv, ref, mov, box, opts = {}) {
   const envLevels = (typeof process !== 'undefined' && process.env && process.env.BC_LEVELS) ? LEVELS.slice(0, +process.env.BC_LEVELS) : null;   // research only: use just the first N levels (a stiffer alignment)
   const levels = opts.levels || envLevels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
-  const refB = new cv.Mat(); cv.GaussianBlur(ref, refB, new cv.Size(0, 0), 0.8);
+  const S = scope(), refB = S.add(new cv.Mat()); cv.GaussianBlur(ref, refB, new cv.Size(0, 0), 0.8);
   let cur = mov;
+  try {
   const total = opts.trackField ? { fx: new Float32Array(W * H), fy: new Float32Array(W * H) } : null;   // sum of all level fields (research: movement map)
   for (const [tile, step, search, threshold] of levels) {
     const t0 = Date.now();
-    const movB = new cv.Mat(); cv.GaussianBlur(cur, movB, new cv.Size(0, 0), 0.8);
+    const movB = S.add(new cv.Mat()); cv.GaussianBlur(cur, movB, new cv.Size(0, 0), 0.8);
     const { cx, cy, SX, SY, rows, cols } = measureLevel(cv, refB, movB, box, tile, step, search);
     movB.delete();
     const t1 = Date.now();
     const fx = denseField(cv, cx, cy, repair(SX, rows, cols, threshold).S, rows, cols, W, H);
     const fy = denseField(cv, cx, cy, repair(SY, rows, cols, threshold).S, rows, cols, W, H);
     if (total) for (let p = 0; p < W * H; p++) { total.fx[p] += fx[p]; total.fy[p] += fy[p]; }
-    const mapx = new cv.Mat(H, W, cv.CV_32F), mapy = new cv.Mat(H, W, cv.CV_32F);
+    const mapx = S.add(new cv.Mat(H, W, cv.CV_32F)), mapy = S.add(new cv.Mat(H, W, cv.CV_32F));
     { const mx = mapx.data32F, my = mapy.data32F; for (let y = 0, p = 0; y < H; y++) for (let x = 0; x < W; x++, p++) { mx[p] = x + fx[p]; my[p] = y + fy[p]; } }
-    const next = new cv.Mat();
+    const next = S.add(new cv.Mat());
     cv.remap(cur, next, mapx, mapy, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(0));
     mapx.delete(); mapy.delete();
     if (cur !== mov) cur.delete();
     cur = next;
     stats.push({ tile, tiles: rows * cols, measure_s: (t1 - t0) / 1000, field_s: (Date.now() - t1) / 1000 });
   }
-  refB.delete();
-  return { aligned: cur, stats, field: total };
+  return { aligned: S.release(cur), stats, field: total };
+  } finally {
+    S.free();                                                                  // (a page that fails here keeps no memory: A5)
+  }
 }
 
 module.exports = { tileAlign, LEVELS };
