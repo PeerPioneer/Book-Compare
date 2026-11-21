@@ -5,6 +5,8 @@
      await engine.reference(file);           // the copy all others are aligned onto
      var r = await engine.align(file, true); // one more copy: times of every step and (measure = true) how well the ink matches
      var c = await engine.alignColor(file);  // the same, and the copy itself bent onto the reference in colour: c.pixels (RGBA), c.w, c.h
+     var b = await engine.alignStore(refFile, refKey, file);   // background (V8-V10): only the movement, packed (b.bin)
+     var s = await engine.warpStored(file, b.bin);             // that movement applied: the same as alignColor gives, without aligning
      engine.terminate();
    `file` is a File or Blob with the scan. Nothing is written anywhere. */
 (function () {
@@ -32,7 +34,10 @@
       reference: function (file) { return call('reference', { file: file }); },
       align: function (file, measure) { return call('align', { file: file, measure: !!measure }); },
       roughColor: function () { return call('roughColor', {}); },                     // V16: the last alignColor copy, rough step only
-      alignColor: function (file, tiles) { return call('alignColor', { file: file, tiles: tiles || null }); },   // tiles: { main, sub } (V15) or nothing
+      alignColor: function (file, tiles, store) { return call('alignColor', { file: file, tiles: tiles || null, store: !!store }); },   // tiles: { main, sub } (V15) or nothing; store: also .bin (V10)
+      // background alignment (V8-V10): refKey names the reference page, so it is prepared only once for several copies; result.bin = the packed movement
+      alignStore: function (refFile, refKey, file, tiles) { return call('alignStore', { refFile: refFile, refKey: refKey, file: file, tiles: tiles || null }); },
+      warpStored: function (file, bin) { return call('warpStored', { file: file, bin: bin }); },        // a stored movement applied to the copy, in colour
       terminate: function () { failAll('The alignment worker was closed.'); worker.terminate(); }
     };
   }

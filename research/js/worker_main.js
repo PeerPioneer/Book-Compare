@@ -1,10 +1,12 @@
 /* Entry of the browser worker: the alignment chain (printed area, rough step, tiles) on scans, off the page's main thread.
-   Messages in:  { id, cmd: 'init' }  |  { id, cmd: 'reference', file }  |  { id, cmd: 'align', file, measure }  |  { id, cmd: 'alignColor', file, tiles }
+   Messages in:  { id, cmd: 'init' }  |  { id, cmd: 'reference', file }  |  { id, cmd: 'align', file, measure }  |  { id, cmd: 'alignColor', file, tiles, store }
+                 { id, cmd: 'alignStore', refFile, refKey, file, tiles }  (background alignment, V8-V10: only the movement comes back, packed for storing)
+                 { id, cmd: 'warpStored', file, bin }                     (a stored movement applied to the copy: no aligning)
    (tiles: { main, sub }, the tile settings of this copy on this page, V15; left out = standard)
    Messages out: { id, ok: true, result } or { id, ok: false, error }
    OpenCV.js (about 13 MB) is loaded once, by 'init'. */
 var OPENCV_URL = '../deps/opencv/opencv.js';
-var cvReady = null, refState = null, lastJob = null;          // lastJob: the copy of the last alignColor and its rough step (V16 rough view)
+var cvReady = null, refState = null, lastJob = null;          // lastJob: the copy of the last alignColor / warpStored and its rough step (V16 rough view)
 
 function loadOpenCv() {
   if (cvReady) return cvReady;
@@ -78,15 +80,58 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
   return out;
 }
 
+async function setReference(cv, file, key) {
+  var Pl = require('./pipeline');
+  if (refState) { refState.ref.delete(); refState = null; } lastJob = null;
+  var d = await decodeRed(cv, file);
+  try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
+  refState.w0 = d.w0; refState.h0 = d.h0; refState.key = key || null;
+  return d;
+}
+// the movement of one aligned page, packed for storing (V10, stored_movement.js): compressed bytes
+async function packMovement(r, mv, extra) {
+  var Sm = require('./stored_movement'), Wr = refState.ref.cols, Hr = refState.ref.rows;
+  var s = r.map ? Sm.downsample(r.map.mx.data32F, r.map.my.data32F, Wr, Hr) : null;
+  var meta = Object.assign({ W: Array.prototype.slice.call(r.W), Wr: Wr, Hr: Hr, refW0: refState.w0, refH0: refState.h0, mvw: mv.w, mvh: mv.h, max: mv.max, hint: mv.hint,
+    unmatched_tiles: r.unmatched ? r.unmatched.tiles : null, unmatched_rough: r.unmatched ? r.unmatched.rough : null, sparse: !!r.sparse, ink_density: r.density }, extra || {});
+  return (await Sm.compress(Sm.pack(meta, s, mv.pixels))).buffer;
+}
+
 var handlers = {
   init: async function () { var o = await loadOpenCv(); return { load_s: o.load_s }; },
   reference: async function (m) {
-    var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');
-    if (refState) { refState.ref.delete(); refState = null; } lastJob = null;
-    var d = await decodeRed(cv, m.file);
-    try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
-    refState.w0 = d.w0; refState.h0 = d.h0;
+    var cv = (await loadOpenCv()).cv;
+    var d = await setReference(cv, m.file, null);
     return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
+  },
+  // background alignment (V8-V10): the copy onto the reference page (prepared again only when it is another page), only the movement comes back
+  alignStore: async function (m) {
+    var cv = (await loadOpenCv()).cv, Pl = require('./pipeline'), t0 = performance.now();
+    if (!refState || !m.refKey || refState.key !== m.refKey) await setReference(cv, m.refFile, m.refKey);
+    var d = await decodeRed(cv, m.file), r = null;
+    try {
+      try { r = Pl.alignCopy(cv, refState, d.red, { measure: true, composeMap: true, levels: m.tiles ? require('./tile_align').levelsFor(m.tiles.main, m.tiles.sub) : undefined }); } finally { d.red.delete(); }
+      r.aligned.delete();
+      var mv = require('./movement').movementMap(r, refState.ref.cols, refState.ref.rows, refState.box);
+      var bin = await packMovement(r, mv, { w0: d.w0, h0: d.h0 });
+      return { bin: bin, unmatched_tiles: r.unmatched.tiles, unmatched_rough: r.unmatched.rough, sparse: !!r.sparse, max: mv.max, hint: mv.hint, total_s: (performance.now() - t0) / 1000, transfer: [bin] };
+    } finally { if (r && r.map) { r.map.mx.delete(); r.map.my.delete(); } }
+  },
+  // a stored movement applied to the copy: the same colour picture as alignColor, without aligning again
+  warpStored: async function (m) {
+    var cv = (await loadOpenCv()).cv, Sm = require('./stored_movement'), t0 = performance.now();
+    var st = Sm.unpack(await Sm.decompress(new Uint8Array(m.bin))), meta = st.meta, map = null;
+    if (st.map) { var up = Sm.upsample(st.map, meta.Wr, meta.Hr); map = { mx: { data32F: up.mx }, my: { data32F: up.my } }; }
+    var bmp;
+    try { bmp = await createImageBitmap(m.file); }
+    catch (e) { throw new Error('The browser could not open the scan "' + (m.file.name || 'picture') + '" (' + (m.file.size / 1e6).toFixed(1) + ' MB).'); }
+    var px = warpColour(cv, bmp, { W: meta.W, map: map }, { cols: meta.Wr, rows: meta.Hr }, meta.refW0, meta.refH0);
+    lastJob = { file: m.file, W: meta.W, Wr: meta.Wr, Hr: meta.Hr, w0: meta.refW0, h0: meta.refH0 };
+    var res = { w: meta.refW0, h: meta.refH0, pixels: px.buffer, stored: true, colour_s: (performance.now() - t0) / 1000,
+      unmatched_tiles: meta.unmatched_tiles, unmatched_rough: meta.unmatched_rough, sparse: meta.sparse, ink_density: meta.ink_density, margin_moved: 0, movement: null };
+    res.transfer = [px.buffer];
+    if (st.mv) { var mvpx = new Uint8ClampedArray(st.mv); res.movement = { w: meta.mvw, h: meta.mvh, pixels: mvpx.buffer, max: meta.max, hint: meta.hint }; res.transfer.push(mvpx.buffer); }
+    return res;
   },
   align: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');
@@ -102,11 +147,11 @@ var handlers = {
   // Compare tab (V16): the copy of the last alignColor job again, bent by the rough (whole-page) step only - "what the fine alignment changed"
   roughColor: async function () {
     var cv = (await loadOpenCv()).cv;
-    if (!refState || !lastJob) throw new Error('nothing has been aligned yet');
+    if (!lastJob) throw new Error('nothing has been aligned yet');
     var d = await decodeRed(cv, lastJob.file, true);
     d.red.delete();
-    var px = warpColour(cv, d.bmp, { W: lastJob.W, map: null }, refState.ref, refState.w0, refState.h0);
-    return { w: refState.w0, h: refState.h0, pixels: px.buffer, transfer: [px.buffer] };
+    var px = warpColour(cv, d.bmp, { W: lastJob.W, map: null }, { cols: lastJob.Wr, rows: lastJob.Hr }, lastJob.w0, lastJob.h0);
+    return { w: lastJob.w0, h: lastJob.h0, pixels: px.buffer, transfer: [px.buffer] };
   },
   // Compare tab: the other copy bent onto the reference, in colour, as big as the reference scan (RGBA, sent back without copying)
   alignColor: async function (m) {
@@ -119,11 +164,13 @@ var handlers = {
       var t0 = performance.now();
       var px = warpColour(cv, d.bmp, r, refState.ref, refState.w0, refState.h0); d.bmp = null;
       var t = r.times, mv = require('./movement').movementMap(r, refState.ref.cols, refState.ref.rows, refState.box);
-      lastJob = { file: m.file, W: Array.prototype.slice.call(r.W) };                        // for the rough view (roughColor)
+      lastJob = { file: m.file, W: Array.prototype.slice.call(r.W), Wr: refState.ref.cols, Hr: refState.ref.rows, w0: refState.w0, h0: refState.h0 };   // for the rough view (roughColor)
+      var bin = m.store ? await packMovement(r, mv, { w0: d.w0, h0: d.h0 }) : null;          // (kept by the page when this pair is one with the reference, V10)
       var res = { w: refState.w0, h: refState.h0, pixels: px.buffer, decode_s: d.decode_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s, colour_s: (performance.now() - t0) / 1000,
         unmatched_rough: r.unmatched.rough, unmatched_tiles: r.unmatched.tiles, sparse: r.sparse, ink_density: r.density, margin_moved: r.margin ? r.margin.moved.length : 0,
         movement: { w: mv.w, h: mv.h, pixels: mv.pixels, max: mv.max, hint: mv.hint } };
       res.transfer = [px.buffer, mv.pixels];
+      if (bin) { res.bin = bin; res.transfer.push(bin); }
       return res;
     } finally {
       if (d.bmp) d.bmp.close();
