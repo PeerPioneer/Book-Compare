@@ -463,6 +463,113 @@ designed for it: a cell can be a region of a file rather than a whole file.
 - Quality dots per row, and the rough wrong-page check before full alignment.
 - Making the app look more pleasing. Surface only, and last.
 
+### 5.7 Finding the subtle differences — owner's idea, 21 November 2026
+
+**The problem (owner).** The obvious changes (a re-set line, a replaced woodcut) are visible
+without Book Compare. Its real value lies in the small ones, and those are still easy to miss:
+"Conradus" against "Couradus" changes the meaning, but on the page it is the difference between
+a u and an n, a few dozen pixels. In the Difference view it shows as two thin slivers of colour,
+and the page is full of similar slivers caused by inking, worn type and paper. The eye slides
+over them. The aim: methods that point the user to such spots, and a way to measure how many
+of them each method finds.
+
+**Step 1: research what is already known.** The owner suspects that this exact problem has been
+studied, and it very likely has. To look into: the optical collators of descriptive bibliography
+(Hinman, Lindstrand, McLeod and later ones) and why they rely on flicker and superimposition; digital
+collation of early prints; Aruspix (superimposition and recognition of early printed music); OCR of
+early printed books followed by a text comparison; and "change detection" in other fields
+(astronomy's blink comparator, document forensics). The result is a short written overview with
+sources, before anything is built.
+
+**Step 2: test pages with planted changes (owner's idea).** Take the same page in two copies that
+are identical in their original state (the owner has scans of the *Ligurinus*, bound with
+the *Melopoiae*: much ordinary text). In one of the two, single letters are replaced by similar
+ones, the kind of change that is common in the *Melopoiae*. Then measure: how many planted changes
+a method finds, and how many false alarms it raises per page.
+- The replacement letters are cut from **elsewhere on the same scan** (same type, same ink,
+  same paper), never typed in a computer font, so that the test is honest. A turned letter (n
+  for u) is a letter of the page turned upside down.
+- Two kinds of test pages: many made by a small script of mine (it records what it changed,
+  where), and a few made by the owner in Photoshop **without telling me where** (a blind test,
+  so that no method gets tuned to answers it already knows).
+- The first measurement is the owner looking with today's Difference and Toggle views: that is
+  the baseline every new method has to beat.
+- The test also checks the alignment: the tile alignment may bend each part of the page by up
+  to 1.5 px (§10: known differences get smaller the more it may bend). A planted change must
+  survive the alignment.
+
+**Step 3: a catalogue of subtle differences**, to decide which ones the test pages must contain.
+Owner's starting list: u/n, l/I, n against a turned u. Further suggestions, to be checked by the owner:
+- *Text:* c/e; long s/f (they differ by a crossbar); rn/m; turned letters in general;
+  an abbreviation mark (tilde or macron over a vowel) added or missing; i with or without its dot;
+  comma against full stop, punctuation added or missing; a ligature against two separate letters; a
+  letter from another font of type; spacing and hyphens.
+- *Music (owner: hard to think of; suggestions):* a stem added or removed (breve against long, the
+  owner's example); stem direction (already in the ground truth: Liber f.19v, stems of 3:12–20); a note
+  one step higher or lower (also in the ground truth: f.19v, the semibreve 6:16 on G in A1 and B but on F
+  in A2); a dot added or missing (dot of addition, dot of division); a rest that hangs from a line against
+  one that stands on it (semibreve against minim rest); mensuration signs (O against C, with or without
+  a dot or a stroke); stems on ligatures, which change the note values; flats and other accidentals;
+  the position of a custos; fermatas and signa congruentiae.
+
+**Step 4: methods to try against the test pages** (ideas, not decisions):
+- *A difference finder:* after alignment, look for small, compact spots of the size of a letter
+  where ink is present in one copy and missing in the other; rank them; show them as a list of
+  small pictures the user steps through (this is C4, the jump list). The hard part is separating
+  real changes from print noise. With many copies there is a strong help: noise is different in
+  every copy, while a real variant appears in exactly the same place in a whole group of copies.
+- *Letter by letter:* cut out every letter and compare it with its partner in the other copy.
+  A u against an n then gets a poor match score, even though few pixels differ.
+- *Reading the text:* OCR made for early printed books on both copies, then a text comparison
+  ("Conradus | Couradus" becomes a word difference). OCR makes mistakes, but it only has to
+  point to the places where the two readings disagree; the user then looks at the picture.
+  For music the same idea would use music recognition (Aruspix recognises early printed music).
+- *Better looking:* the old collators' principle that the eye catches flicker more reliably
+  than a still colour difference: a magnifier with Toggle that follows the list from spot to
+  spot.
+
+No method will find everything. The test pages say honestly how much each one finds, and
+the help text says it too.
+
+### 5.8 The launch — owner's idea, 21 November 2026
+
+**When:** after version 1, after one outside person has installed it (§5.3) and with a DOI
+(§5.2). People should find a download page (a release on GitHub with the installer) and a way
+to cite it. Before the launch, decide about signing the installer (V5d): unsigned, Windows
+warns "unknown publisher", which puts many people off. Signing costs money (a certificate or a
+signing service, yearly or monthly), so this is the owner's decision.
+
+**Where (owner):** academia.edu, LinkedIn, Xing, Facebook. **Suggestions to check before the
+launch** (which ones still exist, and whether announcements are welcome there):
+- Musicology and music libraries: AMS-L (American Musicological Society), IAML and MLA-L (music
+  libraries), the Gesellschaft für Musikforschung, the Medieval and Renaissance Music Conference.
+- Book history and rare books: SHARP-L (Society for the History of Authorship, Reading and
+  Publishing), ExLibris-L (rare-book librarians), bibliographical societies.
+- Digital humanities: the Humanist discussion group, DHd (Digital Humanities im deutschsprachigen
+  Raum), H-Net networks.
+- Bluesky and Mastodon, where many scholars are now.
+- The libraries whose scans appear in the examples (and whose digitised copies the program is for).
+- A short article later, e.g. in the Journal of Open Source Software or *Fontes Artis Musicae*.
+
+**The demonstration, without AI (owner: many people dislike AI-made videos).** A real
+screen recording of the real program, with the owner's own voice, or with captions he writes:
+nobody can mistake that for an AI video.
+- Tools: OBS Studio (free) or the screen recording of the Windows Snipping Tool; cutting with a
+  simple editor (Shotcut is free; Clipchamp comes with Windows).
+- One to two minutes: the question (two copies, where do they differ?), open a project, the page
+  grid, COMPARE, a real variant in the Difference view, the same in Toggle (flicker), done. Real
+  examples from the owner's research (the Liber f.19v stems, a *Melopoiae* variant).
+- Three or four screenshots, and an animated picture made with Book Compare's own GIF export (Toggle).
+- Captions in the video: on LinkedIn and Facebook videos often start without sound.
+- Say plainly how the video was made.
+- **To decide: how to speak about AI in the program itself.** Book Compare's code was written
+  with an AI assistant. Some readers will ask. Openness (a line in the README and the
+  acknowledgements) is the safe way. What can be said with full confidence: Book Compare's
+  *results* involve no AI. The alignment is classical image processing (template matching, ECC,
+  tiles): the same pictures always give the same result, and every step can be checked.
+- I can help with the storyboard and script, the texts for each platform, the screenshots, and the
+  release page.
+
 ---
 
 ## 6. Decisions already made
@@ -956,6 +1063,8 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | P5 | Splitting double-page scans inside Book Compare (§5.5) — the owner's own Photoshop script is the stopgap (not part of the project) | later |
 | P6 | Other visualization modes, quality dots, wrong-page check, look and feel (§5.6) | later |
 | P7 | Mac version from the same code, if colleagues ask | later |
+| P8 | **Finding the subtle differences** (§5.7, owner 21 Nov): research overview first; test pages with planted letter changes (*Ligurinus*, script-made + owner's blind ones); catalogue of subtle differences (text and music); then methods (difference finder / jump list C4, letter by letter, OCR + text comparison, flicker magnifier), each measured against the test pages | later (after version 1) |
+| P9 | **The launch** (§5.8, owner 21 Nov): where to announce; screen-recorded video with the owner's voice or captions (no AI video), screenshots, GIF; download page, DOI; decide about signing the installer and how to speak about AI in the code | later (after version 1) |
 
 ### 11.3 The owner's own tasks and material
 
@@ -966,6 +1075,8 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | T2b | **Several alignments at the same time** (built 20 Nov: speed-test window, button "Several at once …"): the same 16 jobs (prepare the page of one copy, align the same page of another copy onto it) with 1, 2, 4 and 8 helpers from a waiting line; shows the time per number of helpers, the gain against one helper and the longest delay of the page. The owner runs it on his PC and pastes the text; result decides how many helpers V8 uses | **done 20 Nov** (results in §4.5): 4 helpers 3.5 ×, 8 helpers 4.2 ×; default for V8 = half the threads |
 | T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
 | T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |
+| T6 | For P8: scans of the *Ligurinus* (bound with the *Melopoiae*): the same text pages in two copies that are identical in their original state; later a few test pages with letters changed by hand in Photoshop, without telling me where; check the catalogue of subtle differences in §5.7, especially the music part | after version 1 |
+| T7 | For P9: record the demonstration video (screen recording, own voice or captions) | after version 1 |
 | T5 | CZ-Pu split run with v1.0 (15 Nov): 163 double pages split, then every file from NK4288 to NK4405 failed with "Cannot open the file because the open options are incorrect" (112 files); NK4406 (a single page) opened fine. Cause unknown: the D: drive was no longer reachable when I tried to inspect the files. To do: inspect NK4287/NK4288 (format, colour mode, profile), then make the script robust | his drive; then me |
 
 ### 11.4 Decisions still to be taken
