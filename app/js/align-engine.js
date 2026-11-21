@@ -31,7 +31,7 @@
       init: function () { return call('init'); },
       reference: function (file) { return call('reference', { file: file }); },
       align: function (file, measure) { return call('align', { file: file, measure: !!measure }); },
-      alignColor: function (file) { return call('alignColor', { file: file }); },
+      alignColor: function (file, tiles) { return call('alignColor', { file: file, tiles: tiles || null }); },   // tiles: { main, sub } (V15) or nothing
       terminate: function () { failAll('The alignment worker was closed.'); worker.terminate(); }
     };
   }

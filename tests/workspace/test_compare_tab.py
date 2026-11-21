@@ -121,6 +121,20 @@ def scenario(p, kind):
     pg.select_option('#ct_tf', 'perspective'); wait_aligned(pg, 'perspective')
     assert pg.evaluate("document.querySelector('#result canvas').width") > 100
     pg.select_option('#ct_tf', 'tiles'); wait_aligned(pg, 'tiles again')
+    # tile settings for copy 2 on this page (V15): presets, advanced numbers, saved per copy and page, back to standard
+    def tset(): return pg.evaluate("(() => { const s = BookWorkspace.tab.state(); return BookWorkspace.tab.tileSetting(s.row, s.pair[1]); })()")
+    assert pg.is_visible('#ct_tiles') and pg.get_attribute('#ct_tiles button[data-tp=std]', 'aria-pressed') == 'true' and tset() is None
+    pg.click('#ct_tiles button[data-tp=flex]'); wait_aligned(pg, 'more flexible')
+    assert tset() == {'main': 8, 'sub': 4} and 'real differences' in pg.inner_text('#ct_tnote'), (tset(), pg.inner_text('#ct_tnote'))
+    pg.click('#ct_tiles button[data-tp=stiff]'); wait_aligned(pg, 'stiffer')
+    assert tset() == {'main': 8, 'sub': 2} and 'real differences' not in pg.inner_text('#ct_tnote')
+    pg.click('#ct_tadvbtn'); pg.fill('#ct_tmain', '12'); pg.fill('#ct_tsub', '2'); pg.click('#ct_tapply'); wait_aligned(pg, 'advanced')
+    assert tset() == {'main': 12, 'sub': 2} and '12 main tiles' in pg.inner_text('#ct_tnote'), pg.inner_text('#ct_tnote')
+    pg.click('#ct_next'); wait_aligned(pg, 'next page, own setting'); assert tset() is None, 'the setting belongs to one page only'
+    pg.click('#ct_prev'); wait_aligned(pg, 'back'); assert tset() == {'main': 12, 'sub': 2}
+    pg.click('#ct_tiles button[data-tp=std]'); wait_aligned(pg, 'standard again'); assert tset() is None and pg.inner_text('#ct_tnote') == ''
+    pg.select_option('#ct_tf', 'perspective'); pg.wait_for_timeout(150); assert not pg.is_visible('#ct_tiles'), 'the tile settings belong to the tile alignment only'
+    pg.select_option('#ct_tf', 'tiles'); wait_aligned(pg, 'tiles once more')
     pg.click('#ct_c1'); pg.keyboard.press('Escape'); pg.locator('body').click(position={'x': 700, 'y': 450}) if False else None
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     pg.keyboard.press('PageDown'); wait_aligned(pg, 'key page down'); assert 'Page 3' in where(pg), where(pg)

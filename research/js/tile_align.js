@@ -7,6 +7,19 @@
 const { scope } = require('./printed_area');
 const LEVELS = [[384, 192, 56, 8.0], [192, 96, 14, 3.0], [96, 48, 6, 2.0], [48, 24, 3, 1.5]];
 
+/* Tile settings (V15, owner 17 Nov 2026): "main tiles" = how many large tiles cover the page height (standard about 8: 3000 / 384),
+   "sub-tiles" = how many times each is split again (standard 3, so four levels in all). Each level halves the tile size; the search
+   range and the repair threshold of a level are those of the standard level with the same number (a fifth level: 2 px, 1.2).
+   main 8 + sub 3 gives exactly LEVELS. Fewer levels = stiffer (whole regions move together); more = more flexible (smaller pieces
+   may move on their own, which can also pull real differences into place: §10 of PLAN.md). */
+const SEARCH = [56, 14, 6, 3, 2], THRESH = [8.0, 3.0, 2.0, 1.5, 1.2];
+function levelsFor(main, sub, height = 3000) {
+  if (main === 8 && sub === 3) return LEVELS;
+  const t0 = main === 8 ? 384 : Math.round(height / main), out = [];
+  for (let i = 0; i <= sub; i++) { const t = Math.max(16, Math.round(t0 / Math.pow(2, i))); out.push([t, Math.round(t / 2), SEARCH[Math.min(i, 4)], THRESH[Math.min(i, 4)]]); }
+  return out;
+}
+
 function subpixel(v, i, n) {          // v(k) for k = 0..n-1 given as function
   if (i > 0 && i < n - 1) {
     const den = v(i - 1) - 2 * v(i) + v(i + 1);
@@ -222,4 +235,4 @@ function alignMarginItems(cv, ref, aligned, box, opts = {}) {
   } finally { S.free(); }
 }
 
-module.exports = { tileAlign, alignMarginItems, identityMap, LEVELS, OUTSIDE };
+module.exports = { tileAlign, alignMarginItems, identityMap, levelsFor, LEVELS, OUTSIDE };

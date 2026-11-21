@@ -39,10 +39,11 @@
   if (window.AlignEngine && AlignEngine.supported()) TRANSFORMS.unshift(['tiles', 'Tiles (recommended)']);
 
   function W() { return window.BookWorkspace.tab; }
+  function $(id) { return document.getElementById(id); }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function frames(n) { return new Promise(function (res) { (function f(k) { if (k <= 0) res(); else requestAnimationFrame(function () { f(k - 1); }); })(n); }); }
-  function key(s) { return s.pair.join('|') + '#' + s.row + '#' + st.transform; }
+  function key(s) { return s.pair.join('|') + '#' + s.row + '#' + st.transform + '#' + JSON.stringify(W().tileSetting ? W().tileSetting(s.row, s.pair[1]) : null); }
 
   /* ---------------------------------------------------------------- building the pieces */
   function build() {
@@ -70,6 +71,18 @@
       '</div>' +
       '<label class="ct-align"><span>Alignment</span><select id="ct_tf" title="How the second page is bent onto the first. Tiles is the alignment made for printed pages (best in most cases); the older types bend the whole page at once.">' +
       TRANSFORMS.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('') + '</select></label>' +
+      // V15: tile settings for copy 2 on this page (owner's Aruspix idea, decided 17 Nov)
+      '<div class="ct-tiles" id="ct_tiles"><div class="ct-tlab" id="ct_tlab">Fine alignment on this page</div>' +
+      '<div class="ct-seg" role="group" aria-label="Fine alignment on this page">' +
+      '<button data-tp="stiff" title="Larger regions move together. Try this when the alignment bends something it should not.">Stiffer</button>' +
+      '<button data-tp="std" title="The standard setting">Standard</button>' +
+      '<button data-tp="flex" title="Smaller pieces may move on their own. Try this when parts of the page stay doubled. Can also pull real differences into place.">More flexible</button></div>' +
+      '<button class="ct-tadvbtn" id="ct_tadvbtn" aria-expanded="false">Advanced …</button>' +
+      '<div class="ct-tadv" id="ct_tadv" hidden>' +
+      '<label title="How many large tiles cover the height of the page (standard 8)">Main tiles <input type="number" id="ct_tmain" min="4" max="16" step="1"></label>' +
+      '<label title="How many times each tile is split again (standard 3)">Sub-tiles <input type="number" id="ct_tsub" min="1" max="4" step="1"></label>' +
+      '<button class="ct-tapply" id="ct_tapply">Apply</button></div>' +
+      '<p class="ct-tnote" id="ct_tnote"></p></div>' +
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
@@ -140,7 +153,18 @@
     ui.c2.onchange = function () { W().setCopy(1, ui.c2.value); afterCopies(); };
     $('ct_c2up').onclick = function () { stepCopy(1, -1); };
     $('ct_c2dn').onclick = function () { stepCopy(1, 1); };
-    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; markStale(); schedule(80); };
+    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; renderTiles(); markStale(); schedule(80); };
+    ui.tiles = $('ct_tiles');
+    ui.tiles.querySelector('.ct-seg').onclick = function (e) {
+      var b = e.target.closest('button[data-tp]'); if (!b) return;
+      setTiles(PRESETS[b.dataset.tp]);
+    };
+    $('ct_tadvbtn').onclick = function () { var a = $('ct_tadv'); a.hidden = !a.hidden; this.setAttribute('aria-expanded', String(!a.hidden)); };
+    $('ct_tapply').onclick = function () {
+      var m = Math.round(+$('ct_tmain').value), u = Math.round(+$('ct_tsub').value);
+      if (!(m >= 4 && m <= 16 && u >= 1 && u <= 4)) { $('ct_tnote').textContent = 'Main tiles: 4 to 16; sub-tiles: 1 to 4.'; return; }
+      setTiles(m === 8 && u === 3 ? null : { main: m, sub: u });
+    };
     ui.skip.onchange = function () { st.skip = ui.skip.checked; };
     ui.q.oninput = function () { st.q = ui.q.value.trim().toLowerCase(); renderList(); };
     $('ct_prev').onclick = function () { stepPage(-1); };
@@ -254,7 +278,28 @@
     var r = W().rowInfo(s.row);
     ui.where.innerHTML = '<b>' + esc(r.label) + '</b><span>position ' + (s.row + 1) + ' of ' + s.rows + '</span>';
     document.getElementById('ct_proj').textContent = s.name ? s.name : '';
-    renderFlagBtn(r); moveMarker(s);
+    renderFlagBtn(r); moveMarker(s); renderTiles(s);
+  }
+  // V15: the tile settings of copy 2 on this page (null = standard); a change aligns the pair again at once
+  var PRESETS = { stiff: { main: 8, sub: 2 }, std: null, flex: { main: 8, sub: 4 } };
+  function renderTiles(s) {
+    if (!ui.tiles) return;
+    s = s || W().state();
+    ui.tiles.hidden = st.transform !== 'tiles' || !s.pair[1];
+    if (ui.tiles.hidden) return;
+    var t = W().tileSetting(s.row, s.pair[1]), cur = !t ? 'std' : (t.main === 8 && t.sub === 2) ? 'stiff' : (t.main === 8 && t.sub === 4) ? 'flex' : 'custom';
+    Array.prototype.forEach.call(ui.tiles.querySelectorAll('.ct-seg button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.tp === cur)); });
+    $('ct_tmain').value = t ? t.main : 8; $('ct_tsub').value = t ? t.sub : 3;
+    $('ct_tlab').textContent = 'Fine alignment of ' + copyName(1) + ' on this page';
+    var looser = t && (t.sub > 3 || t.main > 8);
+    $('ct_tnote').textContent = !t ? '' : 'Only for ' + copyName(1) + ' on this page' + (cur === 'custom' ? ' (' + t.main + ' main tiles, ' + t.sub + ' sub-tiles)' : '') + '.' +
+      (looser ? ' More flexible settings can also pull real differences into place.' : '');
+    if (cur === 'custom') $('ct_tadv').hidden = false;
+  }
+  function setTiles(t) {
+    var s = W().state(); if (!s.pair[1]) return;
+    W().setTileSetting(s.row, s.pair[1], t);
+    renderTiles(s); markStale(); schedule(60);
   }
   function render() {
     var s = W().state();
@@ -478,7 +523,7 @@
     if (i < 0 || i >= s.rows) return note(dir > 0 ? 'This is the last page to compare.' : 'This is the first page to compare.');
     goRow(i);
   }
-  function afterCopies() { var s = W().state(); renderCopies(s); renderList(); renderMap(s); markStale(); schedule(350); }
+  function afterCopies() { var s = W().state(); renderCopies(s); renderList(); renderMap(s); renderTiles(s); markStale(); schedule(350); }
   function stepCopy(slot, dir) {
     var s = W().state(), n = s.copies.length; if (n < 2) return;
     var other = s.pair[1 - slot], idx = -1;
@@ -530,7 +575,7 @@
       if (my !== st.token) return null;
       setBusy('Aligning copy 2 onto copy 1 … (rough position, then the fine alignment in tiles; a few seconds)');
       g.jobs++;
-      var r = await g.e.alignColor(d.files[1]);
+      var r = await g.e.alignColor(d.files[1], d.tiles);
       await loading;
       if (my !== st.token) return null;
       E.compare.show_aligned(d.names, new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h));
@@ -556,7 +601,7 @@
     var done = false, tiles = st.transform === 'tiles' && d.files, info = null;
     window.BC_COPY_NAMES = [copyName(0), copyName(1)];                                       // the colour note of the Difference view names the copies (js/panes.js)
     try {
-      if (tiles) { info = await serial(function () { return tileJob(d, my); }); done = !!info; }
+      if (tiles) { d.tiles = W().tileSetting(s.row, s.pair[1]); info = await serial(function () { return tileJob(d, my); }); done = !!info; }
       else done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; });
     }
     catch (e) {

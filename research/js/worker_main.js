@@ -1,5 +1,6 @@
 /* Entry of the browser worker: the alignment chain (printed area, rough step, tiles) on scans, off the page's main thread.
-   Messages in:  { id, cmd: 'init' }  |  { id, cmd: 'reference', file }  |  { id, cmd: 'align', file, measure }  |  { id, cmd: 'alignColor', file }
+   Messages in:  { id, cmd: 'init' }  |  { id, cmd: 'reference', file }  |  { id, cmd: 'align', file, measure }  |  { id, cmd: 'alignColor', file, tiles }
+   (tiles: { main, sub }, the tile settings of this copy on this page, V15; left out = standard)
    Messages out: { id, ok: true, result } or { id, ok: false, error }
    OpenCV.js (about 13 MB) is loaded once, by 'init'. */
 var OPENCV_URL = '../deps/opencv/opencv.js';
@@ -104,7 +105,7 @@ var handlers = {
     if (!refState) throw new Error('no reference copy has been set');
     var d = await decodeRed(cv, m.file, true), r = null;
     try {
-      try { r = Pl.alignCopy(cv, refState, d.red, { measure: true, composeMap: true }); } finally { d.red.delete(); }
+      try { r = Pl.alignCopy(cv, refState, d.red, { measure: true, composeMap: true, levels: m.tiles ? require('./tile_align').levelsFor(m.tiles.main, m.tiles.sub) : undefined }); } finally { d.red.delete(); }
       r.aligned.delete();
       var t0 = performance.now();
       var px = warpColour(cv, d.bmp, r, refState.ref, refState.w0, refState.h0); d.bmp = null;

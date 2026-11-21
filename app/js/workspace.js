@@ -282,7 +282,7 @@
 
   /* ---------------------------------------------------------------- state */
   function blank() {
-    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
+    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -344,6 +344,9 @@
     });
     return out;
   }
+  // tile settings (V15): main tiles 4-16, sub-tiles 1-4; anything else is dropped
+  function cleanTile(t) { var m = Math.round(+t.main), u = Math.round(+t.sub); return (m >= 4 && m <= 16 && u >= 1 && u <= 4) ? { main: m, sub: u } : null; }
+  function cleanTiles(o) { var out = {}; if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { var c = /^[\w-]+\|\d+$/.test(k) && cleanTile(o[k] || {}); if (c) out[k] = c; }); return out; }
   function maxAnnId() { var m = 0; Object.keys(S.annots).forEach(function (k) { S.annots[k].forEach(function (a) { if (a.id > m) m = a.id; }); }); return m; }
   function findAnnot(row, id) { var l = S.annots[row] || []; for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
   function selected() {
@@ -365,12 +368,12 @@
 
   /* ---------------------------------------------------------------- undo / redo */
   function snap() {
-    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, s: S.sel, p: S.pair });
+    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, ti: S.tiles, s: S.sel, p: S.pair });
   }
   function restore(str) {
     var o = JSON.parse(str);
     S.copies = o.c.map(function (r) { var c = REG[r.id]; c.name = r.name; c.cells = r.cells; return c; });
-    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.sel = o.s; S.pair = o.p;
+    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.tiles = o.ti || {}; S.sel = o.s; S.pair = o.p;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
     anchor = null;
   }
@@ -682,7 +685,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
@@ -774,7 +777,7 @@
     S = blank(); REG = {}; anchor = null;
     S.projectId = json.projectId || uid();
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
-    S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1);
+    S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1); S.tiles = cleanTiles(json.tiles);
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
     (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
@@ -1425,6 +1428,13 @@
       if (k < 0) return false;
       commit(); l.splice(k, 1); if (!l.length) delete S.annots[row]; touch();
       return true;
+    },
+    // Tile settings (V15) for one copy on one page: { main, sub } (main tiles over the page height, times each is split again), or null = standard
+    tileSetting: function (row, copyId) { var t = S.tiles[copyId + '|' + row]; return t ? { main: t.main, sub: t.sub } : null; },
+    setTileSetting: function (row, copyId, t) {
+      var k = copyId + '|' + row, now = S.tiles[k] || null, c = t ? cleanTile(t) : null;
+      if (JSON.stringify(now) === JSON.stringify(c)) return;
+      commit(); if (c) S.tiles[k] = c; else delete S.tiles[k]; touch();
     },
     flagColors: FLAG_COLORS.slice(), flagNames: FLAG_NAMES.slice(), flagPath: FLAG_PATH,
     // colour 0-5 puts a flag on the row, null takes it away (every change can be undone in the Pages view)

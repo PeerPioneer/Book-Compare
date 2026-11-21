@@ -33,6 +33,20 @@ div.result_container.ct-on.ct-stale #workspace { opacity: .4; transition: opacit
 .ct-step { flex: 0 0 auto; width: 26px; height: 26px; border: 1px solid #cfdcdc; background: #fff; border-radius: 4px; cursor: pointer; color: #008080; font-size: 11px; line-height: 1; padding: 0; }
 .ct-align { display: flex; align-items: center; gap: 10px; padding: 2px 22px 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #5a6d6d; }
 .ct-align select { font-size: 14px; width: auto; flex: 1; border-bottom: 1px solid #cfdcdc; }
+.ct-tiles { padding: 0 22px 10px; font-size: 12.5px; color: #33494a; }
+.ct-tiles[hidden] { display: none; }
+.ct-tlab { font-size: 12px; color: #5a6d6d; margin: 2px 0 5px; }
+.ct-seg { display: flex; border: 1px solid #b9cccc; border-radius: 6px; overflow: hidden; }
+.ct-seg button { flex: 1; border: 0; background: #fff; padding: 5px 4px; font: inherit; font-size: 12px; cursor: pointer; color: #1b2a2a; }
+.ct-seg button + button { border-left: 1px solid #b9cccc; }
+.ct-seg button[aria-pressed="true"] { background: #00807a; color: #fff; }
+.ct-tadvbtn { border: 0; background: none; color: #00807a; font: inherit; font-size: 12px; padding: 4px 0 0; cursor: pointer; }
+.ct-tadv { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.ct-tadv[hidden] { display: none; }
+.ct-tadv input { width: 3.4em; font: inherit; }
+.ct-tapply { border: 1px solid #00807a; background: #fff; color: #00807a; border-radius: 4px; padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer; }
+.ct-tnote { margin: 5px 0 0; color: #7a4b00; font-size: 12px; }
+.ct-tnote:empty { display: none; }
 .ct-listhead { padding: 4px 14px 0; }
 .ct-listhead h3 { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #5a6d6d; }
 .ct-search { display: block; padding: 6px 12px; }
