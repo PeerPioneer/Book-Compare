@@ -2559,6 +2559,11 @@
         // From https://github.com/jakearchibald/wittr/blob/fecaad3a07c41a43230cf8fef2fc102f658981cf/public/js/main/IndexController.js
 
         if (!navigator.serviceWorker) return;
+        // The desktop program has its program files on the computer already: no offline copy is needed (and none can get out of date).
+        if (/BookCompareDesktop/.test(navigator.userAgent)) {
+          navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+          return;
+        }
         const sw_ready = (worker) => {
           // TODO: Currently force refreshing. Show toast.
           worker.postMessage({ action: "skipWaiting" });

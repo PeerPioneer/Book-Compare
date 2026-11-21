@@ -1,0 +1,81 @@
+# The desktop program (V5, Electron, desktop/):
+# 1. "server": the desktop program's own scan reader (desktop/server.js) must give the same answers as the helper:
+#    the whole helper test runs against it (Linux, Chromium).
+# 2. "installer": builds the Windows installer, installs it silently on a real Windows machine, starts the installed program in its
+#    test mode (page loads, scan reader answers, alignment engine available) and uninstalls it again. The installer is kept as a
+#    download of this run ("Book-Compare-Setup"), for 30 days.
+name: Desktop program
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'app/**'
+      - 'tests/workspace/test_helper.py'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install the browser used by the test
+        run: |
+          pip install playwright pillow
+          python -m playwright install --with-deps chromium
+      - name: The helper test against desktop/server.js
+        env:
+          BOOKCOMPARE_SERVER: desktop
+          BOOKCOMPARE_BROWSERS: chromium
+        run: python tests/workspace/test_helper.py
+
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Build the installer
+        working-directory: desktop
+        run: |
+          npm ci --no-audit --no-fund
+          npm run dist
+      - name: The unpacked program starts (test mode)
+        shell: powershell
+        working-directory: desktop
+        run: |
+          $exe = Get-ChildItem dist\win-unpacked -Filter 'Book Compare.exe' | Select-Object -First 1
+          $p = Start-Process $exe.FullName -ArgumentList '--smoke-test', "$env:TEMP\smoke1.json" -PassThru -Wait
+          Get-Content "$env:TEMP\smoke1.json"
+          if ($p.ExitCode -ne 0) { throw "test mode failed (exit $($p.ExitCode))" }
+      - name: Install silently, start the installed program, uninstall
+        shell: powershell
+        working-directory: desktop
+        run: |
+          $setup = Get-ChildItem dist -Filter 'Book-Compare-Setup-*.exe' | Select-Object -First 1
+          Write-Host "installer: $($setup.Name), $([math]::Round($setup.Length / 1MB)) MB"
+          Start-Process $setup.FullName -ArgumentList '/S' -Wait
+          $installed = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Book Compare.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $installed) { throw 'Book Compare.exe was not installed' }
+          Write-Host "installed: $($installed.FullName)"
+          $lnk = @("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Book Compare.lnk") | Where-Object { Test-Path $_ }
+          if (-not $lnk) { throw 'no Start-menu entry' }
+          $p = Start-Process $installed.FullName -ArgumentList '--smoke-test', "$env:TEMP\smoke2.json" -PassThru -Wait
+          Get-Content "$env:TEMP\smoke2.json"
+          if ($p.ExitCode -ne 0) { throw "installed program: test mode failed (exit $($p.ExitCode))" }
+          $un = Get-ChildItem $installed.DirectoryName -Filter 'Uninstall*.exe' | Select-Object -First 1
+          Start-Process $un.FullName -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (Test-Path $installed.FullName) { throw 'uninstall left the program behind' }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Book-Compare-Setup
+          path: desktop/dist/Book-Compare-Setup-*.exe
+          retention-days: 30
+          if-no-files-found: error

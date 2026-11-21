@@ -1,0 +1,38 @@
+{
+  "name": "book-compare",
+  "productName": "Book Compare",
+  "version": "0.7.0",
+  "description": "Compare scans of copies of early printed books, page by page.",
+  "author": "Torge Schiefelbein",
+  "license": "BSD-2-Clause",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.peerpioneer.bookcompare",
+    "productName": "Book Compare",
+    "artifactName": "Book-Compare-Setup-${version}.${ext}",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "server.js", "package.json", "build/icon.ico"],
+    "extraResources": [{ "from": "../app", "to": "app", "filter": ["**/*"] }],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.ico" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Book Compare",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

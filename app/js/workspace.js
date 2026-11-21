@@ -120,7 +120,7 @@
     e.name = status === 404 ? 'NotFoundError' : status === 403 ? 'NotAllowedError' : 'Error';
     return e;
   }
-  function helperLost() { var e = new Error('The Book Compare helper is not running. Start it with “Start Book Compare”.'); e.name = 'Lost'; e.net = true; return e; }
+  function helperLost() { var e = new Error(HELPER && HELPER.desktop ? 'Book Compare cannot read the scan folders right now. Please close Book Compare and open it again.' : 'The Book Compare helper is not running. Start it with “Start Book Compare”.'); e.name = 'Lost'; e.net = true; return e; }
   async function hrequest(method, url, body) {
     var resp;
     try { resp = await fetch(url, { method: method, headers: { 'X-BookCompare': '1' }, body: body, cache: 'no-store' }); }
@@ -1310,7 +1310,7 @@
       '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
       '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
       '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
-      (HELPER ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');
+      (HELPER && !HELPER.desktop ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');   // (the desktop program is closed like any window)
   }
 
   /* ---------------------------------------------------------------- hand a pair of pages to the Compare tab */

@@ -1,6 +1,18 @@
 BOOK COMPARE - START HERE
 =========================
 
+NEW (version 0.7, November 2026): Book Compare as an ordinary Windows program
+-----------------------------------------------------------------------------
+Run the installer "Book-Compare-Setup-0.7.0.exe". It installs Book Compare for your Windows
+user only (no administrator needed), with an entry in the Start menu and on the Desktop.
+Book Compare then opens in its own window: no browser, no .bat file, no black window and no
+icon near the clock. Everything else works as described below.
+ * Windows may say "Windows protected your PC" the first time ("unknown publisher"), because
+   the installer is not signed yet. Click "More info", then "Run anyway".
+ * Projects made with the helper open in the program too: "More" > "Open saved project …", and choose the
+   same project folder. The program remembers its own last project from then on.
+ * The way below (helper + browser) keeps working; you can use both.
+
 Book Compare runs on your own computer. Your scans are never uploaded, and Book Compare
 only READS them: it never changes, moves or deletes a scan.
 

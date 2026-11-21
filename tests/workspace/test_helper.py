@@ -1,4 +1,5 @@
 """Automatic test of the Book Compare helper (launcher/serve.ps1) together with the workspace in the page.
+With BOOKCOMPARE_SERVER=desktop the same test runs against the desktop program's server (desktop/server.js).
 
 Everything here uses REAL folders on disk (made-up scans in a temporary folder, never your own folders):
   * the helper's file service: listing, reading pictures, saving the project file, and everything it must refuse
@@ -19,7 +20,7 @@ REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 PORT = int(os.environ.get('BOOKCOMPARE_HELPER_PORT', '8794'))
 BASE = 'http://localhost:%d' % PORT
 PWSH = os.environ.get('PWSH') or shutil.which('pwsh') or shutil.which('powershell')
-if not PWSH:
+if not PWSH and os.environ.get('BOOKCOMPARE_SERVER') != 'desktop':
     print('SKIPPED: no PowerShell found (set PWSH)'); sys.exit(0)
 
 TMP = os.path.realpath(tempfile.mkdtemp(prefix='bc_helper_'))       # (real path: on Windows the temp folder may be given in the short form RUNNER~1)
@@ -60,11 +61,15 @@ BEFORE = snapshot()
 
 # ------------------------------------------------------------------------------------------------------------ the helper
 proc = None
+SERVER = os.environ.get('BOOKCOMPARE_SERVER', 'helper')     # 'desktop' = test desktop/server.js instead of launcher/serve.ps1
 def start_helper():
     global proc
-    args = [PWSH, '-NoProfile']
-    if os.name == 'nt': args += ['-ExecutionPolicy', 'Bypass']
-    args += ['-File', os.path.join(REPO, 'launcher', 'serve.ps1'), '-Port', str(PORT), '-NoBrowser', '-NoTray', '-NoSetup', '-DataDir', DATA, '-TestPickFile', PICKS]
+    if SERVER == 'desktop':                                   # the desktop program's own server (desktop/server.js), the same answers as serve.ps1
+        args = ['node', os.path.join(REPO, 'desktop', 'server.js'), '--port', str(PORT), '--data-dir', DATA, '--test-pick-file', PICKS]
+    else:
+        args = [PWSH, '-NoProfile']
+        if os.name == 'nt': args += ['-ExecutionPolicy', 'Bypass']
+        args += ['-File', os.path.join(REPO, 'launcher', 'serve.ps1'), '-Port', str(PORT), '-NoBrowser', '-NoTray', '-NoSetup', '-DataDir', DATA, '-TestPickFile', PICKS]
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(80):
         try:
