@@ -203,7 +203,8 @@ def scenario(p, kind):
     # --- first session: three copies, project saved next to them ---------------------------------------------------------
     start_helper(); c, pg = session(); open_workspace(pg)
     assert pg.evaluate("typeof BookWorkspace") == 'object'
-    pg.click('#ws-more'); assert 'Quit the Book Compare helper' in pg.inner_text('#ws-menu'); pg.click('#ws-more')       # helper mode is on
+    assert pg.evaluate("fetch('/api/ping').then(r => r.json()).then(j => !!j.desktop)") == (SERVER == 'desktop')
+    pg.click('#ws-more'); assert ('Quit the Book Compare helper' in pg.inner_text('#ws-menu')) == (SERVER != 'desktop'); pg.click('#ws-more')   # helper mode is on (the program has no "quit helper")
     add_copy(pg, 'Copy-A', 'A-Test'); add_copy(pg, 'Copy-B ä', 'B-Test', start=2); add_copy(pg, 'Copy-C', 'C-Test', ticks=(0, 1))
     assert pg.locator('#ws .ws-hname').count() == 3, pg.inner_text('#ws')
     assert col(pg, 0)[:2] == ['scan_001.jpg', 'scan_002.jpg'] and col(pg, 1)[:3] == ['-', 'img_1.JPG', 'img_2.JPG'] and col(pg, 2)[:2] == ['x_1.jpg', 'x_2.jpg'] or col(pg, 2)[:2] == ['x_1.jpg', 'x_3.jpg'], (col(pg, 0), col(pg, 1), col(pg, 2))
@@ -297,7 +298,8 @@ def scenario(p, kind):
     pg.wait_for_timeout(1200)
     shutil.move(os.path.join(moved, 'Copy-B ä'), os.path.join(BOOKS, 'Copy-B ä')); os.rmdir(moved)       # put everything back for the next run
     # --- the helper is stopped while the page is open: seen pages stay visible, new ones say why they are missing ---------
-    pg.click('#ws-more'); pg.click('[data-m=quit]'); pg.wait_for_timeout(300); pg.click('#cf-yes'); pg.wait_for_timeout(1200)
+    if SERVER == 'desktop': pg.evaluate("fetch('/api/quit', {method: 'POST', headers: {'X-BookCompare': '1'}})"); pg.wait_for_timeout(1200)   # (the program has no menu entry for it)
+    else: pg.click('#ws-more'); pg.click('[data-m=quit]'); pg.wait_for_timeout(300); pg.click('#cf-yes'); pg.wait_for_timeout(1200)
     for _ in range(40):
         if proc.poll() is not None: break
         time.sleep(0.25)
