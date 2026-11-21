@@ -1,1 +1,0 @@
-Logo font: Mohave (https://fonts.google.com/specimen/Mohave?preview.text=Image%20Compare&preview.text_type=custom#about)

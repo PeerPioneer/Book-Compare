@@ -1,98 +1,61 @@
 BOOK COMPARE - START HERE
 =========================
 
-NEW (November 2026): Book Compare as an ordinary Windows program
-----------------------------------------------------------------
-Download the newest installer from https://github.com/PeerPioneer/Book-Compare/releases/latest
-(file "Book-Compare-Setup-x.y.z.exe"; on the website the link "Desktop program for Windows" leads
-there) and run it. It asks where to install Book Compare and whether it should appear in the Start
-menu and on the Desktop; installed for yourself, no administrator password is needed.
-Book Compare then opens in its own window: no browser, no .bat file, no black window and no
-icon near the clock. When a newer version is on the download page, the program says so once a
-day (it never changes itself). Everything else works as described below.
- * Windows may say "Windows protected your PC" the first time ("unknown publisher"), because
-   the installer is not signed yet. Click "More info", then "Run anyway".
- * Projects made with the helper open in the program too: "More" > "Open saved project …", and choose the
-   same project folder. The program remembers its own last project from then on.
- * The way below (helper + browser) keeps working; you can use both.
-
-Book Compare runs on your own computer. Your scans are never uploaded, and Book Compare
-only READS them: it never changes, moves or deletes a scan.
-
-How it works: a small helper program runs quietly in the background. It reads your scan
-folders for Book Compare, so your browser never has to ask for permission to every folder.
-You choose each scan folder once in the normal Windows folder window, and Book Compare
-remembers it. It works in Edge, Chrome and Firefox.
+Book Compare compares scans of copies of early printed books, page by page.
+It runs on your own computer. Your scans are never uploaded, and Book Compare only READS them:
+it never changes, moves or deletes a scan. The only file it writes is the project file, in the
+project folder you choose.
 
 
-1. Get the files
-----------------
-On the GitHub page of Book Compare click the green "Code" button, then "Download ZIP".
-Open the ZIP file and choose "Extract all ...".
-IMPORTANT: unzip the WHOLE folder. Do not start the program from inside the ZIP.
-Put the unzipped folder where you want to keep it (for example in Documents) BEFORE the
-first start.
+1. Install it (Windows 10 and 11)
+---------------------------------
+Download the newest installer from
+    https://github.com/PeerPioneer/Book-Compare/releases/latest
+(the file "Book-Compare-Setup-x.y.z.exe"; on the website, the link "Desktop program for
+Windows" leads there) and run it.
+ * Windows may say "Windows protected your PC" ("unknown publisher"), because the installer
+   is not signed yet. Click "More info", then "Run anyway".
+ * The installer asks for whom to install it (installed only for you, no administrator
+   password is needed), where to install it, and whether Book Compare should appear in the
+   Start menu and on the Desktop.
 
 
-2. Start it
------------
-Double-click the file  "Start Book Compare.bat"
-
- * Windows may say "Windows protected your PC" the first time. This happens with every
-   program that does not come from a big company. Click "More info", then "Run anyway".
-   The start files are short readable text: open them in Notepad to see everything they do.
- * The very first time, Book Compare asks two questions:
-     - Start automatically when Windows starts? (Recommended: Yes. Then it is always ready.)
-     - Put a shortcut on the Desktop?
- * There is no black window. Book Compare opens in Microsoft Edge, where it works best. If Edge is
-   not installed, it opens in your default browser instead. The helper has a small icon near the clock
-   (click the little arrow next to the clock if you do not see it). Right-click it for:
-   Open Book Compare / Start with Windows / Quit Book Compare.
-
-
-3. Every day
+2. Every day
 ------------
-Use the Desktop shortcut, or "Open Book Compare" in the icon near the clock, or type
-http://localhost:8765/ into your browser (bookmark it). If you chose "start automatically",
-the helper is already running when you switch on the computer.
-
-The helper only has to be running while you use Book Compare. If it is not running, Book
-Compare says so and shows the pictures it has seen before.
-
-You do NOT need to "install Book Compare as an app" in Edge any more. (If you did earlier,
-it still works as long as the helper is running.)
+Start Book Compare from the Start menu or the Desktop icon. It opens in its own window.
+On the start screen choose "Compare copies of a book". Add each copy as a folder of scans
+(the ordinary Windows folder window; or "Add single pictures ..." for a few files), then save
+the project in a folder of its own ("More" > "Save project in a folder ..."). Book Compare
+remembers your scan folders and your last project.
 
 
-4. Updating
+3. Updating
 -----------
-Download the new ZIP, unzip it, and double-click "Start Book Compare.bat" in the NEW
-folder. It takes over from the old one by itself, and your Desktop and start-with-Windows
-shortcuts are repaired to point to the new folder. Your saved projects are not in this folder
-(they are in the project folder you chose), so nothing is lost. If you move the Book Compare
-folder, double-click "Start Book Compare.bat" once at the new place.
+When a newer version is on the download page, Book Compare says so once a day ("Go to the
+download page" / "Later"). Download the new installer and run it: it replaces the old
+version; there is no need to remove the old one first. Your projects are not touched.
 
 
-5. Stopping it
+4. Removing it
 --------------
-Right-click the icon near the clock and choose "Quit Book Compare". (Or use "Stop Book
-Compare.bat", or "More" - "Quit the Book Compare helper" inside Book Compare.)
-To stop it from starting with Windows: right-click the icon and untick "Start with Windows".
+Windows Settings > Apps > Installed apps > Book Compare > Uninstall. Your projects and scans
+stay where they are.
 
 
 If something does not work
 --------------------------
- * Nothing opens: double-click "Start Book Compare (with window, for problems).bat". It
-   shows a window that tells you what is going on.
- * "Book Compare could not start on port 8765. Another program is using it.": restart the
-   computer, or close the other program, then try again.
- * 'The folder "app" was not found next to the folder "launcher"': you started the file from
-   inside the ZIP, or the folder is incomplete. Unzip the whole download and try again.
- * Windows blocks the script: right-click "Start Book Compare.bat", choose "Properties", tick
-   "Unblock" at the bottom, click OK, and try again.
- * The Windows folder window does not appear: Book Compare then asks you to paste the folder
-   address instead (in Explorer: click the address bar, copy, paste).
- * A short log of what the helper did is kept in %LOCALAPPDATA%\BookCompare\helper.log
+ * A short log of what Book Compare did is kept in  %APPDATA%\Book Compare\book-compare.log
    (type that into the address bar of a File Explorer window).
- * You opened index.html directly (without the helper): the two-image screen works, but the
-   workspace then has to ask the browser for permission to the scan folders (Edge and Chrome
-   only). Use "Start Book Compare.bat" for the full experience.
+ * Book Compare says it cannot read the scan folders: close it and open it again.
+ * Still there from before November 2026: the old "helper" (a small icon near the clock and
+   the files "Start Book Compare.bat"). It is no longer needed. Right-click its icon near the
+   clock, untick "Start with Windows", choose "Quit Book Compare", and delete the old
+   unzipped Book Compare folder. Projects made with it open in the program: "More" >
+   "Open saved project ...", and choose the same project folder.
+
+
+Without installing: the website
+-------------------------------
+https://peerpioneer.github.io/Book-Compare/ is the same Book Compare in the browser (Edge or
+Chrome; Firefox with fewer comforts). Nothing is uploaded there either. The browser asks for
+permission to your scan folders, which the desktop program does not need.

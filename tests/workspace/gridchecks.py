@@ -1,6 +1,6 @@
 """Checks of the grid editing: column width (drag the edge of a heading), moving a copy (drag the heading or the toolbar buttons) and
 deleting a whole range of files (Shift + click / Shift + arrow). Shared by test_workspace.py (Chromium, private browser storage) and
-test_helper.py (Chromium AND Firefox, real folders). It expects the three test copies and leaves the grid exactly as it found it.
+test_desktop_server.py (Chromium AND Firefox, real folders). It expects the three test copies and leaves the grid exactly as it found it.
 """
 
 def run(pg, col, read_proj=None):

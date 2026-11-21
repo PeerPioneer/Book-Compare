@@ -1,16 +1,15 @@
-"""Automatic test of the Book Compare helper (launcher/serve.ps1) together with the workspace in the page.
-With BOOKCOMPARE_SERVER=desktop the same test runs against the desktop program's server (desktop/server.js).
+"""Automatic test of the desktop program's scan reader (desktop/server.js) together with the workspace in the page.
 
 Everything here uses REAL folders on disk (made-up scans in a temporary folder, never your own folders):
-  * the helper's file service: listing, reading pictures, saving the project file, and everything it must refuse
-  * the workspace in helper mode, in Chromium AND Firefox: add copies, save the project in a folder that lies next to the copy folders,
-    restart the helper and the browser, reopen the project - without a single permission question - compare a pair
-  * a moved scan folder is found again with one folder choice
+  * the scan reader: listing, reading pictures, saving the project file, and everything it must refuse
+  * the workspace in desktop mode, in Chromium AND Firefox: add copies, save the project in a folder that lies next to the copy folders,
+    restart the reader and the browser, reopen the project - without a single permission question - compare a pair
+  * a moved scan folder is found again with one folder choice; single pictures (S10)
   * the scan folders are never changed
 
-Needs PowerShell: pwsh (Linux/Mac) or powershell (Windows), or set PWSH. The Windows folder window itself can not be tested here
-(the helper hands out folder paths from a list instead, see -TestPickFile).
-Run:  python3 tests/workspace/test_helper.py
+The Windows folder and Open windows themselves are not tested here (the reader hands out folder paths from a list instead,
+see --test-pick-file). Needs Node. (Until 21 Nov 2026 this was test_helper.py, for the former helper launcher/serve.ps1.)
+Run:  python3 tests/workspace/test_desktop_server.py
 """
 import hashlib, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
 from playwright.sync_api import sync_playwright
@@ -19,11 +18,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 PORT = int(os.environ.get('BOOKCOMPARE_HELPER_PORT', '8794'))
 BASE = 'http://localhost:%d' % PORT
-PWSH = os.environ.get('PWSH') or shutil.which('pwsh') or shutil.which('powershell')
-if not PWSH and os.environ.get('BOOKCOMPARE_SERVER') != 'desktop':
-    print('SKIPPED: no PowerShell found (set PWSH)'); sys.exit(0)
+if not shutil.which('node'):
+    print('SKIPPED: Node is not installed'); sys.exit(0)
 
-TMP = os.path.realpath(tempfile.mkdtemp(prefix='bc_helper_'))       # (real path: on Windows the temp folder may be given in the short form RUNNER~1)
+TMP = os.path.realpath(tempfile.mkdtemp(prefix='bc_server_'))       # (real path: on Windows the temp folder may be given in the short form RUNNER~1)
 BOOKS = os.path.join(TMP, 'Bücher mit Leerzeichen')       # spaces and a non-ASCII letter on purpose
 DATA = os.path.join(TMP, 'data'); PICKS = os.path.join(TMP, 'picks.txt')
 for d in (BOOKS, DATA): os.makedirs(d)
@@ -59,17 +57,11 @@ def snapshot():
     return out
 BEFORE = snapshot()
 
-# ------------------------------------------------------------------------------------------------------------ the helper
+# ------------------------------------------------------------------------------------------------------------ the scan reader (desktop/server.js)
 proc = None
-SERVER = os.environ.get('BOOKCOMPARE_SERVER', 'helper')     # 'desktop' = test desktop/server.js instead of launcher/serve.ps1
-def start_helper():
+def start_helper():                                                  # (the name is historical: it starts desktop/server.js)
     global proc
-    if SERVER == 'desktop':                                   # the desktop program's own server (desktop/server.js), the same answers as serve.ps1
-        args = ['node', os.path.join(REPO, 'desktop', 'server.js'), '--port', str(PORT), '--data-dir', DATA, '--test-pick-file', PICKS]
-    else:
-        args = [PWSH, '-NoProfile']
-        if os.name == 'nt': args += ['-ExecutionPolicy', 'Bypass']
-        args += ['-File', os.path.join(REPO, 'launcher', 'serve.ps1'), '-Port', str(PORT), '-NoBrowser', '-NoTray', '-NoSetup', '-DataDir', DATA, '-TestPickFile', PICKS]
+    args = ['node', os.path.join(REPO, 'desktop', 'server.js'), '--port', str(PORT), '--data-dir', DATA, '--test-pick-file', PICKS]
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(80):
         try:
@@ -203,8 +195,7 @@ def scenario(p, kind):
     # --- first session: three copies, project saved next to them ---------------------------------------------------------
     start_helper(); c, pg = session(); open_workspace(pg)
     assert pg.evaluate("typeof BookWorkspace") == 'object'
-    assert pg.evaluate("fetch('/api/ping').then(r => r.json()).then(j => !!j.desktop)") == (SERVER == 'desktop')
-    pg.click('#ws-more'); assert ('Quit the Book Compare helper' in pg.inner_text('#ws-menu')) == (SERVER != 'desktop'); pg.click('#ws-more')   # helper mode is on (the program has no "quit helper")
+    assert pg.evaluate("fetch('/api/ping').then(r => r.json()).then(j => !!j.desktop)"), 'desktop mode is on'
     add_copy(pg, 'Copy-A', 'A-Test'); add_copy(pg, 'Copy-B ä', 'B-Test', start=2); add_copy(pg, 'Copy-C', 'C-Test', ticks=(0, 1))
     assert pg.locator('#ws .ws-hname').count() == 3, pg.inner_text('#ws')
     assert col(pg, 0)[:2] == ['scan_001.jpg', 'scan_002.jpg'] and col(pg, 1)[:3] == ['-', 'img_1.JPG', 'img_2.JPG'] and col(pg, 2)[:2] == ['x_1.jpg', 'x_2.jpg'] or col(pg, 2)[:2] == ['x_1.jpg', 'x_3.jpg'], (col(pg, 0), col(pg, 1), col(pg, 2))
@@ -298,8 +289,7 @@ def scenario(p, kind):
     pg.wait_for_timeout(1200)
     shutil.move(os.path.join(moved, 'Copy-B ä'), os.path.join(BOOKS, 'Copy-B ä')); os.rmdir(moved)       # put everything back for the next run
     # --- the helper is stopped while the page is open: seen pages stay visible, new ones say why they are missing ---------
-    if SERVER == 'desktop': pg.evaluate("fetch('/api/quit', {method: 'POST', headers: {'X-BookCompare': '1'}})"); pg.wait_for_timeout(1200)   # (the program has no menu entry for it)
-    else: pg.click('#ws-more'); pg.click('[data-m=quit]'); pg.wait_for_timeout(300); pg.click('#cf-yes'); pg.wait_for_timeout(1200)
+    pg.evaluate("fetch('/api/quit', {method: 'POST', headers: {'X-BookCompare': '1'}})"); pg.wait_for_timeout(1200)   # (as if the reader had stopped)
     for _ in range(40):
         if proc.poll() is not None: break
         time.sleep(0.25)
@@ -312,8 +302,8 @@ def scenario(p, kind):
     pg.locator('#ws .ws-lbl[data-r="7"]').first.click()
     for _ in range(120):                                                  # (Windows needs a few seconds to find out that nothing answers, and each picture is tried three times)
         pg.wait_for_timeout(500)
-        if 'helper is not running' in pg.inner_text('#ws-thumbs'): break
-    assert 'helper is not running' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
+        if 'cannot read the scans right now' in pg.inner_text('#ws-thumbs'): break
+    assert 'cannot read the scans right now' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 
@@ -324,7 +314,7 @@ try:
             scenario(p, kind)
     assert BEFORE == snapshot(), 'scan folders must be unchanged'
     assert not errs, errs
-    print('ALL HELPER TESTS PASSED')
+    print('ALL DESKTOP SERVER TESTS PASSED')
 finally:
     stop_helper()
     shutil.rmtree(TMP, ignore_errors=True)

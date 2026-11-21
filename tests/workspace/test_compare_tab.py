@@ -1,6 +1,6 @@
 """Automatic test of the Compare tab (app/js/compare-tab.js) with the real alignment engine of the app.
 
-It uses the helper (launcher/serve.ps1) with REAL folders on disk and the sample pictures that come with the app
+It uses the desktop program's scan reader (desktop/server.js) with REAL folders on disk and the sample pictures that come with the app
 (app/images/usecases): three copies "A", "B", "C" (C has only two pages), made in a temporary folder - never your own scans.
 Checked, in Chromium and Firefox:
   COMPARE opens the Compare tab and aligns the pair by itself; next/previous page, keys, copy menus, swap, the page list and its
@@ -8,7 +8,7 @@ Checked, in Chromium and Firefox:
   undo), the book map (opens near the pointer, picture of the page, click to jump, grey ticks, pin), focus mode (hides everything but the pictures, keys work, Esc/Leave button),
   the speed test (More > Measure speed on this computer: times each copy, copes with a scan that cannot be opened, Stop, closing the window, changes nothing in the project), and that the scan folders are never changed.
 
-Run:  PWSH=pwsh python3 tests/workspace/test_compare_tab.py
+Run:  python3 tests/workspace/test_compare_tab.py   (needs Node)
 """
 import hashlib, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 from playwright.sync_api import sync_playwright
@@ -17,9 +17,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 PORT = int(os.environ.get('BOOKCOMPARE_HELPER_PORT', '8795'))
 BASE = 'http://localhost:%d' % PORT
-PWSH = os.environ.get('PWSH') or shutil.which('pwsh') or shutil.which('powershell')
-if not PWSH:
-    print('SKIPPED: no PowerShell found (set PWSH)'); sys.exit(0)
+if not shutil.which('node'):
+    print('SKIPPED: Node is not installed'); sys.exit(0)
 
 TMP = os.path.realpath(tempfile.mkdtemp(prefix='bc_ctab_'))
 BOOKS = os.path.join(TMP, 'Books'); DATA = os.path.join(TMP, 'data'); PICKS = os.path.join(TMP, 'picks.txt')
@@ -52,9 +51,7 @@ BEFORE = snapshot()
 proc = None
 def start_helper():
     global proc
-    args = [PWSH, '-NoProfile']
-    if os.name == 'nt': args += ['-ExecutionPolicy', 'Bypass']
-    args += ['-File', os.path.join(REPO, 'launcher', 'serve.ps1'), '-Port', str(PORT), '-NoBrowser', '-NoTray', '-NoSetup', '-DataDir', DATA, '-TestPickFile', PICKS]
+    args = ['node', os.path.join(REPO, 'desktop', 'server.js'), '--port', str(PORT), '--data-dir', DATA, '--test-pick-file', PICKS]
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(80):
         try:

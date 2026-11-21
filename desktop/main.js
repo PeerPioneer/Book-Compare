@@ -1,7 +1,7 @@
 'use strict';
 /* Book Compare as a desktop program (V5, Electron; decided 20 Nov 2026, D3).
-   One window with the pages of the folder "app". The reading of the scan folders that the helper (launcher/serve.ps1) did lives inside the
-   program now (desktop/server.js, the same answers), so there is no .bat file, no black window and no icon near the clock.
+   One window with the pages of the folder "app". The program reads the scan folders itself (desktop/server.js; this replaced the
+   former helper program, removed 21 Nov 2026).
    The folder and picture windows are the ordinary Windows ones (Electron's dialog).
 
    For the automatic test on GitHub:  "Book Compare.exe" --smoke-test <result file>
@@ -10,7 +10,7 @@ const { app, BrowserWindow, dialog, shell, Menu } = require('electron');
 const path = require('path'), fs = require('fs');
 const { createServer, VERSION } = require('./server');
 
-const PORTS = [8790, 8791, 8792, 8793, 8794];              // a fixed address keeps the remembered project between starts (8765 is the helper's)
+const PORTS = [8790, 8791, 8792, 8793, 8794];              // a fixed address keeps the remembered project between starts
 const smokeIdx = process.argv.indexOf('--smoke-test'), SMOKE = smokeIdx >= 0 ? process.argv[smokeIdx + 1] : null;
 const appDir = app.isPackaged ? path.join(process.resourcesPath, 'app') : path.join(__dirname, '..', 'app');
 let win = null, port = 0, server = null;
@@ -37,8 +37,8 @@ async function pick(kind, start, title) {
   const r = await dialog.showOpenDialog(win, o);
   if (r.canceled || !r.filePaths.length) return null;
   if (kind !== 'files') return r.filePaths[0];
-  const folder = path.dirname(r.filePaths[0]);                 // all from one folder (as in the helper)
-  return { folder, files: r.filePaths.filter(f => path.dirname(f) === folder).map(f => path.basename(f)) };
+  const folder = path.dirname(r.filePaths[0]);
+  return { folder, files: r.filePaths.filter(f => path.dirname(f) === folder).map(f => path.basename(f)) };   // (Windows lets you choose from one folder only)
 }
 
 async function start() {

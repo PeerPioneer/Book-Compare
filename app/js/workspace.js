@@ -13,10 +13,9 @@
    its PAGES tab (or Back) returns to this layer.
 
    Three ways to reach the scan folders:
-   - Helper mode: the small Book Compare helper program on this computer (launcher/serve.ps1) reads the scan folders and writes
-     the project file. Folders are remembered as plain addresses, so nothing has to be allowed again after a restart, and it works in
-     any browser (Firefox too). Used automatically when the page is opened through the helper (http://localhost:8765/).
-   - Edge/Chrome without the helper use the File System Access API (folder picker, remembered folders, automatic saving).
+   - Desktop program ("helper mode" in the code): the program itself (desktop/server.js) reads the scan folders and writes the
+     project file. Folders are remembered as plain addresses, so nothing has to be allowed again after a restart.
+   - On the website, Edge/Chrome use the File System Access API (folder picker, remembered folders, automatic saving).
    - Other browsers fall back to a plain folder upload (kept in memory only) and a downloaded project file. */
 (function () {
   'use strict';
@@ -47,7 +46,7 @@
     if (n === 'NotAllowedError' || n === 'SecurityError') return 'The browser did not allow access to that folder or file.';
     if (n === 'NotFoundError') return 'A file or folder was not found. It may have been moved or renamed.';
     if (e && e.busy) return 'Another program is using this file right now.';
-    if (n === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(m)) return 'The connection to the Book Compare helper was interrupted.';
+    if (n === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Book Compare lost the connection to your scan folders.';
     return m;
   }
   function refusal(msg) { var e = new Error(msg); e.name = 'Refused'; return e; }
@@ -133,7 +132,9 @@
   }
   function hideUpdate() { var b = $('#ws-update'); if (b) b.hidden = true; lsSet('bc_update_shown', String(Date.now())); }
 
-  /* ---------------------------------------------------------------- helper mode (folders read by the helper program, see launcher/serve.ps1) */
+  /* ---------------------------------------------------------------- desktop mode (folders read by the desktop program itself, see desktop/server.js) */
+  // (Called "helper" in the code for historical reasons: until 21 Nov 2026 a separate helper program, launcher/serve.ps1, did this
+  // for the browser; the desktop program gives the same answers. On the website there is no such reader: detectHelper() finds nothing.)
   // HDir / HFile imitate the folder and file objects of the browser's File System Access API, so the rest of this file does not
   // care where a folder comes from. A folder is a root (registered with the helper under a random id) plus a path inside it.
   var HELPER = null;                 // the helper's answer to /api/ping, or null when there is no helper
@@ -153,12 +154,12 @@
     } catch (e) { return false; }
   }
   function helperError(status, j) {
-    var code = j && j.error, e = new Error((j && j.message) || 'The Book Compare helper refused the request.');
+    var code = j && j.error, e = new Error((j && j.message) || 'Book Compare refused the request.');
     e.code = code; e.busy = (code === 'busy');
     e.name = status === 404 ? 'NotFoundError' : status === 403 ? 'NotAllowedError' : 'Error';
     return e;
   }
-  function helperLost() { var e = new Error(HELPER && HELPER.desktop ? 'Book Compare cannot read the scan folders right now. Please close Book Compare and open it again.' : 'The Book Compare helper is not running. Start it with “Start Book Compare”.'); e.name = 'Lost'; e.net = true; return e; }
+  function helperLost() { var e = new Error('Book Compare cannot read the scan folders right now. Please close Book Compare and open it again.'); e.name = 'Lost'; e.net = true; return e; }
   async function hrequest(method, url, body) {
     var resp;
     try { resp = await fetch(url, { method: method, headers: { 'X-BookCompare': '1' }, body: body, cache: 'no-store' }); }
@@ -247,7 +248,7 @@
         var m = parseInt(resp.headers.get('X-Mtime-Ms'), 10) || (this._info && this._info.mtime) || Date.now();
         return new File([blob], this.name, { type: blob.type, lastModified: m });
       } catch (e) {
-        if (e && e.name === 'TypeError') { var broken = new Error('The connection to the Book Compare helper was interrupted while the picture was being sent.'); broken.net = true; e = broken; }
+        if (e && e.name === 'TypeError') { var broken = new Error('The connection was interrupted while the picture was being read.'); broken.net = true; e = broken; }
         last = e;
         if (!(e && (e.net || e.busy))) throw e;
       }
@@ -999,7 +1000,7 @@
         thumbPromise(c, key).then(function (r) {
           if (tok !== pvTok || !pg || !pg.isConnected) return;
           if (r && r.url) pg.innerHTML = '<img alt="" src="' + r.url + '">';
-          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? (HELPER ? 'The Book Compare helper is not running' : 'Not seen before: needs access to the scans') : esc((r && r.msg) || 'Not available')) + '</span>' +
+          else pg.innerHTML = '<span class="ws-nopv">' + (r && r.err === 'lost' ? (HELPER ? 'Book Compare cannot read the scans right now' : 'Not seen before: needs access to the scans') : esc((r && r.msg) || 'Not available')) + '</span>' +
             '<button class="ws-rl" data-act="reload" data-ci="' + ci + '" title="Try to load this picture again">Reload</button>';
         });
       })(S.copies[ci], ci);
@@ -1348,8 +1349,7 @@
       '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
       '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
       '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
-      (DESKTOP ? '' : '<hr><button data-m="download"><span class="tick"></span>Desktop program for Windows …</button>') +
-      (HELPER && !HELPER.desktop ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');   // (the desktop program is closed like any window)
+      (DESKTOP ? '' : '<hr><button data-m="download"><span class="tick"></span>Desktop program for Windows …</button>');
   }
 
   /* ---------------------------------------------------------------- hand a pair of pages to the Compare tab */
@@ -1575,7 +1575,6 @@
       else if (m === 'colw') resetWidths();
       else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
       else if (m === 'new') newProject();
-      else if (m === 'quit') quitHelper();
       else if (m === 'download') openDownloadPage();
       return;
     }
@@ -1705,10 +1704,6 @@
     if (t.at === from || t.at === from + 1) return;                    // dropped next to its own place: nothing changes
     commit(); var mv = insertMove(cp.cells, from, t.at); cp.cells = mv.cells; trim(cp);
     S.sel = { ci: ci, row: mv.row }; changed();
-  }
-  async function quitHelper() {
-    if (!(await confirmDialog('Quit the Book Compare helper?', 'Book Compare can then no longer read your scan folders. Start it again with “Start Book Compare” (or the Desktop shortcut or the icon near the clock).', 'Quit helper'))) return;
-    try { await hjson('/api/quit'); toast('The helper has stopped.'); } catch (e) { toast(niceError(e)); }
   }
   async function newProject() {
     if (S.copies.length && dirty && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;

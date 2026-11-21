@@ -1,5 +1,5 @@
-# 1. "helper": tests the Book Compare helper on a real Windows machine (Windows PowerShell 5.1 and a Windows folder window),
-#    which is the one thing that can not be tested on the machine where the code is written.
+# 1. "windows": on a real Windows machine (Windows paths, upper/lower case, locked files): the desktop program's scan reader
+#    (desktop/server.js) with the workspace in Chromium and Firefox, and the Compare tab with the real alignment.
 # 2. "quick": the workspace and library-folder tests (Chromium).
 # 3. "publish": ONLY when both passed (and only for main): puts the folder "app" on the website (GitHub Pages).
 #    A failed test therefore never reaches the website; the last good version stays online.
@@ -9,16 +9,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'launcher/**'
       - 'app/**'
-      - 'tests/**'
-      - '*.bat'
+      - 'desktop/server.js'
+      - 'tests/workspace/**'
       - '.github/workflows/windows-test.yml'
   workflow_dispatch:
 jobs:
-  helper:
+  windows:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       PYTHONUTF8: '1'
     steps:
@@ -26,43 +25,36 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Windows pieces (folder window, shortcuts, start file, icon near the clock)
-        id: checks
-        shell: powershell
-        timeout-minutes: 6
-        continue-on-error: true
-        run: ./tests/windows/windows-checks.ps1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
       - name: Install the browsers used by the tests
         run: |
           pip install playwright pillow
           python -m playwright install chromium firefox
-      - name: Helper and workspace in Chromium and Firefox (Windows PowerShell 5.1)
+      - name: Scan reader and workspace in Chromium and Firefox
         shell: cmd
         timeout-minutes: 12
-        env:
-          PWSH: powershell
         run: |
-          python tests\workspace\test_helper.py > "%TEMP%\bc-helper-test.txt" 2>&1
+          python tests\workspace\test_desktop_server.py > "%TEMP%\bc-server-test.txt" 2>&1
           set RC=%ERRORLEVEL%
-          type "%TEMP%\bc-helper-test.txt"
+          type "%TEMP%\bc-server-test.txt"
           exit /b %RC%
-      - name: Compare tab with the real alignment (Windows PowerShell 5.1)
+      - name: Compare tab with the real alignment
         if: always()
         shell: cmd
         timeout-minutes: 15
-        env:
-          PWSH: powershell
         run: |
           python tests\workspace\test_compare_tab.py > "%TEMP%\bc-compare-test.txt" 2>&1
           set RC=%ERRORLEVEL%
           type "%TEMP%\bc-compare-test.txt"
           exit /b %RC%
-      - name: Windows checks result (the text of both test runs, shown as a note on this job)
+      - name: Windows test output (shown as a note on this job)
         if: always()
         shell: powershell
         run: |
           $text = ''
-          foreach ($f in @('bc-progress.txt', 'bc-helper-test.txt', 'bc-compare-test.txt')) {
+          foreach ($f in @('bc-server-test.txt', 'bc-compare-test.txt')) {
             $p = Join-Path $env:TEMP $f
             $text += "=== $f`r`n"
             if (Test-Path $p) { $c = Get-Content $p -Raw -Encoding UTF8; if ($c.Length -gt 6000) { $c = '...' + $c.Substring($c.Length - 6000) }; $text += $c } else { $text += "(not written)" }
@@ -70,10 +62,6 @@ jobs:
           }
           $text = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
           Write-Host "::notice title=Windows test output::$text"
-      - name: Fail the job if the Windows pieces failed
-        if: steps.checks.outcome == 'failure'
-        shell: cmd
-        run: exit /b 1
 
   quick:
     runs-on: ubuntu-latest
@@ -111,7 +99,7 @@ jobs:
           echo "::notice title=Linux test output::$text"
 
   publish:
-    needs: [helper, quick]
+    needs: [windows, quick]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:

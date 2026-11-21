@@ -3,7 +3,7 @@
 // https://vaadin.com/learn/tutorials/learn-pwa/turn-website-into-a-pwa
 // https://github.com/jakearchibald/wittr/blob/cache-avatars/public/js/sw/index.js
 // Cache
-const CACHE_NAME = "imcomp-mdc-pwa-v25";
+const CACHE_NAME = "imcomp-mdc-pwa-v26";
 const staticAssets = [
     './',
     './favicon.ico',

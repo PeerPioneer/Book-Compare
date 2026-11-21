@@ -1,8 +1,8 @@
 'use strict';
 /* Book Compare desktop program: the part that reads the scan folders (V5).
-   The same answers as the helper launcher/serve.ps1 gives (the same /api), so the pages in "app" work unchanged: they believe they
-   talk to the helper. It runs inside the desktop program (desktop/main.js), on this computer only (address 127.0.0.1), and can also be
-   started on its own with Node for the automatic tests:
+   It replaced the former helper program (launcher/serve.ps1, removed 21 Nov 2026) and gives the same answers (the same /api), so the
+   pages in "app" use it unchanged ("helper mode" in app/js/workspace.js). It runs inside the desktop program (desktop/main.js), on this
+   computer only (address 127.0.0.1), and can also be started on its own with Node for the automatic tests:
 
      node desktop/server.js --port 8790 --data-dir <folder> --test-pick-file <file>
 
@@ -104,7 +104,7 @@ function createServer(opts) {
     const body = await readJson(req);
     const kind = body && body.kind === 'project' ? 'project' : body && body.kind === 'files' ? 'files' : 'scans';
     const start = startDir(body && body.start ? String(body.start) : '', kind === 'files' ? 'scans' : kind);
-    if (opts.testPickFile) {                                     // automatic tests: hand out the next line of the file (same format as serve.ps1)
+    if (opts.testPickFile) {                                     // automatic tests: hand out the next line of the file (one folder per line; for pictures: folder|name|name)
       let lines = [];
       try { lines = fs.readFileSync(opts.testPickFile, 'utf8').split(/\r?\n/).filter(l => l.trim()); } catch (e) { /* none */ }
       if (!lines.length) return json(res, 200, { cancelled: true });
@@ -162,7 +162,7 @@ function createServer(opts) {
     }
     // everything below works on a folder that was registered before
     const r = roots.get(url.searchParams.get('root') || '');
-    if (!r) return err(res, 404, 'unknown-root', 'The helper does not know this folder (it was restarted?).');
+    if (!r) return err(res, 404, 'unknown-root', 'This folder is not known (Book Compare was restarted?).');
     const rel = url.searchParams.get('path') || '', full = resolveInRoot(r, rel);
     if (!full) return err(res, 400, 'bad-path', 'Bad path.');
     const isProjectName = rel.replace(/^\/+|\/+$/g, '') === PROJECT_FILE;

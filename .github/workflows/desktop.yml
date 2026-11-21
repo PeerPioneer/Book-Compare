@@ -1,6 +1,6 @@
 # The desktop program (V5, Electron, desktop/):
-# 1. "server": the desktop program's own scan reader (desktop/server.js) must give the same answers as the helper:
-#    the whole helper test runs against it (Linux, Chromium).
+# 1. "server": the desktop program's scan reader (desktop/server.js) with the workspace (tests/workspace/test_desktop_server.py,
+#    Linux, Chromium).
 # 2. "installer": builds the Windows installer; on a real Windows machine: the unpacked program in its test mode, then
 #    tests/windows/installer-checks.ps1 (silent install into a chosen folder, test mode, uninstall; then the installer's pages clicked
 #    through: install location, the Shortcuts page, Desktop unticked -> Start menu only). The installer is kept as a download of this
@@ -14,7 +14,7 @@ on:
     paths:
       - 'desktop/**'
       - 'app/**'
-      - 'tests/workspace/test_helper.py'
+      - 'tests/workspace/test_desktop_server.py'
       - 'tests/windows/installer-checks.ps1'
       - '.github/workflows/desktop.yml'
   workflow_dispatch:
@@ -31,11 +31,10 @@ jobs:
         run: |
           pip install playwright pillow
           python -m playwright install --with-deps chromium
-      - name: The helper test against desktop/server.js
+      - name: Scan reader and workspace
         env:
-          BOOKCOMPARE_SERVER: desktop
           BOOKCOMPARE_BROWSERS: chromium
-        run: python tests/workspace/test_helper.py
+        run: python tests/workspace/test_desktop_server.py
 
   installer:
     runs-on: windows-latest
