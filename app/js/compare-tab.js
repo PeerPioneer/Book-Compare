@@ -82,7 +82,13 @@
       '<label title="How many large tiles cover the height of the page (standard 8)">Main tiles <input type="number" id="ct_tmain" min="4" max="16" step="1"></label>' +
       '<label title="How many times each tile is split again (standard 3)">Sub-tiles <input type="number" id="ct_tsub" min="1" max="4" step="1"></label>' +
       '<button class="ct-tapply" id="ct_tapply">Apply</button></div>' +
-      '<p class="ct-tnote" id="ct_tnote"></p></div>' +
+      '<p class="ct-tnote" id="ct_tnote"></p>' +
+      // V16: what the fine alignment did - movement map, the rough alignment alone, and the hint for sharp shifts
+      '<div class="ct-check"><label title="Colours over the picture: how far the fine alignment moved each part of copy 2"><input type="checkbox" id="ct_mv"> Movement map</label>' +
+      '<label title="Show copy 2 placed by the whole-page step only, without the fine alignment in tiles"><input type="checkbox" id="ct_rough"> Without fine alignment</label></div>' +
+      '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span></p>' +
+      '<p class="ct-hint" id="ct_hint" hidden></p>' +
+      '<div class="ct-warn" id="ct_warn" hidden></div></div>' +
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
@@ -153,12 +159,14 @@
     ui.c2.onchange = function () { W().setCopy(1, ui.c2.value); afterCopies(); };
     $('ct_c2up').onclick = function () { stepCopy(1, -1); };
     $('ct_c2dn').onclick = function () { stepCopy(1, 1); };
-    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; renderTiles(); markStale(); schedule(80); };
+    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; st.lastTiles = null; st.fineImg = null; renderTiles(); markStale(); drawMovement(); schedule(80); };
     ui.tiles = $('ct_tiles');
     ui.tiles.querySelector('.ct-seg').onclick = function (e) {
       var b = e.target.closest('button[data-tp]'); if (!b) return;
       setTiles(PRESETS[b.dataset.tp]);
     };
+    $('ct_mv').onchange = function () { st.mvOn = this.checked; drawMovement(); };
+    $('ct_rough').onchange = function () { showRough(this.checked); };
     $('ct_tadvbtn').onclick = function () { var a = $('ct_tadv'); a.hidden = !a.hidden; this.setAttribute('aria-expanded', String(!a.hidden)); };
     $('ct_tapply').onclick = function () {
       var m = Math.round(+$('ct_tmain').value), u = Math.round(+$('ct_tsub').value);
@@ -296,6 +304,60 @@
       (looser ? ' More flexible settings can also pull real differences into place.' : '');
     if (cur === 'custom') $('ct_tadv').hidden = false;
   }
+  // V16: the movement map layer over the superimposed picture (stretched to the picture like the annotations)
+  function mvLayer() {
+    if (ui.mv) return ui.mv;
+    var content = document.querySelector('#pane_main .pane__content'); if (!content) return null;
+    ui.mv = el('div', 'ct-mv'); ui.mv.setAttribute('aria-hidden', 'true'); ui.mv.hidden = true;            // (a box, not a bare canvas: the app styles every canvas directly in a pane)
+    ui.mvc = document.createElement('canvas'); ui.mv.appendChild(ui.mvc); content.appendChild(ui.mv);
+    return ui.mv;
+  }
+  function drawMovement() {
+    var cvs = mvLayer(), m = st.lastTiles && st.lastTiles.movement, on = !!(st.mvOn && m && st.transform === 'tiles' && !st.roughOn);
+    $('ct_mvleg').hidden = !on;
+    if (!cvs) return;
+    cvs.hidden = !on;
+    if (!on) return;
+    if (cvs.dataset.k !== String(st.mvStamp)) {
+      var c = ui.mvc; c.width = m.w; c.height = m.h;
+      var x = c.getContext('2d'); x.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), 0, 0);
+      if (m.hint) { x.strokeStyle = '#c800c8'; x.lineWidth = 2; x.setLineDash([6, 4]); x.strokeRect(m.hint.x * m.w - 3, m.hint.y * m.h - 3, m.hint.w * m.w + 6, m.hint.h * m.h + 6); }
+      cvs.dataset.k = String(st.mvStamp);
+    }
+  }
+  // V18 (owner 21 Nov: no search among neighbouring pages): when much of the ink has no partner, the two scans may not show the same page
+  var MISMATCH = 0.30;
+  function showMismatch() {
+    var w = $('ct_warn'), t = st.lastTiles;
+    if (!t || t.sparse || st.transform !== 'tiles' || !(t.unmatched_tiles > MISMATCH)) { w.hidden = true; return; }
+    w.hidden = false;
+    w.innerHTML = '<b>' + Math.round(t.unmatched_tiles * 100) + ' % of the ink has no partner.</b> The two scans may not show the same page: perhaps a page is missing or extra in one copy, and the rows of the grid are out of step here. ' +
+      '<span class="ct-warnacts"><button class="ct-tapply" id="ct_warnpages">Go to the pages</button><button class="ct-tadvbtn" id="ct_warnok">Continue</button></span>';
+    $('ct_warnpages').onclick = toPages;
+    $('ct_warnok').onclick = function () { w.hidden = true; };
+  }
+  function showHint() {
+    var h = $('ct_hint'), m = st.lastTiles && st.lastTiles.movement;
+    if (!m || !m.hint || st.transform !== 'tiles') { h.hidden = true; return; }
+    h.hidden = false;
+    h.innerHTML = 'Part of this page was moved by about <b>' + m.hint.px + ' px</b> by the fine alignment, with a sharp edge: a line or block may have been re-set or shifted here. ' +
+      '<button class="ct-hintbtn" id="ct_hintshow">Show the movement map</button>';
+    $('ct_hintshow').onclick = function () { $('ct_mv').checked = true; st.mvOn = true; if (st.roughOn) { $('ct_rough').checked = false; showRough(false); } drawMovement(); };
+  }
+  // the rough view: copy 2 placed by the whole-page step only; switching back shows the fine result again (kept, not computed again)
+  async function showRough(on) {
+    st.roughOn = on; drawMovement();
+    if (!st.fineImg || st.transform !== 'tiles') return;
+    var my = st.token;
+    if (!on) { E.compare.show_aligned(st.fineNames, st.fineImg); drawMovement(); return; }
+    setBusy('Placing copy 2 by the whole-page step only …');
+    try {
+      var r = await serial(function () { return eng && eng.ready ? eng.e.roughColor() : null; });
+      if (my !== st.token || !st.roughOn) return;
+      if (r) E.compare.show_aligned(st.fineNames, new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h));
+    } catch (e) { note('The rough view could not be shown (' + ((e && e.message) || e) + ').'); $('ct_rough').checked = false; st.roughOn = false; }
+    setBusy(null); drawMovement();
+  }
   function setTiles(t) {
     var s = W().state(); if (!s.pair[1]) return;
     W().setTileSetting(s.row, s.pair[1], t);
@@ -421,7 +483,7 @@
     var a = document.getElementById('ct_busyacts'); a.innerHTML = '';
     (acts || []).forEach(function (x) { var b = el('button', 'ct-btn', esc(x[0])); b.onclick = x[1]; a.appendChild(b); });
   }
-  function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (ui.busy.classList.contains('bad')) setBusy(null); }   // a new wish makes an old message obsolete
+  function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (ui.busy.classList.contains('bad')) setBusy(null); if (ui.mv) ui.mv.hidden = true; var h = document.getElementById('ct_hint'); if (h) h.hidden = true; var w = document.getElementById('ct_warn'); if (w) w.hidden = true; }   // a new wish makes an old message obsolete
   function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale'); }
 
 
@@ -578,7 +640,8 @@
       var r = await g.e.alignColor(d.files[1], d.tiles);
       await loading;
       if (my !== st.token) return null;
-      E.compare.show_aligned(d.names, new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h));
+      st.fineImg = new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h); st.fineNames = d.names;
+      E.compare.show_aligned(d.names, st.fineImg);
       r.pixels = null;
       return r;
     } catch (e) {
@@ -611,7 +674,10 @@
       return;
     }
     if (!done || my !== st.token) return;
-    st.lastTiles = info;                                                                     // (for the tests and for the movement map later: unmatched ink, near-empty page)
+    st.lastTiles = info;                                                                     // (unmatched ink, near-empty page, movement map: tests and V16)
+    st.mvStamp = (st.mvStamp || 0) + 1; st.roughOn = false; $('ct_rough').checked = false;
+    if (!info) st.fineImg = null;
+    drawMovement(); showHint(); showMismatch();
     st.shown = key(s); st.shownRow = s.row; st.shownPair = s.pair.slice();
     E.compare.back_btn.onclick = toPages;                                                    // "Back" in the teal bar returns to the pages
     labelPanels(s);

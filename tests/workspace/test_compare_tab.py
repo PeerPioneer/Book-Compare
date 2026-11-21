@@ -135,6 +135,20 @@ def scenario(p, kind):
     pg.click('#ct_tiles button[data-tp=std]'); wait_aligned(pg, 'standard again'); assert tset() is None and pg.inner_text('#ct_tnote') == ''
     pg.select_option('#ct_tf', 'perspective'); pg.wait_for_timeout(150); assert not pg.is_visible('#ct_tiles'), 'the tile settings belong to the tile alignment only'
     pg.select_option('#ct_tf', 'tiles'); wait_aligned(pg, 'tiles once more')
+    # what the fine alignment did (V16): movement map over the picture, the rough alignment alone and back; the mismatch warning (V18)
+    t = pg.evaluate("CompareTab.lastTiles()"); m = t['movement']
+    assert m and m['w'] > 50 and m['h'] > 50 and m['max'] >= 0, m
+    pg.check('#ct_mv'); pg.wait_for_timeout(200)
+    assert pg.is_visible('#pane_main .ct-mv') and pg.is_visible('#ct_mvleg'), 'movement map and legend shown'
+    pg.screenshot(path=SHOTS + '/movement.png') if SHOTS else None
+    w_fine = pg.evaluate("document.querySelector('#result canvas').width")
+    pg.check('#ct_rough'); pg.wait_for_timeout(400); pg.wait_for_function("!document.querySelector('.ct-busy:not([hidden])')", timeout=60000); pg.wait_for_timeout(300)
+    assert not pg.is_visible('#pane_main .ct-mv'), 'no movement map on the rough view'
+    assert pg.evaluate("document.querySelector('#result canvas').width") == w_fine
+    pg.uncheck('#ct_rough'); pg.wait_for_timeout(300); assert pg.is_visible('#pane_main .ct-mv'), 'back to the fine result, map shown again'
+    pg.uncheck('#ct_mv'); pg.wait_for_timeout(100); assert not pg.is_visible('#pane_main .ct-mv')
+    assert pg.is_visible('#ct_warn') == (t['unmatched_tiles'] > 0.30), ('mismatch warning only above 30 %', t['unmatched_tiles'])
+    assert pg.is_visible('#ct_hint') == bool(m.get('hint')), 'the shift hint appears exactly when the engine reports one'
     pg.click('#ct_c1'); pg.keyboard.press('Escape'); pg.locator('body').click(position={'x': 700, 'y': 450}) if False else None
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     pg.keyboard.press('PageDown'); wait_aligned(pg, 'key page down'); assert 'Page 3' in where(pg), where(pg)

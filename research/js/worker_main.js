@@ -4,7 +4,7 @@
    Messages out: { id, ok: true, result } or { id, ok: false, error }
    OpenCV.js (about 13 MB) is loaded once, by 'init'. */
 var OPENCV_URL = '../deps/opencv/opencv.js';
-var cvReady = null, refState = null;
+var cvReady = null, refState = null, lastJob = null;          // lastJob: the copy of the last alignColor and its rough step (V16 rough view)
 
 function loadOpenCv() {
   if (cvReady) return cvReady;
@@ -82,7 +82,7 @@ var handlers = {
   init: async function () { var o = await loadOpenCv(); return { load_s: o.load_s }; },
   reference: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');
-    if (refState) { refState.ref.delete(); refState = null; }
+    if (refState) { refState.ref.delete(); refState = null; } lastJob = null;
     var d = await decodeRed(cv, m.file);
     try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
     refState.w0 = d.w0; refState.h0 = d.h0;
@@ -99,6 +99,15 @@ var handlers = {
       total_s: d.decode_s + t.total_s, unmatched_rough: r.unmatched && r.unmatched.rough, unmatched_tiles: r.unmatched && r.unmatched.tiles,
       scale: r.scale, ecc: r.ecc, sparse: r.sparse, ink_density: r.density };
   },
+  // Compare tab (V16): the copy of the last alignColor job again, bent by the rough (whole-page) step only - "what the fine alignment changed"
+  roughColor: async function () {
+    var cv = (await loadOpenCv()).cv;
+    if (!refState || !lastJob) throw new Error('nothing has been aligned yet');
+    var d = await decodeRed(cv, lastJob.file, true);
+    d.red.delete();
+    var px = warpColour(cv, d.bmp, { W: lastJob.W, map: null }, refState.ref, refState.w0, refState.h0);
+    return { w: refState.w0, h: refState.h0, pixels: px.buffer, transfer: [px.buffer] };
+  },
   // Compare tab: the other copy bent onto the reference, in colour, as big as the reference scan (RGBA, sent back without copying)
   alignColor: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline');
@@ -109,10 +118,12 @@ var handlers = {
       r.aligned.delete();
       var t0 = performance.now();
       var px = warpColour(cv, d.bmp, r, refState.ref, refState.w0, refState.h0); d.bmp = null;
-      var t = r.times;
+      var t = r.times, mv = require('./movement').movementMap(r, refState.ref.cols, refState.ref.rows, refState.box);
+      lastJob = { file: m.file, W: Array.prototype.slice.call(r.W) };                        // for the rough view (roughColor)
       var res = { w: refState.w0, h: refState.h0, pixels: px.buffer, decode_s: d.decode_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s, colour_s: (performance.now() - t0) / 1000,
-        unmatched_rough: r.unmatched.rough, unmatched_tiles: r.unmatched.tiles, sparse: r.sparse, ink_density: r.density, margin_moved: r.margin ? r.margin.moved.length : 0 };
-      res.transfer = [px.buffer];
+        unmatched_rough: r.unmatched.rough, unmatched_tiles: r.unmatched.tiles, sparse: r.sparse, ink_density: r.density, margin_moved: r.margin ? r.margin.moved.length : 0,
+        movement: { w: mv.w, h: mv.h, pixels: mv.pixels, max: mv.max, hint: mv.hint } };
+      res.transfer = [px.buffer, mv.pixels];
       return res;
     } finally {
       if (d.bmp) d.bmp.close();
