@@ -63,7 +63,8 @@ with sync_playwright() as p:
         pg.evaluate("k=>window.__picks.push(window.__h[k])", target); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(400)
         assert 'scan folder' in pg.inner_text('#ws-toast'), 'saving into a scan folder must be refused'
     pg.evaluate("window.__picks.push(window.__h.proj)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(900)
-    assert 'Saved in folder' in pg.inner_text('#ws-save')
+    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Book project' in pg.inner_text('#ws-save'), pg.inner_text('#ws-save')
+    assert project_files(pg) == ['Book project.bookcompare'], project_files(pg)        # the project is one file
     d = read_project(pg); assert [c['name'] for c in d['copies']] == ['A-Test', 'B-Test', 'C-Test'] and d['labels'] == {'2': 'Index'} and d['folio'] is True
     assert d['version'] == 2 and len(d['roots']) == 3 and all(len(c['locs']) == 1 for c in d['copies']) and 'tray' not in d
     # column width, moving a copy, deleting a range of files with Shift (the grid is left as it was)
@@ -105,9 +106,9 @@ with sync_playwright() as p:
     pg.locator('#af-list input[data-j="0"]').first.check()
     pg.check('input[name=af-where][value=row]'); pg.fill('#af-row', '2'); pg.click('#af-ok'); pg.wait_for_timeout(500)
     assert col(pg, 1)[:4] == ['scan_001.jpg', 'scan_002.jpg', 'img_1.JPG', 'img_2.JPG'], col(pg, 1)       # scan_001 was no longer offered (already in the grid); scan_002 went in at row 2
-    # a project folder must not be a scan folder, and a scan folder must not be the project folder
+    # the folder that holds the project file cannot be a scan folder
     pg.click('#ws .ws-addbtn'); pg.evaluate("window.__picks.push(window.__h.proj)"); pg.click('#ac-folder'); pg.wait_for_timeout(400)
-    assert 'project folder' in pg.inner_text('#ac-err'); pg.click('[data-close]')
+    assert 'project file' in pg.inner_text('#ac-err'), pg.inner_text('#ac-err'); pg.click('[data-close]')
     # hand a pair to the two-image screen and come back
     cell(0, 1).click(); pg.wait_for_timeout(300)
     pg.click('#ws-compare'); pg.wait_for_timeout(1500)

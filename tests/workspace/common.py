@@ -14,6 +14,16 @@ window.mkScan = async (dir, name, n, variant) => {
 };
 window.snapshot = async (dir, path='') => { const out = []; for await (const [name, h] of dir.entries()) { if (h.kind === 'file') { const f = await h.getFile(); out.push(path+name+'|'+f.size+'|'+f.lastModified); } else out.push(...await window.snapshot(h, path+name+'/')); } return out.sort(); };
 window.__picks = [];
+// "Save as" / "Open" for the project file: the test queues a FOLDER; Save makes the file in it (as the browser does: at once, empty),
+// Open takes the project file in it (a .bookcompare file, or the project file of an older version).
+window.showSaveFilePicker = async function (opts) { window.__lastOpts = window.__lastOpts || []; window.__lastOpts.push(JSON.stringify({id: opts.id, save: opts.suggestedName}));
+  const d = window.__picks.shift(); if (!d) throw new DOMException('no pick queued', 'AbortError');
+  const fh = await d.getFileHandle(window.__saveName || opts.suggestedName, {create: true}); return fh; };
+window.showOpenFilePicker = async function (opts) { window.__lastOpts = window.__lastOpts || []; window.__lastOpts.push(JSON.stringify({id: opts.id, open: true}));
+  const d = window.__picks.shift(); if (!d) throw new DOMException('no pick queued', 'AbortError');
+  if (d.kind === 'file') return [d];
+  let legacy = null; for await (const [n, h] of d.entries()) { if (h.kind !== 'file') continue; if (/\.bookcompare$/i.test(n)) return [h]; if (n === 'book-compare-project.json') legacy = h; }
+  if (legacy) return [legacy]; throw new DOMException('no project file in ' + d.name, 'AbortError'); };
 window.showDirectoryPicker = async function (opts) { window.__lastOpts = window.__lastOpts || []; window.__lastOpts.push(JSON.stringify({id: opts.id, mode: opts.mode, startIn: opts.startIn ? opts.startIn.name : null})); const h = window.__picks.shift(); if (!h) throw new DOMException('no pick queued', 'AbortError'); return h; };
 
 // Simulates what Edge does after a project is reopened: the permission of remembered folders has lapsed until the user clicks "Allow".
@@ -33,8 +43,14 @@ window.__locked = new Set(); window.__prompts = []; window.__deny = false;
 
 errs=[]
 def start(p, build=True, ctx=None):
-    b=p.chromium.launch(args=['--allow-file-access-from-files'] if URL.startswith('file:') else []) if ctx is None else None
-    c=ctx or b.new_context(viewport={'width':1500,'height':900}, service_workers='block')
+    args=['--allow-file-access-from-files'] if URL.startswith('file:') else []
+    if ctx is None and os.environ.get('BOOKCOMPARE_PERSISTENT'):
+        # a browser profile on disk (some Chromium builds crash when a folder handle is read back from storage in a private window)
+        import tempfile
+        c=b=p.chromium.launch_persistent_context(tempfile.mkdtemp(prefix='bc-profile-'), args=args, viewport={'width':1500,'height':900}, service_workers='block')
+    else:
+        b=p.chromium.launch(args=args) if ctx is None else None
+        c=ctx or b.new_context(viewport={'width':1500,'height':900}, service_workers='block')
     pg=c.new_page()
     pg.on('pageerror',lambda e:errs.append('PAGEERROR '+str(e)))
     pg.on('console',lambda m: errs.append('CONSOLE '+m.text) if m.type=='error' and '/api/' not in (m.location or {}).get('url','') else None)
@@ -92,8 +108,13 @@ def lock(pg, *names): pg.evaluate("n=>{window.__locked=new Set(n); window.__prom
 def prompts(pg): return pg.evaluate("window.__prompts")
 def hid(pg, sel): return pg.evaluate("s=>document.querySelector(s).hidden", sel)
 def read_project(pg, which='proj'):
+    # the project file in that folder: <name>.bookcompare (or, if there is none, the project file of an older version)
     import json as _j
-    return _j.loads(pg.evaluate("async(w)=>{const fh=await __h[w].getFileHandle('book-compare-project.json'); return await (await fh.getFile()).text();}", which))
+    return _j.loads(pg.evaluate("""async(w)=>{ let leg = null; for await (const [n, h] of __h[w].entries()) { if (h.kind !== 'file') continue;
+      if (/\\.bookcompare$/i.test(n)) return await (await h.getFile()).text(); if (n === 'book-compare-project.json') leg = h; }
+      return await (await leg.getFile()).text(); }""", which))
+def project_files(pg, which='proj'):
+    return pg.evaluate("async(w)=>{const o=[]; for await (const [n, h] of __h[w].entries()) o.push(n); return o.sort();}", which)
 def reopen(ctx, url=URL):
     pg2 = ctx.new_page(); pg2.on('pageerror', lambda e: errs.append('PAGEERROR '+str(e))); pg2.goto(url); pg2.wait_for_timeout(900)
     pg2.evaluate(HELPERS); handles(pg2); return pg2

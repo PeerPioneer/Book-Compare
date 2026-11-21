@@ -2,7 +2,8 @@
 
    A full-screen layer on top of the app. Columns = copies, rows = page positions. Each copy is a folder of scans on your
    disk. The scans stay where they are: this code only READS them (it never writes, renames or deletes anything in a scan folder).
-   The project (which file sits in which row, row names, ...) is saved as one small file in a SEPARATE project folder.
+   The project (which file sits in which row, row names, ...) is saved as one small file, <name>.bookcompare, which never lies in a
+   folder that holds scans of the project. (Before 0.9.0 a project was a folder holding book-compare-project.json: those still open.)
 
    Scan folders are remembered as "roots": a folder you pick once (for example the folder that holds all copies of a book).
    A copy points into a root. After a project is reopened the browser only has to be asked about the roots (one click),
@@ -23,16 +24,20 @@
   var HAS_FSA = typeof window.showDirectoryPicker === 'function';
   var IMG_RE = /\.(jpe?g|png)$/i;
   var OTHER_IMG_RE = /\.(tiff?|webp|bmp|gif)$/i;
-  var PROJECT_FILE = 'book-compare-project.json';
+  // A project is ONE file, <name>.bookcompare (from 0.9.0). Projects of older versions were a folder holding book-compare-project.json:
+  // they still open, and "Save project as" turns them into a project file (the old folder is left as it is).
+  var LEGACY_FILE = 'book-compare-project.json', PROJECT_EXT = '.bookcompare';
   var ROW_H = 40, COL_W = 172, LBL_W = 96, HEAD_H = 74, OVERSCAN = 4;
 
   var root = null;
   var S = null;                      // project state
   var REG = {};                      // every copy object of this session by id (so undo can bring a removed copy back)
   var hist = { undo: [], redo: [] };
-  var proj = { handle: null, state: 'none', name: '', err: '', timer: 0, saving: false, again: false };
-  var dirty = false;                 // changes not yet written to a project folder / file
-  var lastProject = null;            // remembered project folder (Edge/Chrome)
+  // proj.target: where the project is saved: { dir, file } (desktop program: the folder of the file and its name) or { fh } (browser: the file)
+  // proj.legacy: a project of an older version that was opened (it is not saved automatically until it is saved as a project file)
+  var proj = { target: null, legacy: null, state: 'none', name: '', err: '', timer: 0, saving: false, again: false };
+  var dirty = false;                 // changes not yet written to the project file
+  var lastProject = null;            // remembered project { target, name, projectId }
   var cb = { compare: null, leave: null };
 
   /* ---------------------------------------------------------------- small helpers */
@@ -496,9 +501,13 @@
       inp.click();
     });
   }
-  // Scans must not be read from the project folder (or from inside it).
+  // Scans must not be read from the folder that holds the project file.
+  // (the project file may lie in a folder that holds the scan folders, but not in the scan folder itself)
   async function checkNotProjectFolder(dir) {
-    if (proj.handle && await proj.handle.resolve(dir)) throw refusal('That folder is (or is inside) your project folder. Scans and project must be in different folders.');
+    var t = proj.target; if (!t) return;
+    var rel = null;
+    try { rel = t.dir ? await t.dir.resolve(dir) : await dir.resolve(t.fh); } catch (e) { rel = null; }
+    if (rel && rel.length === (t.dir ? 0 : 1)) throw refusal('That folder holds your project file. Scans and project must be in different folders.');
   }
   // The folders that really hold the scans of this project (one entry per folder, not the whole root).
   async function usedImageDirs() {
@@ -516,16 +525,16 @@
     }
     return out;
   }
-  // The project is saved in a folder of its own. It may lie next to the scan folders, or in a folder that holds them,
+  // The project file may lie next to the scan folders, or in a folder that holds them,
   // but never in (or inside) a folder that holds scans used by this project.
-  async function projectConflict(h) {
-    var dirs = await usedImageDirs();
-    for (var i = 0; i < dirs.length; i++) if (await dirs[i].d.resolve(h)) return dirs[i].name;
+  async function projectConflict(t) {
+    var dirs = await usedImageDirs(), h = t.fh || t.dir;
+    for (var i = 0; i < dirs.length; i++) { var rel = null; try { rel = await dirs[i].d.resolve(h); } catch (e) { rel = null; } if (rel) return dirs[i].name; }
     return null;
   }
-  async function checkNotScanFolder(h) {
-    var n = await projectConflict(h);
-    if (n) throw refusal('That folder is (or is inside) the scan folder “' + n + '”. The project must be saved in a separate folder, so that your scan folders are never touched.');
+  async function checkNotScanFolder(t) {
+    var n = await projectConflict(t);
+    if (n) throw refusal('That place is (or is inside) the scan folder “' + n + '”. Save the project in another folder, so that your scan folders are never touched.');
   }
   // A picked folder becomes (or joins) a root. If a known root already covers it, that root is reused, so one permission is enough.
   async function rootFor(h, granted) {
@@ -693,86 +702,164 @@
       copies: S.copies.map(function (c) { var o = { id: c.id, name: c.name, folder: c.folder, locs: c.locs, keys: c.keys, cells: c.cells }; if (c.w) o.w = c.w; return o; })
     };
   }
-  function touch() { dirty = true; if (proj.handle) { proj.state = 'dirty'; clearTimeout(proj.timer); proj.timer = setTimeout(saveNow, 700); } renderSave(); }
+  function touch() { dirty = true; if (proj.target) { proj.state = 'dirty'; clearTimeout(proj.timer); proj.timer = setTimeout(saveNow, 700); } renderSave(); }
+  function targetFile(t) { return t.fh ? t.fh.name : t.file; }
+  function targetName(t) { return targetFile(t).replace(/\.bookcompare$/i, ''); }
+  function isLegacy(t) { return targetFile(t) === LEGACY_FILE; }
+  function abortError() { var e = new Error('cancelled'); e.name = 'AbortError'; return e; }
+  async function targetWrite(t, text) {                                   // the ONLY place that writes: the project file
+    var fh = t.fh || await t.dir.getFileHandle(t.file, { create: true });
+    var w = await fh.createWritable();
+    await w.write(text);
+    await w.close();
+  }
+  async function targetRead(t) {
+    var fh = t.fh || await t.dir.getFileHandle(t.file);
+    return JSON.parse((await (await fh.getFile()).text()).replace(/^\uFEFF/, ''));
+  }
   async function saveNow() {
-    if (!proj.handle) return;
+    if (!proj.target) return;
     clearTimeout(proj.timer);
     if (proj.saving) { proj.again = true; return; }
     proj.saving = true; proj.state = 'saving'; renderSave();
     try {
-      var fh = await proj.handle.getFileHandle(PROJECT_FILE, { create: true });      // the ONLY place that writes: the project folder
-      var w = await fh.createWritable();
-      await w.write(JSON.stringify(serialize(), null, 1));
-      await w.close();
+      await targetWrite(proj.target, JSON.stringify(serialize(), null, 1));
       proj.state = 'saved'; dirty = false;
     } catch (e) { proj.state = 'error'; proj.err = niceError(e); }
     proj.saving = false;
     if (proj.again) { proj.again = false; proj.timer = setTimeout(saveNow, 50); }
     renderSave();
   }
+  // before another project is opened: a change that is still waiting to be saved is saved now
+  async function flushSave() { if (proj.target && (proj.state === 'dirty' || proj.saving)) { await saveNow(); for (var i = 0; i < 50 && proj.saving; i++) await new Promise(function (r) { setTimeout(r, 100); }); } }
+  // true if the work so far may be replaced by another project (asks when there are changes that are saved nowhere)
+  async function mayReplace() {
+    await flushSave();
+    if (!S || !S.copies.length || !dirty || proj.target) return true;
+    return confirmDialog('The project is not saved', 'The changes to the project you are working on are not saved anywhere. Open the other project anyway?', 'Open anyway');
+  }
   function renderSave() {
     if (!root) return;
     var b = $('#ws-save'), t = '', cls = 'ws-save';
     if (!HAS_FSA) { t = dirty ? 'Not saved · save project file' : 'Project file saved'; cls += dirty ? ' warn' : ' ok'; }
-    else if (!proj.handle) { t = S.copies.length ? 'Not saved yet · choose a project folder' : 'No project yet'; cls += S.copies.length ? ' warn' : ''; }
+    else if (!proj.target) {
+      t = !S.copies.length ? 'No project yet' : proj.legacy ? 'Older project · save it as a project file' : 'Not saved yet · save the project';
+      cls += S.copies.length ? ' warn' : '';
+    }
     else if (proj.state === 'saving' || proj.state === 'dirty') { t = 'Saving …'; }
     else if (proj.state === 'error') { t = 'Could not save · ' + proj.err; cls += ' bad'; }
-    else { t = '✓ Saved in folder “' + proj.name + '”'; cls += ' ok'; }
-    b.className = cls; b.textContent = t; b.title = proj.handle ? 'Project folder: ' + proj.name + '. Changes are saved automatically.' : 'Choose a folder (not one of your scan folders) where the project is saved.';
+    else { t = '✓ Saved · “' + proj.name + '”'; cls += ' ok'; }
+    b.className = cls; b.textContent = t;
+    b.title = proj.target ? 'Project file: ' + targetFile(proj.target) + '. Changes are saved automatically.'
+      : proj.legacy ? 'This project was saved by an older version of Book Compare. Save it as a project file to keep your changes; the old project folder stays as it is.'
+      : 'Save the project as a file (not in one of your scan folders).';
   }
-  async function chooseProjectFolder() {
-    if (!HAS_FSA) { downloadProject(); return; }
-    var h;
-    try { h = await pickDir('book-project', 'readwrite'); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
-    try { await checkNotScanFolder(h); } catch (e) { return toast(niceError(e)); }
-    var exists = false;
-    try { await h.getFileHandle(PROJECT_FILE); exists = true; } catch (e) { exists = false; }
-    if (exists && !(await confirmDialog('This folder already holds a project', 'Replace the project in the folder “' + esc(h.name) + '” with the one you are working on now?', 'Replace'))) return;
-    proj.handle = h; proj.name = h.name;
-    await rememberProject();
+  function suggestedName() {
+    var n = proj.legacy ? (proj.legacy.dir ? proj.legacy.dir.name : '') : proj.name;
+    return (n && !/[<>:"\/\\|?*\x00-\x1f]/.test(n) ? n : 'Book project') + PROJECT_EXT;
+  }
+  // the Windows "Save as" or "Open" window for a project file
+  async function pickProjectFile(save) {
+    if (HELPER) {
+      var body = { kind: save ? 'save-project' : 'open-project' };
+      if (save) body.name = suggestedName();
+      if (proj.legacy && proj.legacy.dir.isHelper) body.start = proj.legacy.dir.rootPath + (/\\/.test(proj.legacy.dir.rootPath) ? '\\' : '/') + 'x';
+      var j = await hjson('/api/pick', body);
+      if (j.cancelled) throw abortError();
+      return { dir: new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name), file: j.file };
+    }
+    var types = [{ description: 'Book Compare project', accept: { 'application/json': [PROJECT_EXT] } }];
+    if (save) return { fh: await window.showSaveFilePicker({ id: 'book-project', suggestedName: suggestedName(), types: types }) };
+    types.push({ description: 'Project of an older version (book-compare-project.json)', accept: { 'application/json': ['.json'] } });
+    var arr = await window.showOpenFilePicker({ id: 'book-project', types: types, multiple: false });
+    if (!arr || !arr.length) throw abortError();
+    return { fh: arr[0] };
+  }
+  async function saveProjectAs() {
+    if (!HAS_FSA || (!HELPER && typeof window.showSaveFilePicker !== 'function')) { downloadProject(); return; }
+    var t;
+    try { t = await pickProjectFile(true); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
+    try { await checkNotScanFolder(t); }
+    catch (e) {
+      if (t.fh && t.fh.remove) { try { if ((await t.fh.getFile()).size === 0) await t.fh.remove(); } catch (e2) { /* nothing to remove */ } }   // (the browser may have made an empty file already)
+      return toast(niceError(e));
+    }
+    var before = { target: proj.target, legacy: proj.legacy, name: proj.name };
+    proj.target = t; proj.legacy = null; proj.name = targetName(t);
     await saveNow();
-    toast('Project saved in “' + h.name + '”. From now on changes are saved automatically.');
+    if (proj.state === 'error') {
+      var why = proj.err;
+      proj.target = before.target; proj.legacy = before.legacy; proj.name = before.name; proj.state = proj.target ? 'saved' : 'none'; renderSave();
+      return toast('The project could not be saved there: ' + why);
+    }
+    await rememberProject();
+    renderAll();
+    toast('Project saved as “' + proj.name + '”. From now on changes are saved automatically.');
   }
   function downloadProject() {
     var blob = new Blob([JSON.stringify(serialize(), null, 1)], { type: 'application/json' });
-    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = PROJECT_FILE;
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = suggestedName();
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-    dirty = false; renderSave(); toast('Project file downloaded. Keep it in a folder of its own.');
+    dirty = false; renderSave(); toast('Project file downloaded.');
   }
   async function rememberProject() {
-    if (!proj.handle) return;
-    if (proj.handle.isHelper) {                                  // the helper remembers folders by their address
-      lastProject = { handle: proj.handle, name: proj.name, projectId: S.projectId };
-      await idbPut('meta', 'lastProjectH', { path: proj.handle.rootPath, name: proj.name, projectId: S.projectId });
-      return;
-    }
-    lastProject = { handle: proj.handle, name: proj.name, projectId: S.projectId };
-    await idbPut('meta', 'lastProject', lastProject);
+    if (!proj.target) return;
+    var t = proj.target;
+    lastProject = { target: t, name: proj.name, projectId: S.projectId };
+    if (t.dir && t.dir.isHelper) await idbPut('meta', 'lastProjectH', { path: t.dir.rootPath, file: t.file, name: proj.name, projectId: S.projectId });   // remembered by its address
+    else await idbPut('meta', 'lastProject', { fh: t.fh, dir: t.dir || null, file: t.file || null, name: proj.name, projectId: S.projectId });
   }
-  async function readProjectFolder(h) {
-    var fh;
-    try { fh = await h.getFileHandle(PROJECT_FILE); } catch (e) { toast('There is no Book Compare project in the folder “' + h.name + '”.'); return false; }
+  // the remembered project, as saved by this version or an older one
+  async function loadLastProject() {
+    var lp = null;
+    if (HELPER) {
+      var rec = await idbGet('meta', 'lastProjectH');
+      if (rec && rec.path) { try { lp = { target: { dir: await helperRegister(rec.path, 'project'), file: rec.file || LEGACY_FILE }, name: rec.name, projectId: rec.projectId }; } catch (e) { lp = null; } }
+    } else {
+      var r = await idbGet('meta', 'lastProject');
+      if (r && r.fh) lp = { target: { fh: r.fh }, name: r.name, projectId: r.projectId };
+      else if (r && (r.dir || r.handle)) lp = { target: { dir: r.dir || r.handle, file: r.file || LEGACY_FILE }, name: r.name, projectId: r.projectId };
+    }
+    return lp;
+  }
+  async function readProject(t) {
     var json;
-    try { json = JSON.parse(await (await fh.getFile()).text()); } catch (e) { toast('The project file in that folder could not be read.'); return false; }
-    return adopt(json, h);
+    try { json = await targetRead(t); }
+    catch (e) {
+      if (e && e.name === 'NotFoundError') toast(isLegacy(t) && t.dir ? 'There is no Book Compare project in the folder “' + t.dir.name + '”.' : 'The project file “' + targetFile(t) + '” was not found.');
+      else toast('The project file “' + targetFile(t) + '” could not be read.');
+      return false;
+    }
+    return adopt(json, t);
   }
   async function openProject() {
-    if (!HAS_FSA) { $('#ws-jsoninput').value = ''; $('#ws-jsoninput').click(); return; }
-    var h;
-    try { h = await pickDir('book-project', 'readwrite'); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
-    await readProjectFolder(h);
+    if (!HAS_FSA || (!HELPER && typeof window.showOpenFilePicker !== 'function')) { $('#ws-jsoninput').value = ''; $('#ws-jsoninput').click(); return; }
+    if (!(await mayReplace())) return;
+    var t;
+    try { t = await pickProjectFile(false); } catch (e) { if (e && e.name === 'AbortError') return; return toast(niceError(e)); }
+    await readProject(t);
   }
   async function continueLast() {
     if (!lastProject) return;
-    var h = lastProject.handle;
+    var t = lastProject.target, h = t.fh || t.dir, mode = isLegacy(t) ? 'read' : 'readwrite';
     try {
-      var perm = await h.queryPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') perm = await h.requestPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') return toast('The browser did not give access to the project folder.');
+      var perm = await h.queryPermission({ mode: mode });
+      if (perm !== 'granted') perm = await h.requestPermission({ mode: mode });
+      if (perm !== 'granted') return toast('The browser did not give access to the project file.');
     } catch (e) { return toast(niceError(e)); }
-    await readProjectFolder(h);
+    await readProject(t);
   }
-  async function adopt(json, handle) {
+  // desktop program: a project file that was double-clicked in Explorer
+  async function openPending() {
+    if (!HELPER) return false;
+    var j;
+    try { j = await hjson('/api/pending', {}); } catch (e) { return false; }
+    if (!j || j.none || !j.file) return false;
+    if (!root || root.hidden) show();
+    if (!(await mayReplace())) return false;
+    return readProject({ dir: new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name), file: j.file });
+  }
+  async function adopt(json, t) {
     if (!json || json.format !== 'book-compare-project' || !Array.isArray(json.copies)) { toast('This is not a Book Compare project file.'); return false; }
     S = blank(); REG = {}; anchor = null;
     S.projectId = json.projectId || uid();
@@ -791,7 +878,9 @@
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
     hist = { undo: [], redo: [] };
     thumbMem.clear();
-    proj.handle = handle || null; proj.name = handle ? handle.name : ''; proj.state = handle ? 'saved' : 'none'; dirty = false;
+    var oldFormat = !!(t && isLegacy(t));                      // (a project folder of an older version)
+    proj.target = t && !oldFormat ? t : null; proj.legacy = oldFormat ? t : null; proj.name = !t ? '' : oldFormat ? (t.dir ? t.dir.name : '') : targetName(t);
+    proj.state = proj.target ? 'saved' : 'none'; dirty = false;
     // folders this browser remembers for the project
     for (var k = 0; k < S.roots.length; k++) {
       var rt = S.roots[k];
@@ -809,17 +898,19 @@
       else { var pr = newRoot(lc.folder || lc.name); lc.locs = [{ root: pr.id, path: '' }]; }
     }
     ensurePair();
-    if (handle) {
-      // safety: a project folder that is (or is inside, or contains) a scan folder must never be written to
-      var unsafe = false;
-      try { unsafe = !!(await projectConflict(handle)); }
+    var unsafe = false;
+    if (proj.target) {
+      // safety: a project file that lies in (or inside) a folder that holds scans of this project is never written to
+      try { unsafe = !!(await projectConflict(proj.target)); }
       catch (e) { unsafe = true; }
-      if (unsafe) { proj.handle = null; proj.state = 'none'; proj.name = ''; }
+      if (unsafe) { proj.target = null; proj.state = 'none'; }
     }
-    if (proj.handle) await rememberProject();
+    if (proj.target) await rememberProject();
     renderAll(); renderSave();
-    if (handle && !proj.handle) toast('This project folder is in a folder that holds scans, so automatic saving is switched off. Save the project in a separate folder (More → Save project).');
-    else toast('Project opened: ' + S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies') + '.');
+    var copies = S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies');
+    if (unsafe) toast('This project file lies in a folder that holds scans, so automatic saving is switched off. Save the project in another folder (More → Save project as …).');
+    else if (oldFormat) toast('Project opened (' + copies + '). It was saved by an older version of Book Compare: to keep your changes, save it as a project file (More → Save project as …). The old project folder stays as it is.');
+    else toast('Project opened: ' + copies + '.');
     return true;
   }
 
@@ -1344,8 +1435,8 @@
   function renderMenu() {
     var m = $('#ws-menu'), lost = usedRoots().some(function (r) { return !rootReady(r); });
     m.innerHTML =
-      '<button data-m="save"><span class="tick"></span>' + (HAS_FSA ? (proj.handle ? 'Choose another project folder …' : 'Save project in a folder …') : 'Download project file') + '</button>' +
-      '<button data-m="open"><span class="tick"></span>Open saved project …</button>' +
+      '<button data-m="save"><span class="tick"></span>' + (HAS_FSA ? (proj.target ? 'Save project as …' : 'Save project …') : 'Download project file') + '</button>' +
+      '<button data-m="open"><span class="tick"></span>Open project …</button>' +
       '<button data-m="reconnect"' + (lost ? '' : ' disabled') + '><span class="tick"></span>Choose scan folder again …</button><hr>' +
       '<button data-m="folio"><span class="tick"></span>' + (S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') + '</button>' +
       '<button data-m="colw"><span class="tick"></span>Standard width for all columns</button>' +
@@ -1577,7 +1668,7 @@
     if (!t.closest('#ws-menu') && !t.closest('#ws-more')) $('#ws-menu').hidden = true;
     if ((el = t.closest('[data-m]'))) {
       var m = el.dataset.m; $('#ws-menu').hidden = true;
-      if (m === 'save') chooseProjectFolder();
+      if (m === 'save') saveProjectAs();
       else if (m === 'open') openProject();
       else if (m === 'reconnect') reconnectScans();
       else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
@@ -1601,7 +1692,7 @@
       case 'back': return leave();
       case 'more': renderMenu(); $('#ws-menu').hidden = !$('#ws-menu').hidden; return;
       case 'compare': return compareNow();
-      case 'savechip': return proj.handle ? (proj.state === 'error' ? saveNow() : toast('Project folder: “' + proj.name + '”. Changes are saved automatically.')) : chooseProjectFolder();
+      case 'savechip': return proj.target ? (proj.state === 'error' ? saveNow() : toast('Project file: “' + targetFile(proj.target) + '”. Changes are saved automatically.')) : saveProjectAs();
       case 'openproj': return openProject();
       case 'continue': return continueLast();
       case 'upd-dl': hideUpdate(); return openDownloadPage();
@@ -1717,7 +1808,7 @@
   }
   async function newProject() {
     if (S.copies.length && dirty && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
-    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.handle = null; proj.state = 'none'; proj.name = ''; dirty = false;
+    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.target = null; proj.legacy = null; proj.state = 'none'; proj.name = ''; dirty = false;
     renderAll();
   }
 
@@ -1733,7 +1824,7 @@
       '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div></aside></div>' +
       '<div class="ws-bar"><button class="ws-side" id="ws-back" data-act="back"><span class="g">&#8249;</span>Back</button><button class="ws-compare" id="ws-compare" data-act="compare">COMPARE</button><button class="ws-side" id="ws-more" data-act="more"><span class="g">&#8942;</span>More</button><div class="ws-menu" id="ws-menu" hidden></div></div>' +
       '<div id="ws-layer"></div>' +
-      '<input type="file" id="ws-dirinput" class="ws-hidden" webkitdirectory multiple><input type="file" id="ws-jsoninput" class="ws-hidden" accept=".json,application/json">';
+      '<input type="file" id="ws-dirinput" class="ws-hidden" webkitdirectory multiple><input type="file" id="ws-jsoninput" class="ws-hidden" accept=".bookcompare,.json,application/json">';
     document.body.appendChild(root);
     root.addEventListener('click', onClick);
     root.addEventListener('dblclick', onDblClick);
@@ -1748,7 +1839,7 @@
     root.addEventListener('pointercancel', onPointerUp);
     $('#ws-jsoninput').onchange = function () {
       var f = this.files && this.files[0]; if (!f) return;
-      f.text().then(function (t) { adopt(JSON.parse(t), null); }).catch(function () { toast('That file could not be read as a project.'); });
+      mayReplace().then(function (ok) { if (ok) return f.text().then(function (t) { adopt(JSON.parse(t), null); }); }).catch(function () { toast('That file could not be read as a project.'); });
     };
     window.addEventListener('resize', function () { if (root && !root.hidden) renderRows(); });
     window.addEventListener('beforeunload', function (e) { if (S && S.copies.length && dirty) { e.preventDefault(); e.returnValue = ''; } });
@@ -1760,12 +1851,8 @@
     root.hidden = false;
     renderAll();
     helperReady.then(async function () {                        // the helper (if there is one) is known now
-      var lp = null;
-      if (HELPER) {
-        var rec = await idbGet('meta', 'lastProjectH');
-        if (rec && rec.path) { try { lp = { handle: await helperRegister(rec.path, 'project'), name: rec.name, projectId: rec.projectId }; } catch (e) { lp = null; } }
-      } else { lp = await idbGet('meta', 'lastProject'); }
-      if (lp && lp.handle && !S.copies.length) lastProject = lp;
+      var lp = await loadLastProject();
+      if (lp && !S.copies.length) lastProject = lp;
       renderAll();
     });
     var vp = $('#ws-vp'); (vp || root).focus();
@@ -1779,6 +1866,14 @@
     hide: hide,
     onCompare: function (fn) { cb.compare = fn; },
     onLeave: function (fn) { cb.leave = fn; },
+    openPending: openPending,
+    projectInfo: function () { return { name: proj.name, file: proj.target ? targetFile(proj.target) : '', state: proj.state, legacy: !!proj.legacy, copies: S ? S.copies.length : 0 }; },
     tab: tabApi
   };
+  // desktop program: a project file that was double-clicked opens at once
+  helperReady.then(function (h) {
+    if (!h) return;
+    var go = function () { openPending().catch(function () { }); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go, 0);
+  });
 })();

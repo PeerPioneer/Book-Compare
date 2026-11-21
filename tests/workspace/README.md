@@ -21,7 +21,7 @@ Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the ap
 
 `gridchecks.py` holds the checks of the grid editing (column width, moving copies, deleting a range with Shift); it is run by `test_workspace.py` and `test_desktop_server.py`, not on its own.
 
-`test_desktop_server.py` checks the desktop program's scan reader (`desktop/server.js`) with real folders on disk, in Chromium and in Firefox: its safety rules (other web sites and other host names are refused, scan folders are read-only, only `book-compare-project.json` can be written), choosing folders and single pictures, saving and reopening a project, and a simulated restart (no permission question, because the program holds the folder access). It needs Node:
+`test_desktop_server.py` checks the desktop program's scan reader (`desktop/server.js`) with real folders on disk, in Chromium and in Firefox: its safety rules (other web sites and other host names are refused, scan folders are read-only, only the project file `<name>.bookcompare` and its results folder can be written, never in a folder that holds pictures), choosing folders and single pictures, saving and reopening a project, a project of an older version, a double-clicked project file, and a simulated restart (no permission question, because the program holds the folder access). It needs Node:
 
     python3 tests/workspace/test_desktop_server.py      # prints ALL DESKTOP SERVER TESTS PASSED
 
@@ -32,7 +32,9 @@ Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the ap
 
     python3 tests/workspace/test_compare_tab.py   # prints ALL COMPARE TAB TESTS PASSED
 
-`common.py` holds the helpers (making test scans, faking the folder picker with private-storage folders).
+`common.py` holds the helpers (making test scans, faking the folder picker and the Save/Open windows for the project file with private-storage folders).
+Environment switches: `BOOKCOMPARE_BROWSERS=chromium` runs only Chromium where a test would also run Firefox; `BOOKCOMPARE_PERSISTENT=1` runs the
+browser tests with a profile on disk (some Chromium builds crash in a private window when a remembered folder is read back from storage).
 Not covered by these scripts: how the real Windows folder and Open windows look and feel, and the permission prompts of Edge/Chrome on the website; these must be tried by hand.
 
 

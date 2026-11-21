@@ -4,8 +4,11 @@
    former helper program, removed 21 Nov 2026).
    The folder and picture windows are the ordinary Windows ones (Electron's dialog).
 
-   For the automatic test on GitHub:  "Book Compare.exe" --smoke-test <result file>
-   opens the program without showing the window, checks that the page and the scan reader answer, writes the result and quits. */
+   For the automatic test on GitHub:  "Book Compare.exe" --smoke-test <result file> [<project file>.bookcompare]
+   opens the program without showing the window, checks that the page and the scan reader answer (and that the project file opens),
+   writes the result and quits.
+   A double-clicked project file (.bookcompare, registered by the installer) arrives as an argument; it is handed to the page,
+   which asks for it (/api/pending) when it starts, or at once if the program is already open (second-instance). */
 const { app, BrowserWindow, dialog, shell, Menu } = require('electron');
 const path = require('path'), fs = require('fs');
 const { createServer, VERSION } = require('./server');
@@ -14,12 +17,23 @@ const PORTS = [8790, 8791, 8792, 8793, 8794];              // a fixed address ke
 const smokeIdx = process.argv.indexOf('--smoke-test'), SMOKE = smokeIdx >= 0 ? process.argv[smokeIdx + 1] : null;
 const appDir = app.isPackaged ? path.join(process.resourcesPath, 'app') : path.join(__dirname, '..', 'app');
 let win = null, port = 0, server = null;
+// A project file that was double-clicked (Windows starts the program with its address) waits here until the page asks for it.
+function projectArg(argv) { return (argv || []).slice(1).find(a => /\.bookcompare$/i.test(a) && fs.existsSync(a)) || null; }
+let pendingOpen = projectArg(process.argv);
+const SMOKE_OPEN = SMOKE && pendingOpen ? path.basename(pendingOpen) : null;     // test mode with a project file: it must open
 
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=8192');   // big scans: let the page use more memory than a browser tab gets
 
 if (!SMOKE && !app.requestSingleInstanceLock()) { app.quit(); }
 else {
-  app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+  app.on('second-instance', (e, argv) => {
+    const f = projectArg(argv);
+    if (f) pendingOpen = f;
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+    if (f) win.webContents.executeJavaScript('window.BookWorkspace && window.BookWorkspace.openPending && window.BookWorkspace.openPending()').catch(() => { });
+  });
   app.whenReady().then(start).catch(e => { dialog.showErrorBox('Book Compare could not start', String(e && e.message || e)); app.quit(); });
 }
 app.on('window-all-closed', () => app.quit());
@@ -28,8 +42,20 @@ function log(text) {
   try { fs.mkdirSync(app.getPath('userData'), { recursive: true }); fs.appendFileSync(path.join(app.getPath('userData'), 'book-compare.log'), new Date().toISOString() + ' ' + text + '\n'); } catch (e) { /* no log */ }
 }
 
-async function pick(kind, start, title) {
+const PROJECT_FILTER = { name: 'Book Compare project', extensions: ['bookcompare'] };
+async function pick(kind, start, title, name) {
   const o = { title, defaultPath: start || undefined };
+  if (kind === 'save-project') {
+    const r = await dialog.showSaveDialog(win, { title, defaultPath: path.join(start || app.getPath('documents'), name || 'Book project.bookcompare'),
+      filters: [PROJECT_FILTER], properties: ['showOverwriteConfirmation', 'createDirectory'] });
+    return r.canceled || !r.filePath ? null : r.filePath;
+  }
+  if (kind === 'open-project') {
+    o.properties = ['openFile'];
+    o.filters = [PROJECT_FILTER, { name: 'Project of an older version (book-compare-project.json)', extensions: ['json'] }];
+    const r = await dialog.showOpenDialog(win, o);
+    return r.canceled || !r.filePaths.length ? null : r.filePaths[0];
+  }
   if (kind === 'files') {
     o.properties = ['openFile', 'multiSelections'];
     o.filters = [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'tif', 'tiff'] }, { name: 'All files', extensions: ['*'] }];
@@ -45,7 +71,8 @@ async function start() {
   Menu.setApplicationMenu(null);
   let lastErr = null;
   for (const p of PORTS) {
-    const s = createServer({ port: p, appDir, dataDir: app.getPath('userData'), pick, log, quit: () => app.quit() });
+    const s = createServer({ port: p, appDir, dataDir: app.getPath('userData'), pick, log, quit: () => app.quit(),
+      takeOpen: () => { const f = pendingOpen; pendingOpen = null; return f; } });
     try { await s.listen(); server = s; port = p; break; } catch (e) { lastErr = e; }
   }
   if (!server) throw new Error('No free address on this computer (' + (lastErr && lastErr.message) + ').');
@@ -85,10 +112,13 @@ async function smokeTest(origin) {
     out.result = await win.webContents.executeJavaScript(`(async () => {
       for (let i = 0; i < 100 && !(window.BookWorkspace && window.CompareTab); i++) await new Promise(r => setTimeout(r, 100));
       const ping = await (await fetch('/api/ping')).json();
-      return { workspace: !!window.BookWorkspace, compare: !!window.CompareTab, engine: !!(window.AlignEngine && AlignEngine.supported()), desktopAgent: /BookCompareDesktop/.test(navigator.userAgent), ping };
+      let opened = '';
+      for (let i = 0; i < 100 && ${JSON.stringify(!!SMOKE_OPEN)} && !(opened = BookWorkspace.projectInfo().file); i++) await new Promise(r => setTimeout(r, 100));
+      return { workspace: !!window.BookWorkspace, compare: !!window.CompareTab, engine: !!(window.AlignEngine && AlignEngine.supported()), desktopAgent: /BookCompareDesktop/.test(navigator.userAgent), ping, opened };
     })()`);
     const r = out.result;
-    out.ok = r.workspace && r.compare && r.engine && r.desktopAgent && r.ping.app === 'BookCompare' && r.ping.desktop === true && r.ping.pick === 'dialog';
+    out.ok = r.workspace && r.compare && r.engine && r.desktopAgent && r.ping.app === 'BookCompare' && r.ping.desktop === true && r.ping.pick === 'dialog'
+      && (!SMOKE_OPEN || r.opened === SMOKE_OPEN);
     out.version = app.getVersion(); out.port = port;
   } catch (e) { out.error = String(e && e.message || e); }
   fs.writeFileSync(SMOKE, JSON.stringify(out, null, 1));

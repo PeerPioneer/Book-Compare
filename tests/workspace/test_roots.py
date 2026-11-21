@@ -70,12 +70,19 @@ with sync_playwright() as p:
       await new Promise(res=>{const tx=d.transaction('handles','readwrite'); tx.objectStore('handles').put(__h.A,'legacy1/1'); tx.objectStore('handles').put(__h.B,'legacy1/2'); tx.oncomplete=res;}); }""", json.dumps(legacy))
     lock(pg3, 'Copy-A', 'Copy-B'); pg3.evaluate("window.__noact = true")           # as if the browser had used up the click already
     pg3.evaluate("window.__picks.push(window.__h.legacy)"); pg3.click('#ws-more'); pg3.click('[data-m=open]'); pg3.wait_for_timeout(1500)
-    assert pg3.locator('#ws .ws-hname').count() == 2 and not hid(pg3, '#ws-banner')
+    assert pg3.locator('#ws .ws-hname').count() == 2 and not hid(pg3, '#ws-banner'), pg3.inner_text('#ws-toast')
     assert pg3.locator('#ws-banner [data-act=allow]').count() == 1 and pg3.locator('#ws-banner [data-act=reconnect]').count() == 1, pg3.inner_html('#ws-banner')
     # ... one choice of the folder that holds both merges them into a single remembered folder
     pg3.evaluate("window.__noact = false; window.__picks.push(window.__h.scans)"); pg3.click('#ws-banner [data-act=reconnect]'); pg3.wait_for_timeout(1500)
     assert hid(pg3, '#ws-banner') and thumbs(pg3, 2) and prompts(pg3) == []
     pg3.locator('#ws .ws-hname').first.click(); pg3.keyboard.type('Renamed-A'); pg3.keyboard.press('Enter'); pg3.wait_for_timeout(1500)
+    # a project of an older version is not saved by itself: "Save project as" makes a project file and leaves the old folder as it was
+    assert 'Older project' in pg3.inner_text('#ws-save'), pg3.inner_text('#ws-save')
+    assert read_project(pg3, 'legacy')['version'] == 1 and project_files(pg3, 'legacy') == ['book-compare-project.json']
+    pg3.evaluate("window.__picks.push(window.__h.legacy)"); pg3.click('#ws-more'); pg3.click('[data-m=save]'); pg3.wait_for_timeout(1200)
+    assert project_files(pg3, 'legacy') == ['Book project.bookcompare', 'book-compare-project.json'], project_files(pg3, 'legacy')
+    assert '✓ Saved' in pg3.inner_text('#ws-save') and 'Book project' in pg3.inner_text('#ws-save'), pg3.inner_text('#ws-save')
+    assert pg3.evaluate("(async()=>JSON.parse(await (await (await __h.legacy.getFileHandle('book-compare-project.json')).getFile()).text()).version)()") == 1
     d = read_project(pg3, 'legacy'); assert d['version'] == 2 and len(d['roots']) == 1 and d['roots'][0]['name'] == 'scans', d['roots']
     assert [c['locs'][0]['path'] for c in d['copies']] == ['Copy-A', 'Copy-B'] and d['copies'][0]['name'] == 'Renamed-A'
     # the same legacy project again, this time with one click per remembered folder
@@ -85,7 +92,7 @@ with sync_playwright() as p:
       await new Promise(res=>{const tx=d.transaction('handles','readwrite'); tx.objectStore('handles').put(__h.A,'legacy1/1'); tx.objectStore('handles').put(__h.B,'legacy1/2'); tx.oncomplete=res;});
       const fh = await __h.legacy.getFileHandle('book-compare-project.json'); const w = await fh.createWritable(); await w.write(j); await w.close(); }""", json.dumps(legacy))
     lock(pg4, 'Copy-A', 'Copy-B')
-    pg4.evaluate("window.__picks.push(window.__h.legacy)"); pg4.click('#ws-more'); pg4.click('[data-m=open]'); pg4.wait_for_timeout(1500)
+    pg4.evaluate("(async()=>{ window.__picks.push(await __h.legacy.getFileHandle('book-compare-project.json')); })()"); pg4.click('#ws-more'); pg4.click('[data-m=open]'); pg4.wait_for_timeout(1500)
     clicks = 0
     while not hid(pg4, '#ws-banner') and clicks < 4:
         pg4.click('#ws-banner [data-act=allow]'); clicks += 1; pg4.wait_for_timeout(700)
@@ -94,7 +101,7 @@ with sync_playwright() as p:
     # the project folder may lie NEXT TO the copy folders (inside the folder that holds them) - that is where many people keep it
     pg.evaluate("(async()=>{ window.__h.P = await __h.scans.getDirectoryHandle('Project',{create:true}); })()")
     pg.evaluate("window.__picks.push(window.__h.P)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1300)
-    assert 'Saved in folder' in pg.inner_text('#ws-save') and 'Project' in pg.inner_text('#ws-save'), pg.inner_text('#ws-save')
+    assert '✓ Saved' in pg.inner_text('#ws-save') and pg.evaluate("(async()=>{const o=[]; for await (const [n] of __h.P.entries()) o.push(n); return o;})()") == ['Book project.bookcompare'], pg.inner_text('#ws-save')
     # a scan folder may be the folder that holds the project ...
     pg.click('#ws .ws-addbtn'); pg.evaluate("window.__picks.push(window.__h.scans)"); pg.click('#ac-folder'); pg.wait_for_timeout(600)
     assert pg.inner_text('#ac-err') == '', pg.inner_text('#ac-err'); pg.click('[data-close]')

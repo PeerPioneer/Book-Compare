@@ -3,8 +3,10 @@ BOOK COMPARE - START HERE
 
 Book Compare compares scans of copies of early printed books, page by page.
 It runs on your own computer. Your scans are never uploaded, and Book Compare only READS them:
-it never changes, moves or deletes a scan. The only file it writes is the project file, in the
-project folder you choose.
+it never changes, moves or deletes a scan. It only writes your project: one file
+("<name>.bookcompare", saved where you choose, but never in a scan folder) and, next to it, the
+folder "<name>.bookcompare results" with the stored alignments. Double-click a project file
+to open it.
 
 
 1. Install it (Windows 10 and 11)
@@ -51,7 +53,9 @@ If something does not work
    the files "Start Book Compare.bat"). It is no longer needed. Right-click its icon near the
    clock, untick "Start with Windows", choose "Quit Book Compare", and delete the old
    unzipped Book Compare folder. Projects made with it open in the program: "More" >
-   "Open saved project ...", and choose the same project folder.
+   "Open project ...", and choose the file "book-compare-project.json" in the old project
+   folder. Then "More" > "Save project as ..." saves it as a project file; the old project
+   folder is left as it is.
 
 
 Without installing: the website

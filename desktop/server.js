@@ -6,12 +6,16 @@
 
      node desktop/server.js --port 8790 --data-dir <folder> --test-pick-file <file>
 
-   Scan folders are only READ. The only file it ever writes is the project file (book-compare-project.json) in the project folder chosen. */
+   Scan folders are only READ. It writes only the project file (<name>.bookcompare) and the files in the results folder next to it
+   (<name>.bookcompare results), and never in a folder that holds pictures. Project folders of older versions (book-compare-project.json)
+   are only read. */
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 
 const VERSION = '2.0-desktop';
 const IMG_EXT = ['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp', '.bmp', '.gif'];
-const PROJECT_FILE = 'book-compare-project.json';
+const LEGACY_FILE = 'book-compare-project.json';                 // the project file of versions before 0.9 (one project per folder): only read
+const PROJECT_EXT = '.bookcompare', RESULTS_SUFFIX = ' results';
+const PROJECT_RE = /^.+\.bookcompare$/i, RESULTS_RE = /^.+\.bookcompare results$/i;
 const IS_WIN = process.platform === 'win32';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -25,7 +29,20 @@ const BAD_NAME = /[<>:"/\\|?*\x00-\x1f]/;
 function same(a, b) { return IS_WIN ? a.toLowerCase() === b.toLowerCase() : a === b; }
 function isImage(name) { return IMG_EXT.includes(path.extname(name).toLowerCase()); }
 
-/* opts: { port, appDir, dataDir, testPickFile, pick(kind, start, title) -> Promise<null | string | {folder, files}>, quit(), log(text) } */
+// What a path inside a project folder is: 'root' (the folder itself), 'file' (a project file), 'legacy' (the project file of older versions),
+// 'results' (the results folder of a project, or anything in it) or null (anything else, which is never touched).
+function projectPart(rel) {
+  rel = rel.replace(/^\/+|\/+$/g, '');
+  if (rel === '') return 'root';
+  const parts = rel.split('/');
+  if (parts.length === 1 && parts[0] === LEGACY_FILE) return 'legacy';
+  if (parts.length === 1 && PROJECT_RE.test(parts[0])) return 'file';
+  if (RESULTS_RE.test(parts[0])) return 'results';
+  return null;
+}
+
+/* opts: { port, appDir, dataDir, testPickFile, pick(kind, start, title, name) -> Promise<null | string | {folder, files}>, takeOpen() -> path | null,
+           quit(), log(text) } */
 function createServer(opts) {
   const port = opts.port, appDir = path.resolve(opts.appDir), appRoot = appDir + path.sep;
   const allowedHosts = ['localhost:' + port, '127.0.0.1:' + port], allowedOrigins = ['http://localhost:' + port, 'http://127.0.0.1:' + port];
@@ -92,6 +109,20 @@ function createServer(opts) {
     const s = readSettings(); if (kind === 'project') s.lastProject = reg.root.path; else s.lastScans = reg.root.path; saveSettings(s);
     json(res, 200, rootJson(reg.id, reg.root));
   }
+  // A project file chosen in the Save or Open window: its folder becomes a project folder; the answer names the file.
+  function finishPickProject(res, full, save) {
+    if (!full || !path.isAbsolute(full)) return err(res, 400, 'bad-path', 'Bad path.');
+    full = path.resolve(full);
+    let name = path.basename(full);
+    if (save && !PROJECT_RE.test(name)) name += PROJECT_EXT;
+    if (BAD_NAME.test(name)) return err(res, 400, 'bad-path', 'Bad file name.');
+    if (!save && !PROJECT_RE.test(name) && name !== LEGACY_FILE) return err(res, 400, 'not-project', 'That is not a Book Compare project.');
+    if (!save && !isFile(path.join(path.dirname(full), name))) return err(res, 404, 'not-found', 'That file does not exist.');
+    const reg = registerRoot(path.dirname(full), 'project');
+    if (!reg) return err(res, 404, 'not-found', 'That folder does not exist.');
+    const s = readSettings(); s.lastProject = path.join(reg.root.path, name); saveSettings(s);
+    json(res, 200, Object.assign(rootJson(reg.id, reg.root), { file: name }));
+  }
   function finishPickFiles(res, folder, names) {
     const reg = registerRoot(folder, 'scans');
     if (!reg) return err(res, 404, 'not-found', 'That folder does not exist.');
@@ -102,8 +133,10 @@ function createServer(opts) {
   }
   async function startPick(req, res) {
     const body = await readJson(req);
-    const kind = body && body.kind === 'project' ? 'project' : body && body.kind === 'files' ? 'files' : 'scans';
-    const start = startDir(body && body.start ? String(body.start) : '', kind === 'files' ? 'scans' : kind);
+    const KINDS = ['project', 'files', 'save-project', 'open-project'];
+    const kind = body && KINDS.includes(body.kind) ? body.kind : 'scans', isProj = kind === 'save-project' || kind === 'open-project';
+    const start = startDir(body && body.start ? String(body.start) : '', kind === 'files' ? 'scans' : isProj ? 'project' : kind);
+    const suggested = body && typeof body.name === 'string' && body.name.trim() && !BAD_NAME.test(body.name) ? body.name.trim() : 'Book project' + PROJECT_EXT;
     if (opts.testPickFile) {                                     // automatic tests: hand out the next line of the file (one folder per line; for pictures: folder|name|name)
       let lines = [];
       try { lines = fs.readFileSync(opts.testPickFile, 'utf8').split(/\r?\n/).filter(l => l.trim()); } catch (e) { /* none */ }
@@ -113,20 +146,28 @@ function createServer(opts) {
       if (first === 'FAIL') return err(res, 501, 'no-dialog', 'test: no folder window');
       if (first === 'CANCEL') return json(res, 200, { cancelled: true });
       if (kind === 'files') { const p = first.split('|'); return finishPickFiles(res, p[0], p.slice(1)); }
+      if (isProj) return finishPickProject(res, first, kind === 'save-project');
       return finishPick(res, kind, first);
     }
     if (!opts.pick) return err(res, 501, 'no-dialog', 'This computer cannot show a folder window.');
     if (pickOpen) return err(res, 409, 'busy', 'A folder window is already open.');
     const title = kind === 'project' ? 'Book Compare: choose the project folder (not one of your scan folders)'
+      : kind === 'save-project' ? 'Book Compare: save the project (not in one of your scan folders)'
+      : kind === 'open-project' ? 'Book Compare: open a project'
       : kind === 'files' ? 'Book Compare: choose one or several pictures (Ctrl- or Shift-click for several)' : 'Book Compare: choose the folder with the scans';
     pickOpen = true;
     let r;
-    try { r = await opts.pick(kind, start, title); }
+    try { r = await opts.pick(kind, start, title, suggested); }
     catch (e) { log('folder window: ' + e.message); return err(res, 501, 'no-dialog', 'The folder window did not work.'); }
     finally { pickOpen = false; }
     if (!r) return json(res, 200, { cancelled: true });
     if (kind === 'files') return finishPickFiles(res, r.folder, r.files);
+    if (isProj) return finishPickProject(res, r, kind === 'save-project');
     return finishPick(res, kind, r);
+  }
+  // A folder that holds pictures is never written to (safety for the scan folders).
+  function holdsPictures(dir) {
+    try { return fs.readdirSync(dir, { withFileTypes: true }).some(d => d.isFile() && isImage(d.name)); } catch (e) { return true; }
   }
 
   function apiAllowed(req) {
@@ -154,6 +195,12 @@ function createServer(opts) {
       return;
     }
     if (p === '/api/pick') { if (m !== 'POST') return err(res, 405, 'method'); return startPick(req, res); }
+    if (p === '/api/pending') {                                  // a project file that was double-clicked (or dropped on the program's icon)
+      if (m !== 'POST') return err(res, 405, 'method');
+      const f = opts.takeOpen ? opts.takeOpen() : null;
+      if (!f) return json(res, 200, { none: true });
+      return finishPickProject(res, f, false);
+    }
     if (p === '/api/register') {
       if (m !== 'POST') return err(res, 405, 'method');
       const b = await readJson(req), reg = b ? registerRoot(String(b.path || ''), b.kind === 'project' ? 'project' : 'scans') : null;
@@ -165,22 +212,22 @@ function createServer(opts) {
     if (!r) return err(res, 404, 'unknown-root', 'This folder is not known (Book Compare was restarted?).');
     const rel = url.searchParams.get('path') || '', full = resolveInRoot(r, rel);
     if (!full) return err(res, 400, 'bad-path', 'Bad path.');
-    const isProjectName = rel.replace(/^\/+|\/+$/g, '') === PROJECT_FILE;
+    const part = r.kind === 'project' ? projectPart(rel) : null;
 
     if (p === '/api/list') {
-      if (r.kind !== 'scans') return err(res, 403, 'refused', 'Not a scan folder.');
+      if (r.kind !== 'scans' && part !== 'results') return err(res, 403, 'refused', 'Not a scan folder.');
       if (!isDir(full)) return err(res, 404, 'not-found', 'Folder not found.');
       const entries = [];
       for (const d of fs.readdirSync(full, { withFileTypes: true })) {
         try {
           if (d.isDirectory()) entries.push({ n: d.name, d: true });
-          else if (isImage(d.name)) { const st = fs.statSync(path.join(full, d.name)); if (st.isFile()) entries.push({ n: d.name, d: false, s: st.size, m: Math.round(st.mtimeMs) }); }
+          else if (part === 'results' || isImage(d.name)) { const st = fs.statSync(path.join(full, d.name)); if (st.isFile()) entries.push({ n: d.name, d: false, s: st.size, m: Math.round(st.mtimeMs) }); }
         } catch (e) { /* unreadable entry: skipped */ }
       }
       return json(res, 200, { entries });
     }
     if (p === '/api/stat') {
-      if (r.kind === 'project' && rel.replace(/^\/+|\/+$/g, '') !== '' && !isProjectName) return err(res, 403, 'refused', 'Not allowed.');
+      if (r.kind === 'project' && !part) return err(res, 403, 'refused', 'Not allowed.');
       let st = null; try { st = fs.statSync(full); } catch (e) { /* missing */ }
       if (st && st.isDirectory()) return json(res, 200, { exists: true, dir: true });
       if (st && st.isFile() && (r.kind === 'project' || isImage(full))) return json(res, 200, { exists: true, dir: false, size: st.size, mtime: Math.round(st.mtimeMs) });
@@ -188,7 +235,7 @@ function createServer(opts) {
     }
     if (p === '/api/file') {
       if (m !== 'GET' && m !== 'HEAD') return err(res, 405, 'method');
-      if (r.kind === 'project') { if (!isProjectName) return err(res, 403, 'refused', 'Not allowed.'); }
+      if (r.kind === 'project') { if (!part || part === 'root') return err(res, 403, 'refused', 'Not allowed.'); }
       else if (!isImage(full)) return err(res, 403, 'refused', 'Only pictures can be read.');
       let st; try { st = fs.statSync(full); } catch (e) { st = null; }
       if (!st || !st.isFile()) return err(res, 404, 'not-found', 'File not found.');
@@ -203,11 +250,15 @@ function createServer(opts) {
       s.pipe(res);
       return;
     }
-    if (p === '/api/write') {                                    // the ONLY thing this program writes: the project file
+    if (p === '/api/write') {                                    // the ONLY things this program writes: the project file and its results folder
       if (m !== 'PUT') return err(res, 405, 'method');
-      if (r.kind !== 'project' || !isProjectName) return err(res, 403, 'refused', 'Only the project file in the project folder can be written.');
-      let bytes; try { bytes = await readBody(req, 64 * 1024 * 1024); } catch (e) { return err(res, 413, 'too-large', 'Too large.'); }
+      if (r.kind !== 'project' || (part !== 'file' && part !== 'results') || rel.replace(/^\/+|\/+$/g, '').split('/').length < (part === 'results' ? 2 : 1))
+        return err(res, 403, 'refused', 'Only the project file and its results can be written.');
+      let bytes; try { bytes = await readBody(req, 256 * 1024 * 1024); } catch (e) { return err(res, 413, 'too-large', 'Too large.'); }
       if (!isDir(r.path)) return err(res, 404, 'not-found', 'The project folder does not exist.');
+      if (holdsPictures(r.path)) return err(res, 403, 'scan-folder', 'This folder holds pictures, so Book Compare does not save anything in it. Save the project in another folder.');
+      if (part === 'results') { try { fs.mkdirSync(path.dirname(full), { recursive: true }); } catch (e) { return err(res, 500, 'mkdir', 'The results folder could not be made.'); } }
+      if (isDir(full)) return err(res, 409, 'is-folder', 'There is a folder of that name.');
       const tmp = full + '.tmp';
       fs.writeFileSync(tmp, bytes);
       for (let i = 0; ; i++) {                                    // replaces the old file in one step (retried: Dropbox or a virus scanner may hold it a moment)
@@ -249,11 +300,12 @@ function createServer(opts) {
   };
 }
 
-module.exports = { createServer, VERSION };
+module.exports = { createServer, projectPart, VERSION };
 
 if (require.main === module) {                                   // started on its own (automatic tests)
   const a = process.argv.slice(2), arg = (n, d) => { const i = a.indexOf(n); return i >= 0 ? a[i + 1] : d; };
   const s = createServer({ port: +arg('--port', 8790), appDir: arg('--app-dir', path.join(__dirname, '..', 'app')), dataDir: arg('--data-dir', path.join(require('os').tmpdir(), 'bookcompare-test')),
-    testPickFile: arg('--test-pick-file', ''), log: t => process.stderr.write(t + '\n'), quit: () => process.exit(0) });
+    testPickFile: arg('--test-pick-file', ''), log: t => process.stderr.write(t + '\n'), quit: () => process.exit(0),
+    takeOpen: () => { const i = a.indexOf('--open'); if (i < 0) return null; const f = a[i + 1]; a.splice(i, 2); return f || null; } });   // --open <file>: as if it had been double-clicked
   s.listen().then(() => process.stderr.write('Book Compare server ready\n'), e => { process.stderr.write('could not start: ' + e.message + '\n'); process.exit(1); });
 }

@@ -40,10 +40,22 @@ Check 'silent install into a chosen folder, both shortcuts, test mode, uninstall
   $p = Start-Process $exe -ArgumentList '--smoke-test', $out -PassThru -Wait
   Get-Content $out | Write-Host
   if ($p.ExitCode -ne 0) { throw "test mode failed (exit $($p.ExitCode))" }
+  # project files (.bookcompare) open with Book Compare, and a project file given to the program opens
+  $assoc = Get-ItemProperty -Path 'Registry::HKEY_CURRENT_USER\Software\Classes\.bookcompare' -ErrorAction SilentlyContinue
+  if (-not $assoc) { $assoc = Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\.bookcompare' -ErrorAction SilentlyContinue }
+  if (-not $assoc) { throw '.bookcompare files are not registered' }
+  $projDir = 'C:\BC-Test\proj'; New-Item -ItemType Directory -Force $projDir | Out-Null
+  $projFile = Join-Path $projDir 'test.bookcompare'
+  Set-Content -Path $projFile -Encoding UTF8 -Value '{"format":"book-compare-project","version":2,"projectId":"smoke","roots":[],"copies":[],"labels":{},"skip":{},"pair":[null,null],"sel":{"ci":null,"row":0}}'
+  $out2 = Join-Path $env:TEMP 'bc-smoke-2.json'
+  $p = Start-Process $exe -ArgumentList '--smoke-test', $out2, $projFile -PassThru -Wait
+  Get-Content $out2 | Write-Host
+  if ($p.ExitCode -ne 0) { throw "the project file did not open (exit $($p.ExitCode))" }
   Uninstall $dir1
   if (Test-Path $exe) { throw 'uninstall left the program behind' }
   if (Has-StartMenu) { throw 'uninstall left the Start-menu shortcut' }
   if (Has-Desktop) { throw 'uninstall left the Desktop shortcut' }
+  if (Test-Path 'Registry::HKEY_CURRENT_USER\Software\Classes\.bookcompare') { $v = (Get-ItemProperty 'Registry::HKEY_CURRENT_USER\Software\Classes\.bookcompare').'(default)'; if ($v) { Write-Host "  note: .bookcompare still registered after uninstall ($v)" } }
 }
 
 # ---------------------------------------------------------------------------------------------- 2. the pages, clicked through

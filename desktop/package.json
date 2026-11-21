@@ -38,6 +38,9 @@
         ]
       }
     ],
+    "fileAssociations": [
+      { "ext": "bookcompare", "name": "Book Compare project", "description": "Book Compare project", "role": "Editor" }
+    ],
     "win": {
       "target": [
         {

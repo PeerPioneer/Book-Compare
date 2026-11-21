@@ -1,9 +1,11 @@
 """Automatic test of the desktop program's scan reader (desktop/server.js) together with the workspace in the page.
 
 Everything here uses REAL folders on disk (made-up scans in a temporary folder, never your own folders):
-  * the scan reader: listing, reading pictures, saving the project file, and everything it must refuse
-  * the workspace in desktop mode, in Chromium AND Firefox: add copies, save the project in a folder that lies next to the copy folders,
+  * the scan reader: listing, reading pictures, saving the project file (<name>.bookcompare) and its results folder, and everything it must refuse
+  * the workspace in desktop mode, in Chromium AND Firefox: add copies, save the project as a file in a folder that lies next to the copy folders,
     restart the reader and the browser, reopen the project - without a single permission question - compare a pair
+  * a project of an older version (a folder with book-compare-project.json) opens and is saved as a project file, the old one untouched;
+    a double-clicked project file opens by itself
   * a moved scan folder is found again with one folder choice; single pictures (S10)
   * the scan folders are never changed
 
@@ -59,9 +61,9 @@ BEFORE = snapshot()
 
 # ------------------------------------------------------------------------------------------------------------ the scan reader (desktop/server.js)
 proc = None
-def start_helper():                                                  # (the name is historical: it starts desktop/server.js)
+def start_helper(extra=()):                                          # (the name is historical: it starts desktop/server.js)
     global proc
-    args = ['node', os.path.join(REPO, 'desktop', 'server.js'), '--port', str(PORT), '--data-dir', DATA, '--test-pick-file', PICKS]
+    args = ['node', os.path.join(REPO, 'desktop', 'server.js'), '--port', str(PORT), '--data-dir', DATA, '--test-pick-file', PICKS] + list(extra)
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(80):
         try:
@@ -130,21 +132,46 @@ def api_tests():
         assert st in (400, 403, 404), (p, st)
     assert call('GET', '/api/file?root=nope&path=x.jpg')[0] == 404
     assert call('PUT', '/api/write' + q(sc, 'book-compare-project.json'), data=b'{}')[0] == 403
+    assert call('PUT', '/api/write' + q(sc, 'x.bookcompare'), data=b'{}')[0] == 403
     assert call('PUT', '/api/write' + q(pr, 'other.json'), data=b'{}')[0] == 403
+    assert call('PUT', '/api/write' + q(pr, 'book-compare-project.json'), data=b'{}')[0] == 403        # the project file of older versions is only read
     assert call('PUT', '/api/write' + q(pr, 'x/book-compare-project.json'), data=b'{}')[0] in (400, 403)
+    assert call('PUT', '/api/write' + q(pr, 'x/y.bookcompare'), data=b'{}')[0] in (400, 403)
+    assert call('PUT', '/api/write' + q(pr, 'T.bookcompare results'), data=b'{}')[0] == 403              # the results folder itself is not a file
+    assert call('PUT', '/api/write' + q(pr, 'T.bookcompare results/../x.bookcompare'), data=b'{}')[0] in (400, 403)
     assert call('GET', '/api/list' + q(pr, ''))[0] == 403 and call('GET', '/api/file' + q(pr, 'scan.jpg'))[0] == 403
+    # a folder that holds pictures is never written to, even as a project folder
+    st, pic = jcall('POST', '/api/register', {'path': os.path.join(BOOKS, 'Copy-A', 'Gesamtes Buch'), 'kind': 'project'}); assert st == 200
+    st, body, _ = call('PUT', '/api/write' + q(pic, 'x.bookcompare'), data=b'{}'); assert st == 403 and json.loads(body)['error'] == 'scan-folder', (st, body)
     # requests from other web sites or without the Book Compare header are refused
     assert call('GET', '/api/ping', headers={'Sec-Fetch-Site': 'cross-site'})[0] == 403
     assert call('GET', '/api/ping', headers={'Origin': 'http://evil.example'})[0] == 403
     assert call('GET', '/api/ping', headers={'Sec-Fetch-Site': 'same-origin', 'Origin': BASE})[0] == 200
     st, _, _ = call('POST', '/api/register', headers={'X-BookCompare': ''}, data=b'{}'); assert st == 403
     assert call('GET', '/api/ping', headers={'Host': 'evil.example:%d' % PORT})[0] in (400, 403, 404)
-    # the project file: written, replaced, no leftovers
-    assert call('PUT', '/api/write' + q(pr, 'book-compare-project.json'), data='{"a":"ä"}'.encode())[0] == 200
-    assert call('PUT', '/api/write' + q(pr, 'book-compare-project.json'), data='{"a":"b"}'.encode())[0] == 200
-    assert os.listdir(os.path.join(BOOKS, 'Project')) == ['book-compare-project.json']
-    assert call('GET', '/api/file' + q(pr, 'book-compare-project.json'))[1] == b'{"a":"b"}'
-    os.remove(os.path.join(BOOKS, 'Project', 'book-compare-project.json'))
+    # the project file: written, replaced, no leftovers; the results folder next to it is made when something is stored in it
+    assert call('PUT', '/api/write' + q(pr, 'Test ä.bookcompare'), data='{"a":"ä"}'.encode())[0] == 200
+    assert call('PUT', '/api/write' + q(pr, 'Test ä.bookcompare'), data='{"a":"b"}'.encode())[0] == 200
+    assert os.listdir(os.path.join(BOOKS, 'Project')) == ['Test ä.bookcompare']
+    assert call('GET', '/api/file' + q(pr, 'Test ä.bookcompare'))[1] == b'{"a":"b"}'
+    assert call('PUT', '/api/write' + q(pr, 'Test ä.bookcompare results/c2/r0001.bin'), data=b'\x00\x01\x02')[0] == 200
+    assert call('PUT', '/api/write' + q(pr, 'Test ä.bookcompare results/index.json'), data=b'{}')[0] == 200
+    assert sorted(os.listdir(os.path.join(BOOKS, 'Project'))) == ['Test ä.bookcompare', 'Test ä.bookcompare results']
+    assert call('GET', '/api/file' + q(pr, 'Test ä.bookcompare results/c2/r0001.bin'))[1] == b'\x00\x01\x02'
+    st, j = jcall('GET', '/api/list' + q(pr, 'Test ä.bookcompare results')); assert st == 200 and sorted(e['n'] for e in j['entries']) == ['c2', 'index.json'], (st, j)
+    # the project file of an older version can be read
+    open(os.path.join(BOOKS, 'Project', 'book-compare-project.json'), 'w').write('{"old":1}')
+    assert call('GET', '/api/file' + q(pr, 'book-compare-project.json'))[1] == b'{"old":1}'
+    for f in os.listdir(os.path.join(BOOKS, 'Project')):
+        f = os.path.join(BOOKS, 'Project', f); shutil.rmtree(f) if os.path.isdir(f) else os.remove(f)
+    # the Save and Open windows for a project file: the folder is registered, the answer names the file (".bookcompare" is added when missing)
+    push_pick(os.path.join(BOOKS, 'Project', 'Mein Buch')); st, j = jcall('POST', '/api/pick', {'kind': 'save-project', 'name': 'x.bookcompare'})
+    assert st == 200 and j['kind'] == 'project' and j['file'] == 'Mein Buch.bookcompare' and j['name'] == 'Project', (st, j)
+    assert not os.listdir(os.path.join(BOOKS, 'Project')), 'choosing the place writes nothing yet'
+    push_pick(os.path.join(BOOKS, 'Project', 'Mein Buch.bookcompare')); assert jcall('POST', '/api/pick', {'kind': 'open-project'})[0] == 404     # (does not exist)
+    push_pick(os.path.join(BOOKS, 'Copy-A', 'notes.txt')); assert jcall('POST', '/api/pick', {'kind': 'open-project'})[0] == 400                  # not a project
+    push_pick('CANCEL'); st, j = jcall('POST', '/api/pick', {'kind': 'save-project'}); assert st == 200 and j.get('cancelled')
+    st, j = jcall('POST', '/api/pending', {}); assert st == 200 and j.get('none'), (st, j)
     # the program files are still served, and nothing outside the folder "app"
     assert call('GET', '/index.html')[0] == 200 and call('GET', '/..%2fREADME.md')[0] in (400, 403, 404)
     # a folder window that cannot be shown is reported, a cancelled one too
@@ -179,12 +206,15 @@ def add_copy(pg, folder, name, ticks=(), start=None):
     if start: pg.fill('#ac-start', str(start))
     for i in ticks: pg.check('#ac-groups input[data-g="%d"]' % i)
     pg.click('#ac-ok'); pg.wait_for_timeout(800)
-def project_json():
-    return json.load(open(os.path.join(BOOKS, 'Project', 'book-compare-project.json'), encoding='utf-8'))
+def project_json(name='Book project.bookcompare'):
+    return json.load(open(os.path.join(BOOKS, 'Project', name), encoding='utf-8'))
+def clear_project_folder():
+    for f in os.listdir(os.path.join(BOOKS, 'Project')):
+        f = os.path.join(BOOKS, 'Project', f); shutil.rmtree(f) if os.path.isdir(f) else os.remove(f)
 
 def scenario(p, kind):
     ud = os.path.join(TMP, 'profile-' + kind); os.makedirs(ud)
-    for f in os.listdir(os.path.join(BOOKS, 'Project')): os.remove(os.path.join(BOOKS, 'Project', f))      # a project left by the previous browser
+    clear_project_folder()                                                                        # a project left by the previous browser
     launch = getattr(p, kind).launch_persistent_context
     def session():
         c = launch(ud, viewport={'width': 1500, 'height': 900}, service_workers='block')
@@ -203,12 +233,13 @@ def scenario(p, kind):
         if pg.locator('#ws-thumbs img').count() >= 2: break
         pg.wait_for_timeout(500)
     assert pg.locator('#ws-thumbs img').count() >= 2, ('thumbnails: ' + pg.inner_text('#ws-thumbs') + ' | errors: ' + str(errs) + ' | helper.log: ' + (open(os.path.join(DATA, 'helper.log'), encoding='utf-8').read()[-1500:] if os.path.exists(os.path.join(DATA, 'helper.log')) else '-'))
-    # a project folder that is one of the scan folders is refused; the folder NEXT to them is accepted
-    push_pick(os.path.join(BOOKS, 'Copy-B ä')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(600)
+    # a project file in one of the scan folders is refused; in the folder NEXT to them it is accepted
+    push_pick(os.path.join(BOOKS, 'Copy-B ä', 'Book project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(600)
     assert 'scan folder' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
-    assert not os.path.exists(os.path.join(BOOKS, 'Copy-B ä', 'book-compare-project.json'))
-    push_pick(os.path.join(BOOKS, 'Project')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
-    assert 'Saved in folder' in pg.inner_text('#ws-save') and 'Project' in pg.inner_text('#ws-save'), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
+    assert not [f for f in os.listdir(os.path.join(BOOKS, 'Copy-B ä')) if 'bookcompare' in f]
+    push_pick(os.path.join(BOOKS, 'Project', 'Book project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
+    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Book project' in pg.inner_text('#ws-save'), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
+    assert os.listdir(os.path.join(BOOKS, 'Project')) == ['Book project.bookcompare'], os.listdir(os.path.join(BOOKS, 'Project'))
     d = project_json()
     assert d['version'] == 2 and len(d['roots']) == 3 and all(os.path.normcase(r['path']).startswith(os.path.normcase(BOOKS)) for r in d['roots']), d['roots']
     pg.locator('#ws .ws-hname').first.click(); pg.keyboard.type('A-Renamed'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1500)      # changes are saved by themselves
@@ -304,6 +335,28 @@ def scenario(p, kind):
         pg.wait_for_timeout(500)
         if 'cannot read the scans right now' in pg.inner_text('#ws-thumbs'): break
     assert 'cannot read the scans right now' in pg.inner_text('#ws-thumbs'), pg.inner_text('#ws-thumbs')
+    c.close(); stop_helper()
+    # --- a double-clicked project file (the program is started with its address) opens by itself ------------------------------
+    start_helper(['--open', os.path.join(BOOKS, 'Project', 'Book project.bookcompare')]); c, pg = session()
+    pg.goto(BASE + '/index.html')
+    for _ in range(40):
+        pg.wait_for_timeout(300)
+        if pg.evaluate("window.BookWorkspace ? BookWorkspace.projectInfo().file : ''") == 'Book project.bookcompare': break
+    assert pg.evaluate("BookWorkspace.projectInfo()") == {'name': 'Book project', 'file': 'Book project.bookcompare', 'state': 'saved', 'legacy': False, 'copies': 3}, pg.evaluate("BookWorkspace.projectInfo()")
+    assert not pg.evaluate("document.getElementById('ws').hidden") and pg.locator('#ws .ws-hname').count() == 3
+    assert jcall('POST', '/api/pending', {})[1].get('none'), 'handed out once only'
+    # --- a project of an older version (a folder holding book-compare-project.json): opened, then saved as a project file ----
+    old = os.path.join(BOOKS, 'Project', 'Old project'); os.makedirs(old)
+    oldtext = json.dumps(dict(project_json(), projectId='old1'), indent=1).encode('utf-8')
+    open(os.path.join(old, 'book-compare-project.json'), 'wb').write(oldtext)
+    push_pick(os.path.join(old, 'book-compare-project.json')); pg.click('#ws-more'); pg.click('[data-m=open]'); pg.wait_for_timeout(2000)
+    assert 'older version' in pg.inner_text('#ws-toast') and 'Older project' in pg.inner_text('#ws-save'), (pg.inner_text('#ws-toast'), pg.inner_text('#ws-save'))
+    pg.locator('#ws .ws-hname').first.click(); pg.keyboard.type('Old-A'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1500)
+    assert open(os.path.join(old, 'book-compare-project.json'), 'rb').read() == oldtext and os.listdir(old) == ['book-compare-project.json'], 'not saved by itself'
+    push_pick(os.path.join(old, 'Old project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
+    assert sorted(os.listdir(old)) == ['Old project.bookcompare', 'book-compare-project.json'] and open(os.path.join(old, 'book-compare-project.json'), 'rb').read() == oldtext
+    assert json.load(open(os.path.join(old, 'Old project.bookcompare'), encoding='utf-8'))['copies'][0]['name'] == 'Old-A'
+    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Old project' in pg.inner_text('#ws-save'), pg.inner_text('#ws-save')
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 
