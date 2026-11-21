@@ -95,6 +95,44 @@
   }
 
 
+  /* ---------------------------------------------------------------- website or desktop program (21 Nov 2026) */
+  // The same pages run on the website and inside the desktop program. The desktop program adds "BookCompareDesktop/<version>" to the
+  // name its browser engine reports (desktop/main.js), so the page can tell where it runs: the website shows where to download the
+  // program (the start screen in index.html, and the More menu here); the program itself does not, but says when a newer version is
+  // on the download page.
+  var DESKTOP = (/BookCompareDesktop\/([0-9][0-9.]*)/.exec(navigator.userAgent) || [])[1] || null;   // the version of the desktop program, or null
+  var RELEASES = 'https://github.com/PeerPioneer/Book-Compare/releases/latest';                   // always the newest installer
+  var RELEASES_API = 'https://api.github.com/repos/PeerPioneer/Book-Compare/releases/latest';
+  function openDownloadPage() { window.open(RELEASES, '_blank', 'noopener'); }
+  // "1.10.0" > "1.9.2"
+  function newerVersion(a, b) {
+    var x = String(a).replace(/^v/i, '').split('.').map(Number), y = String(b).replace(/^v/i, '').split('.').map(Number);
+    for (var i = 0; i < Math.max(x.length, y.length); i++) { var p = x[i] || 0, q = y[i] || 0; if (p !== q) return p > q; }
+    return false;
+  }
+  // Desktop program only: at most once a day, ask GitHub which version is the newest; if it is newer than this one, say so
+  // (once a day at most). Nothing is downloaded or changed by itself: "Download" opens the download page in the browser.
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* no storage */ } }
+  async function checkForUpdate() {
+    if (!DESKTOP || !window.fetch) return;
+    var now = Date.now(), DAY = 20 * 3600 * 1000, latest = lsGet('bc_latest_version');
+    if (!latest || now - (+lsGet('bc_update_checked') || 0) > DAY) {
+      try {
+        var r = await fetch(RELEASES_API, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } });
+        if (r.ok) { var j = await r.json(); if (j && j.tag_name) { latest = String(j.tag_name).replace(/^v/i, ''); lsSet('bc_latest_version', latest); } }
+        lsSet('bc_update_checked', String(now));
+      } catch (e) { return; }                                                     // offline: try again next time
+    }
+    if (!latest || !newerVersion(latest, DESKTOP)) return;
+    if (now - (+lsGet('bc_update_shown') || 0) < DAY) return;                     // "Later": not again today
+    var b = $('#ws-update'); if (!b) return;
+    b.innerHTML = '<span>A new version of Book Compare is available: <b>' + esc(latest) + '</b> (you have ' + esc(DESKTOP) + ').</span>' +
+      '<button class="ws-tb primary" data-act="upd-dl">Go to the download page</button><button class="ws-tb" data-act="upd-later">Later</button>';
+    b.hidden = false;
+  }
+  function hideUpdate() { var b = $('#ws-update'); if (b) b.hidden = true; lsSet('bc_update_shown', String(Date.now())); }
+
   /* ---------------------------------------------------------------- helper mode (folders read by the helper program, see launcher/serve.ps1) */
   // HDir / HFile imitate the folder and file objects of the browser's File System Access API, so the rest of this file does not
   // care where a folder comes from. A folder is a root (registered with the helper under a random id) plus a path inside it.
@@ -1310,6 +1348,7 @@
       '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
       '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
       '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
+      (DESKTOP ? '' : '<hr><button data-m="download"><span class="tick"></span>Desktop program for Windows …</button>') +
       (HELPER && !HELPER.desktop ? '<hr><button data-m="quit"><span class="tick"></span>Quit the Book Compare helper</button>' : '');   // (the desktop program is closed like any window)
   }
 
@@ -1537,6 +1576,7 @@
       else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
       else if (m === 'new') newProject();
       else if (m === 'quit') quitHelper();
+      else if (m === 'download') openDownloadPage();
       return;
     }
     var cell = t.closest('.ws-cell');
@@ -1555,6 +1595,8 @@
       case 'savechip': return proj.handle ? (proj.state === 'error' ? saveNow() : toast('Project folder: “' + proj.name + '”. Changes are saved automatically.')) : chooseProjectFolder();
       case 'openproj': return openProject();
       case 'continue': return continueLast();
+      case 'upd-dl': hideUpdate(); return openDownloadPage();
+      case 'upd-later': return hideUpdate();
       case 'allow': return allowAccess(false);
       case 'reconnect': return reconnectScans();
       case 'swap': S.pair = [S.pair[1], S.pair[0]]; touch(); renderAll(); return;
@@ -1681,7 +1723,7 @@
     root.innerHTML =
       '<div class="ws-head"><div class="ws-headtext"><h1>Copies and pages</h1><p>Each column is one copy, each row one page position. Check that every row shows the same page in all copies, then mark two pages and compare them.</p></div>' +
       '<button class="ws-save" id="ws-save" data-act="savechip"></button><button class="ws-icon" data-act="help" aria-label="Help">?</button></div>' +
-      '<div class="ws-banner" id="ws-banner" hidden></div>' +
+      '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-update" id="ws-update" hidden></div>' +
       '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-summary" id="ws-summary"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
       '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div></aside></div>' +
       '<div class="ws-bar"><button class="ws-side" id="ws-back" data-act="back"><span class="g">&#8249;</span>Back</button><button class="ws-compare" id="ws-compare" data-act="compare">COMPARE</button><button class="ws-side" id="ws-more" data-act="more"><span class="g">&#8942;</span>More</button><div class="ws-menu" id="ws-menu" hidden></div></div>' +
@@ -1705,6 +1747,7 @@
     };
     window.addEventListener('resize', function () { if (root && !root.hidden) renderRows(); });
     window.addEventListener('beforeunload', function (e) { if (S && S.copies.length && dirty) { e.preventDefault(); e.returnValue = ''; } });
+    setTimeout(function () { checkForUpdate().catch(function () { }); }, 2500);
   }
   function show() {
     if (!S) S = blank();

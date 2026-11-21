@@ -1,12 +1,15 @@
 BOOK COMPARE - START HERE
 =========================
 
-NEW (version 0.7, November 2026): Book Compare as an ordinary Windows program
------------------------------------------------------------------------------
-Run the installer "Book-Compare-Setup-0.7.0.exe". It installs Book Compare for your Windows
-user only (no administrator needed), with an entry in the Start menu and on the Desktop.
+NEW (November 2026): Book Compare as an ordinary Windows program
+----------------------------------------------------------------
+Download the newest installer from https://github.com/PeerPioneer/Book-Compare/releases/latest
+(file "Book-Compare-Setup-x.y.z.exe"; on the website the link "Desktop program for Windows" leads
+there) and run it. It asks where to install Book Compare and whether it should appear in the Start
+menu and on the Desktop; installed for yourself, no administrator password is needed.
 Book Compare then opens in its own window: no browser, no .bat file, no black window and no
-icon near the clock. Everything else works as described below.
+icon near the clock. When a newer version is on the download page, the program says so once a
+day (it never changes itself). Everything else works as described below.
  * Windows may say "Windows protected your PC" the first time ("unknown publisher"), because
    the installer is not signed yet. Click "More info", then "Run anyway".
  * Projects made with the helper open in the program too: "More" > "Open saved project …", and choose the

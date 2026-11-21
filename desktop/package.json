@@ -1,7 +1,7 @@
 {
   "name": "book-compare",
   "productName": "Book Compare",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Compare scans of copies of early printed books, page by page.",
   "author": "Torge Schiefelbein",
   "license": "BSD-2-Clause",
@@ -19,20 +19,47 @@
     "appId": "io.github.peerpioneer.bookcompare",
     "productName": "Book Compare",
     "artifactName": "Book-Compare-Setup-${version}.${ext}",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "server.js", "package.json", "build/icon.ico"],
-    "extraResources": [{ "from": "../app", "to": "app", "filter": ["**/*"] }],
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.ico" },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "package.json",
+      "build/icon.ico"
+    ],
+    "extraResources": [
+      {
+        "from": "../app",
+        "to": "app",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowElevation": false,
-      "allowToChangeInstallationDirectory": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Book Compare",
       "runAfterFinish": true,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
     }
   }
 }

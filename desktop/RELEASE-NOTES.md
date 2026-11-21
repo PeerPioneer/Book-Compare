@@ -1,0 +1,11 @@
+**Book Compare VERSION**: compare scans of copies of early printed books, page by page.
+
+**Download:** `Book-Compare-Setup-VERSION.exe` below (Windows 10 and 11, about 130 MB).
+
+**Install:** run the file and follow the steps. You choose the folder and whether Book Compare appears in the Start menu and on the Desktop. No administrator password is needed when you install it for yourself.
+
+Windows may say "Windows protected your PC" (unknown publisher), because the installer is not signed yet. Click "More info", then "Run anyway".
+
+An older version does not need to be removed first: installing the new one replaces it. Your projects stay where you saved them.
+
+What is new: see [CHANGELOG.txt](https://github.com/PeerPioneer/Book-Compare/blob/main/CHANGELOG.txt). Book Compare in the browser, without installing: https://peerpioneer.github.io/Book-Compare/

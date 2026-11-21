@@ -170,6 +170,9 @@
         text-transform: none;
       }
 
+      .desktop-dl { margin: 1.5rem auto 0; max-width: 34rem; text-align: center; font-size: 0.85rem; color: #4a5a5a; line-height: 1.4; }
+      .desktop-dl a { font-weight: 500; color: #00807a; }
+      .desktop-dl[hidden], .desktop-dl [hidden] { display: none; }
       /* Info dialog */
       .mdc-dialog .mdc-dialog__close {
         align-self: flex-end;
@@ -1664,6 +1667,13 @@
           <i class="material-icons mdc-button__icon" aria-hidden="true">help</i>
           <span class="mdc-button__label">How it works</span>
         </button>
+        <!-- website only: where to get the desktop program (hidden inside the desktop program itself, see the script below) -->
+        <p id="desktop_dl" class="desktop-dl" hidden>
+          Book Compare is also a desktop program for Windows: no browser needed,
+          and your scan folders open directly.
+          <a href="https://github.com/PeerPioneer/Book-Compare/releases/latest" target="_blank" rel="noopener">Desktop program for Windows</a>
+          <span id="desktop_dl_note" hidden>(it does not run on this device)</span>
+        </p>
       </section>
       <footer>
         <span
@@ -2558,6 +2568,16 @@
       window.addEventListener("load", () => {
         // From https://github.com/jakearchibald/wittr/blob/fecaad3a07c41a43230cf8fef2fc102f658981cf/public/js/main/IndexController.js
 
+        // The desktop program says "BookCompareDesktop/<version>" in the name of its browser engine (desktop/main.js):
+        // the website shows where to download it, the program itself does not.
+        if (!/BookCompareDesktop/.test(navigator.userAgent)) {
+          const dl = document.getElementById("desktop_dl");
+          if (dl) dl.hidden = false;
+          if (!/Windows/.test(navigator.userAgent) || /Windows Phone/.test(navigator.userAgent)) {
+            const n = document.getElementById("desktop_dl_note");
+            if (n) n.hidden = false;
+          }
+        }
         if (!navigator.serviceWorker) return;
         // The desktop program has its program files on the computer already: no offline copy is needed (and none can get out of date).
         if (/BookCompareDesktop/.test(navigator.userAgent)) {

@@ -96,12 +96,13 @@ jobs:
           rc=0
           (node research/js/build_worker.js --check && python tests/workspace/test_align_worker.py) > /tmp/bc-worker-test.txt 2>&1 || rc=1
           (python tests/workspace/test_modes.py > /tmp/bc-modes-test.txt 2>&1 && python tests/workspace/test_workspace.py > /tmp/bc-workspace-test.txt 2>&1 && python tests/workspace/test_roots.py > /tmp/bc-roots-test.txt 2>&1) || rc=1
+          python tests/workspace/test_desktop_links.py > /tmp/bc-desktop-links-test.txt 2>&1 || rc=1
           exit $rc
       - name: Test output (shown as a note on this job)
         if: always()
         run: |
           text=""
-          for f in /tmp/bc-worker-test.txt /tmp/bc-modes-test.txt /tmp/bc-workspace-test.txt /tmp/bc-roots-test.txt; do
+          for f in /tmp/bc-worker-test.txt /tmp/bc-modes-test.txt /tmp/bc-workspace-test.txt /tmp/bc-roots-test.txt /tmp/bc-desktop-links-test.txt; do
             text="$text=== $f"$'\n'
             if [ -f "$f" ]; then text="$text$(tail -c 5000 "$f")"; else text="$text(not written)"; fi
             text="$text"$'\n'

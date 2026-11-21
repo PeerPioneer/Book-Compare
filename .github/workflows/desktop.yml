@@ -1,9 +1,12 @@
 # The desktop program (V5, Electron, desktop/):
 # 1. "server": the desktop program's own scan reader (desktop/server.js) must give the same answers as the helper:
 #    the whole helper test runs against it (Linux, Chromium).
-# 2. "installer": builds the Windows installer, installs it silently on a real Windows machine, starts the installed program in its
-#    test mode (page loads, scan reader answers, alignment engine available) and uninstalls it again. The installer is kept as a
-#    download of this run ("Book-Compare-Setup"), for 30 days.
+# 2. "installer": builds the Windows installer; on a real Windows machine: the unpacked program in its test mode, then
+#    tests/windows/installer-checks.ps1 (silent install into a chosen folder, test mode, uninstall; then the installer's pages clicked
+#    through: install location, the Shortcuts page, Desktop unticked -> Start menu only). The installer is kept as a download of this
+#    run ("Book-Compare-Setup") for 30 days, and when its version (desktop/package.json) is new it is published on the Releases page
+#    (https://github.com/PeerPioneer/Book-Compare/releases/latest), which is where the website's link and the program's
+#    "new version" notice point.
 name: Desktop program
 on:
   push:
@@ -12,6 +15,7 @@ on:
       - 'desktop/**'
       - 'app/**'
       - 'tests/workspace/test_helper.py'
+      - 'tests/windows/installer-checks.ps1'
       - '.github/workflows/desktop.yml'
   workflow_dispatch:
 jobs:
@@ -36,6 +40,8 @@ jobs:
   installer:
     runs-on: windows-latest
     timeout-minutes: 30
+    permissions:
+      contents: write          # to publish a new version on the Releases page
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -54,28 +60,25 @@ jobs:
           $p = Start-Process $exe.FullName -ArgumentList '--smoke-test', "$env:TEMP\smoke1.json" -PassThru -Wait
           Get-Content "$env:TEMP\smoke1.json"
           if ($p.ExitCode -ne 0) { throw "test mode failed (exit $($p.ExitCode))" }
-      - name: Install silently, start the installed program, uninstall
+      - name: Installer checks (silent install into a chosen folder; the pages clicked through)
         shell: powershell
-        working-directory: desktop
         run: |
-          $setup = Get-ChildItem dist -Filter 'Book-Compare-Setup-*.exe' | Select-Object -First 1
-          Write-Host "installer: $($setup.Name), $([math]::Round($setup.Length / 1MB)) MB"
-          Start-Process $setup.FullName -ArgumentList '/S' -Wait
-          $installed = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Book Compare.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $installed) { throw 'Book Compare.exe was not installed' }
-          Write-Host "installed: $($installed.FullName)"
-          $lnk = @("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Book Compare.lnk") | Where-Object { Test-Path $_ }
-          if (-not $lnk) { throw 'no Start-menu entry' }
-          $p = Start-Process $installed.FullName -ArgumentList '--smoke-test', "$env:TEMP\smoke2.json" -PassThru -Wait
-          Get-Content "$env:TEMP\smoke2.json"
-          if ($p.ExitCode -ne 0) { throw "installed program: test mode failed (exit $($p.ExitCode))" }
-          $un = Get-ChildItem $installed.DirectoryName -Filter 'Uninstall*.exe' | Select-Object -First 1
-          Start-Process $un.FullName -ArgumentList '/S' -Wait
-          Start-Sleep -Seconds 5
-          if (Test-Path $installed.FullName) { throw 'uninstall left the program behind' }
+          $setup = Get-ChildItem desktop\dist -Filter 'Book-Compare-Setup-*.exe' | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File tests\windows\installer-checks.ps1 -Setup $setup.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'installer checks failed' }
       - uses: actions/upload-artifact@v5
         with:
           name: Book-Compare-Setup
           path: desktop/dist/Book-Compare-Setup-*.exe
           retention-days: 30
           if-no-files-found: error
+      - name: Publish on the Releases page (only a new version)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./desktop/package.json').version")
+          if gh release view "v$v" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "v$v is already on the Releases page"; exit 0; fi
+          sed "s/VERSION/$v/g" desktop/RELEASE-NOTES.md > notes.md
+          gh release create "v$v" "desktop/dist/Book-Compare-Setup-$v.exe" -R "$GITHUB_REPOSITORY" --title "Book Compare $v" --notes-file notes.md --target "$GITHUB_SHA" --latest
