@@ -9,6 +9,8 @@ It uses the desktop program's scan reader (desktop/server.js) with REAL folders 
     in "<project>.bookcompare results" (index.json + one file per pair); started again, everything is skipped
   * the Compare tab shows a pair with the reference from the stored movement (no aligning), aligns any other pair directly and prepares
     the next page meanwhile (then shown from memory); a changed tile setting is aligned again and replaces the stored one
+  * the printed area (V2b): shown on the pictures, a corner dragged on the superimposed picture, aligned again at once, saved for that scan,
+    used again when coming back to the page, "Back to automatic"
   * the scan folders are never changed
 Run:  python3 tests/workspace/test_background.py   (needs Node)
 """
@@ -131,8 +133,10 @@ def scenario(p, kind):
     assert pg.locator('#ws-scrim .bg-copy').count() == 2, 'the reference itself is not offered'
     pg.click('#bg-go'); pg.wait_for_timeout(800)
     t = wait_strip(pg, ['Aligning in the background', 'Paused', 'finished'], 30)
+    if os.environ.get('BOOKCOMPARE_SHOTS'): pg.wait_for_timeout(3000); pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-strip.png'))
     t = wait_strip(pg, ['Paused:', 'finished'])
     assert 'Paused:' in t and 'has no partner' in t and 'C-Test' in t, t
+    if os.environ.get('BOOKCOMPARE_SHOTS'): pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-paused.png'))
     pg.click('#ws-bg [data-bg=goto]'); pg.wait_for_timeout(500)
     sel = pg.evaluate("[document.querySelector('#ws .ws-cell.sel') && document.querySelector('#ws .ws-cell.sel').dataset.c, document.querySelector('#ws .ws-cell.sel') && document.querySelector('#ws .ws-cell.sel').dataset.r]")
     assert sel[0] == '2', ('Go to the page selects the cell of C-Test', sel)
@@ -155,6 +159,9 @@ def scenario(p, kind):
     t0 = time.time(); pg.click('#ws-compare'); wait_aligned(pg, 'reference pair'); took = time.time() - t0
     lt = pg.evaluate("CompareTab.lastTiles()"); assert lt and lt.get('stored') is True and lt['w'] > 100, lt
     print('  %s: reference pair shown from the stored movement in %.1f s' % (kind, took))
+    # the help text on what cannot be seen (B5)
+    assert not pg.is_visible('#ct_help li'); pg.click('#ct_help summary'); pg.wait_for_timeout(200)
+    assert 'Lighter inks' in pg.inner_text('#ct_help') and 'Small shifts' in pg.inner_text('#ct_help'); pg.click('#ct_help summary')
     pg.select_option('#ct_c1', label='B-Test'); pg.wait_for_timeout(300); pg.select_option('#ct_c2', label='C-Test'); wait_aligned(pg, 'B against C')
     lt = pg.evaluate("CompareTab.lastTiles()"); assert not lt.get('stored'), 'B against C is not a pair with the reference: aligned directly'
     for _ in range(240):
@@ -187,6 +194,36 @@ def scenario(p, kind):
         time.sleep(0.25)
     assert settings() == ['std'] * 4, settings()
     pg.click('#ct_prev'); wait_aligned(pg, 'page 1 again'); assert pg.evaluate("CompareTab.lastTiles()").get('stored') is True
+    # --- the printed area (V2b): shown on the pictures, a corner dragged, aligned again at once, saved for the scan; back to automatic ---
+    assert not pg.is_visible('#pane_main .ct-qbox')
+    pg.check('#ct_box'); pg.wait_for_timeout(400)
+    assert pg.is_visible('#pane_main .ct-qbox') and pg.locator('#pane_main .ct-qbox circle[data-h]').count() == 4 and pg.locator('#pane_o1 .ct-qbox circle').count() == 0
+    lt = pg.evaluate("CompareTab.lastTiles()"); q0 = pg.evaluate("CompareBox.quad()")
+    assert lt.get('box') and q0 == [lt['box'][0], lt['box'][1], lt['box'][2], lt['box'][1], lt['box'][2], lt['box'][3], lt['box'][0], lt['box'][3]], (lt.get('box'), q0)
+    assert 'Found automatically' in pg.inner_text('#ct_boxnote') and not pg.is_visible('#ct_boxauto')
+    hb = pg.locator('#pane_main .ct-qbox circle[data-h="0"]').bounding_box(); sv = pg.locator('#pane_main .ct-qbox svg').bounding_box()
+    cx, cy = hb['x'] + hb['width'] / 2, hb['y'] + hb['height'] / 2
+    pg.mouse.move(cx, cy); pg.mouse.down(); pg.mouse.move(cx + sv['width'] * 0.05, cy + sv['height'] * 0.03, steps=6); pg.mouse.up()
+    wait_aligned(pg, 'after a corner was moved')
+    lt = pg.evaluate("CompareTab.lastTiles()")
+    assert lt.get('quad') and not lt.get('stored'), ('aligned again with the shape', lt.get('quad'), lt.get('stored'))
+    assert abs(lt['quad'][0] - (q0[0] + 0.05)) < 0.02 and abs(lt['quad'][1] - (q0[1] + 0.03)) < 0.02 and lt['quad'][2:] == [round(v, 4) for v in q0[2:]], (q0, lt['quad'])
+    for _ in range(20):
+        bx = project().get('boxes') or {}
+        if bx: break
+        time.sleep(0.25)
+    assert list(bx.keys()) == ['%d|p1.jpg' % A] and bx['%d|p1.jpg' % A] == lt['quad'], bx
+    assert pg.is_visible('#ct_boxauto') and 'Set by hand' in pg.inner_text('#ct_boxnote')
+    if os.environ.get('BOOKCOMPARE_SHOTS'): pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'printed-area.png'))
+    pg.click('#ct_next'); wait_aligned(pg, 'page 2 has its own (automatic) area'); assert not pg.evaluate("CompareTab.lastTiles()").get('quad')
+    pg.click('#ct_prev'); wait_aligned(pg, 'page 1 with the shape'); lt = pg.evaluate("CompareTab.lastTiles()"); assert lt.get('quad') and lt.get('stored') is True, 'the result with the shape was stored'
+    pg.click('#ct_boxauto'); wait_aligned(pg, 'back to automatic')
+    assert not pg.evaluate("CompareTab.lastTiles()").get('quad') and not pg.is_visible('#ct_boxauto')
+    for _ in range(20):
+        if not project().get('boxes'): break
+        time.sleep(0.25)
+    assert not project().get('boxes'), project().get('boxes')
+    pg.uncheck('#ct_box'); pg.wait_for_timeout(200); assert not pg.is_visible('#pane_main .ct-qbox')
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

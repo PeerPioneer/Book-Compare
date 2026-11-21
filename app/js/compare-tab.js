@@ -44,7 +44,7 @@
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function frames(n) { return new Promise(function (res) { (function f(k) { if (k <= 0) res(); else requestAnimationFrame(function () { f(k - 1); }); })(n); }); }
-  function key(s) { return s.pair.join('|') + '#' + s.row + '#' + st.transform + '#' + JSON.stringify(W().tileSetting ? W().tileSetting(s.row, s.pair[1]) : null); }
+  function key(s) { return s.pair.join('|') + '#' + s.row + '#' + st.transform + '#' + JSON.stringify(W().tileSetting ? W().tileSetting(s.row, s.pair[1]) : null) + '#' + JSON.stringify(W().boxSetting ? W().boxSetting(s.row, s.pair[0]) : null); }
 
   /* ---------------------------------------------------------------- building the pieces */
   function build() {
@@ -84,12 +84,25 @@
       '<label title="How many times each tile is split again (standard 3)">Sub-tiles <input type="number" id="ct_tsub" min="1" max="4" step="1"></label>' +
       '<button class="ct-tapply" id="ct_tapply">Apply</button></div>' +
       '<p class="ct-tnote" id="ct_tnote"></p>' +
+      // V2b: the printed area, shown and corrected by hand (js/compare-box.js)
+      '<div class="ct-check ct-boxrow"><label title="Show the area the alignment works on; its corners can be dragged"><input type="checkbox" id="ct_box"> Printed area</label>' +
+      '<button class="ct-tadvbtn" id="ct_boxauto" hidden title="Forget the shape set by hand and use the box found automatically">Back to automatic</button></div>' +
+      '<p class="ct-tnote" id="ct_boxnote" hidden></p>' +
       // V16: what the fine alignment did - movement map, the rough alignment alone, and the hint for sharp shifts
       '<div class="ct-check"><label title="Colours over the picture: how far the fine alignment moved each part of copy 2"><input type="checkbox" id="ct_mv"> Movement map</label>' +
       '<label title="Show copy 2 placed by the whole-page step only, without the fine alignment in tiles"><input type="checkbox" id="ct_rough"> Without fine alignment</label></div>' +
       '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span></p>' +
       '<p class="ct-hint" id="ct_hint" hidden></p>' +
-      '<div class="ct-warn" id="ct_warn" hidden></div></div>' +
+      '<div class="ct-warn" id="ct_warn" hidden></div>' +
+      // B5: what the comparison cannot show (owner 18 Nov / 21 Nov)
+      '<details class="ct-help" id="ct_help"><summary>What the comparison cannot show</summary><ul>' +
+      '<li><b>Lighter inks.</b> Only dark ink takes part in the alignment and in the differences. Red print (staves, rubrics, initials) and other light colours are not looked at: a difference that exists only in red ink cannot be seen here. Look at the two scans side by side for those.</li>' +
+      '<li><b>Small shifts.</b> The fine alignment bends small parts of the page onto each other. A line, a note or a block moved by a few pixels (up to about one staff space) is pulled into place and does not show as a difference. “Movement map” and “Without fine alignment” show where the alignment moved something; a sharp shift of about 15 px or more is pointed out. Shifts of a few pixels cannot be detected at all.</li>' +
+      '<li><b>Tile settings.</b> “More flexible” can pull real differences into place; “Stiffer” is safer but shows more differences that are only paper and scanning.</li>' +
+      '<li><b>Pages with almost no ink</b> (title pages, blank pages) are placed by the whole-page step only.</li>' +
+      '<li><b>Outside the printed area</b> set by hand nothing is aligned; there the picture only follows the nearest aligned parts.</li>' +
+      '<li><b>Paper and scanning</b> (stains, show-through, pencil, a curved page, a dark binding edge) can show as differences. A wrong page in one copy shows as a page full of differences (more than 30 % of the ink without partner is pointed out).</li>' +
+      '</ul></details></div>' +
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
@@ -151,6 +164,13 @@
       stale: function () { return st.stale; }
     });
 
+    if (window.CompareBox) CompareBox.init({
+      W: W, say: function (t) { note(t); }, info: function () { return st.lastTiles || null; }, tiles: function () { return st.transform === 'tiles'; },
+      shown: function () { return st.shownRow == null ? null : { row: st.shownRow, pair: st.shownPair }; },
+      stale: function () { return st.stale; },
+      realign: function () { markStale(); schedule(60); }
+    });
+
     $('ct_sidebtn').onclick = function () { st.side = !st.side; layout(); };
     $('ct_focusbtn').onclick = function () { setFocus(true); };
     ui.leave.onclick = function () { setFocus(false); };
@@ -160,7 +180,7 @@
     ui.c2.onchange = function () { W().setCopy(1, ui.c2.value); afterCopies(); };
     $('ct_c2up').onclick = function () { stepCopy(1, -1); };
     $('ct_c2dn').onclick = function () { stepCopy(1, 1); };
-    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; st.lastTiles = null; st.fineImg = null; renderTiles(); markStale(); drawMovement(); schedule(80); };
+    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; st.lastTiles = null; st.fineImg = null; renderTiles(); markStale(); drawMovement(); if (window.CompareBox) CompareBox.refresh(); schedule(80); };
     ui.tiles = $('ct_tiles');
     ui.tiles.querySelector('.ct-seg').onclick = function (e) {
       var b = e.target.closest('button[data-tp]'); if (!b) return;
@@ -484,7 +504,7 @@
     var a = document.getElementById('ct_busyacts'); a.innerHTML = '';
     (acts || []).forEach(function (x) { var b = el('button', 'ct-btn', esc(x[0])); b.onclick = x[1]; a.appendChild(b); });
   }
-  function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (ui.busy.classList.contains('bad')) setBusy(null); if (ui.mv) ui.mv.hidden = true; var h = document.getElementById('ct_hint'); if (h) h.hidden = true; var w = document.getElementById('ct_warn'); if (w) w.hidden = true; }   // a new wish makes an old message obsolete
+  function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (window.CompareBox) CompareBox.refresh(); if (ui.busy.classList.contains('bad')) setBusy(null); if (ui.mv) ui.mv.hidden = true; var h = document.getElementById('ct_hint'); if (h) h.hidden = true; var w = document.getElementById('ct_warn'); if (w) w.hidden = true; }   // a new wish makes an old message obsolete
   function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale'); }
 
 
@@ -628,9 +648,9 @@
   // in the direction of travel is prepared meanwhile (D2, kept in memory only, prepared by a second helper).
   function storeKey(d) {
     if (!d.ids || !window.BCResults || !BCResults.available() || !W().refFor || W().refFor(d.row) !== d.ids[0]) return null;
-    return { c0: d.ids[0], k0: d.keys[0], c1: d.ids[1], k1: d.keys[1], i0: BCResults.fileInfo(d.files[0]), i1: BCResults.fileInfo(d.files[1]), tiles: d.tiles || null };
+    return { c0: d.ids[0], k0: d.keys[0], c1: d.ids[1], k1: d.keys[1], i0: BCResults.fileInfo(d.files[0]), i1: BCResults.fileInfo(d.files[1]), tiles: d.tiles || null, quad: d.quad || null };
   }
-  function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null)].join('|') : null; }
+  function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null), JSON.stringify(d.quad || null)].join('|') : null; }
   var pre = { e: null, ready: false, jobs: 0, cache: new Map(), busy: null };          // the helper that prepares the next page, and what it prepared
   function preTake(d) { var k = preKey(d), v = k && pre.cache.get(k); if (v) pre.cache.delete(k); return v || null; }
   async function stored(d) {
@@ -647,13 +667,13 @@
     (async function () {
       try {
         var d = await W().loadRow(i); if (!d || my !== st.token) return;
-        d.tiles = W().tileSetting(i, d.ids[1]);
+        d.tiles = W().tileSetting(i, d.ids[1]); d.quad = W().boxSetting(i, d.ids[0]);
         var k = preKey(d); if (pre.cache.has(k)) return;
         var p = storeKey(d); if (p && await BCResults.has(p)) return;                       // stored already: nothing to prepare
         if (pre.e && pre.jobs >= MAX_JOBS) { try { pre.e.terminate(); } catch (x) { /* ignore */ } pre.e = null; }
         if (!pre.e) { pre.e = AlignEngine.create(); pre.ready = false; pre.jobs = 0; }
         if (!pre.ready) { await pre.e.init(); pre.ready = true; }
-        var r = await pre.e.alignStore(d.files[0], d.ids[0] + '#' + d.keys[0] + '#' + d.files[0].size + '#' + d.files[0].lastModified, d.files[1], d.tiles);
+        var r = await pre.e.alignStore(d.files[0], d.ids[0] + '#' + d.keys[0] + '#' + d.files[0].size + '#' + d.files[0].lastModified + '#' + JSON.stringify(d.quad || null), d.files[1], d.tiles, d.quad);
         pre.jobs++;
         if (p) BCResults.save(p, r.bin, { u: r.unmatched_tiles, max: r.max, sparse: !!r.sparse }).catch(function () { });
         else { pre.cache.set(k, r.bin); while (pre.cache.size > 3) pre.cache.delete(pre.cache.keys().next().value); }
@@ -684,9 +704,10 @@
         } catch (x) { /* a stored result that cannot be used: aligned again below */ }
       }
       if (my !== st.token) return null;
-      if (g.ref !== d.key) {
+      var rk = d.key + '#' + JSON.stringify(d.quad || null);
+      if (g.ref !== rk) {
         setBusy('Preparing copy 1 (finding the printed area) …');
-        g.ref = null; await g.e.reference(d.files[0]); g.ref = d.key;
+        g.ref = null; await g.e.reference(d.files[0], d.quad); g.ref = rk;
       }
       if (my !== st.token) return null;
       setBusy('Aligning copy 2 onto copy 1 … (rough position, then the fine alignment in tiles; a few seconds)');
@@ -720,7 +741,7 @@
     var done = false, tiles = st.transform === 'tiles' && d.files, info = null;
     window.BC_COPY_NAMES = [copyName(0), copyName(1)];                                       // the colour note of the Difference view names the copies (js/panes.js)
     try {
-      if (tiles) { d.tiles = W().tileSetting(s.row, s.pair[1]); info = await serial(function () { return tileJob(d, my); }); done = !!info; }
+      if (tiles) { d.tiles = W().tileSetting(s.row, s.pair[1]); d.quad = W().boxSetting(s.row, s.pair[0]); info = await serial(function () { return tileJob(d, my); }); done = !!info; }
       else done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; });
     }
     catch (e) {
@@ -740,6 +761,7 @@
     clearStale(); setBusy(null);
     if (info && info.sparse) note('This page has almost no ink: only the whole-page alignment was used, without the fine alignment in tiles.');
     if (window.CompareAnnot) CompareAnnot.refresh();
+    if (window.CompareBox) CompareBox.refresh();
     if (tiles) prepareNext(s);
   }
   // the panels say which copy and page they show (the file names stay the names of the exported files)

@@ -31,12 +31,12 @@
     }
     return {
       init: function () { return call('init'); },
-      reference: function (file) { return call('reference', { file: file }); },
+      reference: function (file, quad) { return call('reference', { file: file, quad: quad || null }); },      // quad: printed area set by hand (V2b) or nothing
       align: function (file, measure) { return call('align', { file: file, measure: !!measure }); },
       roughColor: function () { return call('roughColor', {}); },                     // V16: the last alignColor copy, rough step only
       alignColor: function (file, tiles, store) { return call('alignColor', { file: file, tiles: tiles || null, store: !!store }); },   // tiles: { main, sub } (V15) or nothing; store: also .bin (V10)
       // background alignment (V8-V10): refKey names the reference page, so it is prepared only once for several copies; result.bin = the packed movement
-      alignStore: function (refFile, refKey, file, tiles) { return call('alignStore', { refFile: refFile, refKey: refKey, file: file, tiles: tiles || null }); },
+      alignStore: function (refFile, refKey, file, tiles, quad) { return call('alignStore', { refFile: refFile, refKey: refKey, file: file, tiles: tiles || null, quad: quad || null }); },
       warpStored: function (file, bin) { return call('warpStored', { file: file, bin: bin }); },        // a stored movement applied to the copy, in colour
       terminate: function () { failAll('The alignment worker was closed.'); worker.terminate(); }
     };

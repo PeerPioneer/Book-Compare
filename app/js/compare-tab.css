@@ -227,3 +227,19 @@ body.ct-focus #compare_screen > footer { display: none; }
 .ct-leave:focus-visible, .ct-iconbtn:focus-visible { outline: 2px solid #008080; outline-offset: 2px; }
 .ct-toast { position: absolute; left: 50%; bottom: 38px; transform: translateX(-50%); z-index: 9; max-width: 70%; background: rgba(0, 60, 60, .92); color: #fff; padding: 7px 16px; border-radius: 18px; font-size: 13.5px; pointer-events: none; text-align: center; }
 .ct-toast[hidden] { display: none; }
+
+/* V2b: the printed area, shown and corrected by hand (js/compare-box.js) */
+.ct-qbox { display: none; position: absolute; inset: 0; pointer-events: none; }
+div.result_container.ct-on .ct-qbox { display: block; }
+#result > .ct-qbox { box-sizing: border-box; padding: .25em; }                    /* the same frame as the picture itself (as .ct-ann) */
+.ct-qbox svg { display: block; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.ct-qbox[hidden] { display: none !important; }
+.ct-qbox.edit svg [data-h] { pointer-events: auto; cursor: move; }
+.ct-boxrow { margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#pane_main.ct-boxedit .ct-atools { display: none; }
+
+/* B5: what the comparison cannot show */
+.ct-help { margin-top: 10px; font-size: 12.5px; color: #3c4a4a; }
+.ct-help summary { cursor: pointer; color: #00807a; font-weight: 500; }
+.ct-help ul { margin: 6px 0 0; padding-left: 18px; }
+.ct-help li { margin-bottom: 5px; line-height: 1.35; }

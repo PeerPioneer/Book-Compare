@@ -75,13 +75,13 @@
       if (t.resultsId() !== run0.resultsId) throw new Error('another project');
       var b = t.refFor(row), k0 = b != null ? t.cellKey(b, row) : null, k1 = t.cellKey(c, row);
       if (b == null || b === c || !k0 || !k1) { run0.skipped++; return; }               // (the grid was changed meanwhile)
-      var tiles = t.tileSetting(row, c), p = { c0: b, k0: k0, c1: c, k1: k1, tiles: tiles, i0: await t.scanInfo(b, row), i1: await t.scanInfo(c, row) };
+      var tiles = t.tileSetting(row, c), quad = t.boxSetting(row, b), p = { c0: b, k0: k0, c1: c, k1: k1, tiles: tiles, quad: quad, i0: await t.scanInfo(b, row), i1: await t.scanInfo(c, row) };
       if (await BCResults.has(p)) { run0.skipped++; return; }
       var f0 = await t.scanFile(b, row), f1 = await t.scanFile(c, row);
       p.i0 = BCResults.fileInfo(f0); p.i1 = BCResults.fileInfo(f1);
       if (run0.stopped) return;
       if (!w.ready) { await w.e.init(); w.ready = true; }
-      var r = await w.e.alignStore(f0, b + '#' + k0 + '#' + p.i0.size + '#' + p.i0.mtime, f1, tiles);
+      var r = await w.e.alignStore(f0, b + '#' + k0 + '#' + p.i0.size + '#' + p.i0.mtime + '#' + JSON.stringify(quad || null), f1, tiles, quad);
       w.jobs++; aligned = true;
       if (run0.stopped) return;
       await BCResults.save(p, r.bin, { u: r.unmatched_tiles, max: r.max, sparse: !!r.sparse });

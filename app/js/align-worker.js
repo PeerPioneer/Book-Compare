@@ -694,6 +694,37 @@ function prepareReference(cv, red) {
   return { ref, box, boxInfo: pick, times: { box_s: (t2 - t1) / 1000, ink_ref_s: (t1 - t0) / 1000 } };
 }
 
+/* V2b (21 Nov 2026): the printed area corrected by hand, as a shape with four free corners (quad: x, y of the corners clockwise from the top left,
+   as fractions 0-1 of the picture). Everything outside the shape is left out of the alignment - in the reference AND in the other copy (after the
+   rough step) - so a dark binding edge or a sliver of the next page no longer pulls the alignment; the box becomes the rectangle around the shape. */
+function quadOk(q) {
+  if (!Array.isArray(q) || q.length !== 8 || !q.every(v => typeof v === 'number' && isFinite(v) && v >= 0 && v <= 1)) return false;
+  let a = 0; for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; a += q[2 * i] * q[2 * j + 1] - q[2 * j] * q[2 * i + 1]; }
+  return Math.abs(a) / 2 > 0.02;                                                     // (at least 2 % of the picture)
+}
+function quadMask(W, H, q) {
+  const px = [], py = [], m = new Uint8Array(W * H);
+  for (let i = 0; i < 4; i++) { px.push(q[2 * i] * W); py.push(q[2 * i + 1] * H); }
+  for (let y = 0; y < H; y++) {
+    const yc = y + 0.5, xs = [];
+    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; if ((py[i] <= yc) !== (py[j] <= yc)) xs.push(px[i] + (yc - py[i]) * (px[j] - px[i]) / (py[j] - py[i])); }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) { const a = Math.max(0, Math.ceil(xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(xs[k + 1] - 0.5)); for (let x = a; x <= b; x++) m[y * W + x] = 1; }
+  }
+  return m;
+}
+function applyQuad(refState, quad) {
+  if (!quadOk(quad)) return false;
+  const W = refState.ref.cols, H = refState.ref.rows, m = quadMask(W, H, quad), d = refState.ref.data32F;
+  for (let i = 0; i < m.length; i++) if (!m[i]) d[i] = 0;
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  for (let i = 0; i < 4; i++) { const x = quad[2 * i] * W, y = quad[2 * i + 1] * H; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  refState.autoBox = refState.box;
+  refState.box = [Math.max(0, Math.floor(x0)), Math.max(0, Math.floor(y0)), Math.min(W, Math.ceil(x1)), Math.min(H, Math.ceil(y1))];
+  refState.mask = m; refState.quad = quad.slice();
+  return true;
+}
+
 /* aligns one more copy (red channel Mat) onto the prepared reference. Set opts.measure to also compute the unmatched-ink shares
    (not counted in the times). Returns { aligned (Mat, caller deletes), rough (Mat or null), W, tbox, stats, times, unmatched } */
 function alignCopy(cv, refState, red, opts = {}) {
@@ -705,6 +736,7 @@ function alignCopyIn(cv, refState, red, opts, S) {
   const mov = S.add(inkMap(cv, red)); tm.ink_s = (now() - t) / 1000; t = now();
   const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true }); tm.rough_s = (now() - t) / 1000; t = now();
   const rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); tm.warp_s = (now() - t) / 1000;
+  if (refState.mask) { const d = rough.data32F, mk = refState.mask; for (let i = 0; i < mk.length; i++) if (!mk[i]) d[i] = 0; }     // V2b: outside the hand-set shape
   const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows;
   const envRing = (typeof process !== 'undefined' && process.env && process.env.BC_RING) ? +process.env.BC_RING : null;     // research only (A2): ring width as a fraction of the longer box side
   const envEdge = (typeof process !== 'undefined' && process.env && process.env.BC_EDGE) ? +process.env.BC_EDGE : null;     // research only (A2): strip along the scan edge that is never fine-aligned (px)
@@ -739,7 +771,7 @@ function alignCopyIn(cv, refState, red, opts, S) {
   return out;
 }
 
-module.exports = { prepareReference, alignCopy, unmatchedShare, now };
+module.exports = { prepareReference, alignCopy, unmatchedShare, now, applyQuad, quadOk, quadMask };
 
 };
 __defs["movement"] = function (module, exports, require) {
@@ -897,7 +929,8 @@ module.exports = { downsample: downsample, upsample: upsample, pack: pack, unpac
 };
 /* Entry of the browser worker: the alignment chain (printed area, rough step, tiles) on scans, off the page's main thread.
    Messages in:  { id, cmd: 'init' }  |  { id, cmd: 'reference', file }  |  { id, cmd: 'align', file, measure }  |  { id, cmd: 'alignColor', file, tiles, store }
-                 { id, cmd: 'alignStore', refFile, refKey, file, tiles }  (background alignment, V8-V10: only the movement comes back, packed for storing)
+                 { id, cmd: 'alignStore', refFile, refKey, file, tiles, quad }  (background alignment, V8-V10: only the movement comes back, packed for storing)
+                 (quad, also for 'reference': the printed area set by hand for the reference scan, V2b)
                  { id, cmd: 'warpStored', file, bin }                     (a stored movement applied to the copy: no aligning)
    (tiles: { main, sub }, the tile settings of this copy on this page, V15; left out = standard)
    Messages out: { id, ok: true, result } or { id, ok: false, error }
@@ -977,12 +1010,16 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
   return out;
 }
 
-async function setReference(cv, file, key) {
+// quad (V2b): the printed area set by hand for this scan (four corners, fractions of the picture), or nothing = the automatic box
+async function setReference(cv, file, key, quad) {
   var Pl = require('./pipeline');
   if (refState) { refState.ref.delete(); refState = null; } lastJob = null;
   var d = await decodeRed(cv, file);
   try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
   refState.w0 = d.w0; refState.h0 = d.h0; refState.key = key || null;
+  var Wr = refState.ref.cols, Hr = refState.ref.rows, b = refState.box;
+  refState.autoBoxF = [b[0] / Wr, b[1] / Hr, b[2] / Wr, b[3] / Hr];                   // the automatic box, as fractions (shown in the Compare tab)
+  if (quad) Pl.applyQuad(refState, quad);
   return d;
 }
 // the movement of one aligned page, packed for storing (V10, stored_movement.js): compressed bytes
@@ -990,6 +1027,7 @@ async function packMovement(r, mv, extra) {
   var Sm = require('./stored_movement'), Wr = refState.ref.cols, Hr = refState.ref.rows;
   var s = r.map ? Sm.downsample(r.map.mx.data32F, r.map.my.data32F, Wr, Hr) : null;
   var meta = Object.assign({ W: Array.prototype.slice.call(r.W), Wr: Wr, Hr: Hr, refW0: refState.w0, refH0: refState.h0, mvw: mv.w, mvh: mv.h, max: mv.max, hint: mv.hint,
+    box: refState.autoBoxF, quad: refState.quad || null,
     unmatched_tiles: r.unmatched ? r.unmatched.tiles : null, unmatched_rough: r.unmatched ? r.unmatched.rough : null, sparse: !!r.sparse, ink_density: r.density }, extra || {});
   return (await Sm.compress(Sm.pack(meta, s, mv.pixels))).buffer;
 }
@@ -998,13 +1036,13 @@ var handlers = {
   init: async function () { var o = await loadOpenCv(); return { load_s: o.load_s }; },
   reference: async function (m) {
     var cv = (await loadOpenCv()).cv;
-    var d = await setReference(cv, m.file, null);
-    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
+    var d = await setReference(cv, m.file, null, m.quad);
+    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, auto_box: refState.autoBoxF, quad: refState.quad || null, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
   },
   // background alignment (V8-V10): the copy onto the reference page (prepared again only when it is another page), only the movement comes back
   alignStore: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline'), t0 = performance.now();
-    if (!refState || !m.refKey || refState.key !== m.refKey) await setReference(cv, m.refFile, m.refKey);
+    if (!refState || !m.refKey || refState.key !== m.refKey) await setReference(cv, m.refFile, m.refKey, m.quad);
     var d = await decodeRed(cv, m.file), r = null;
     try {
       try { r = Pl.alignCopy(cv, refState, d.red, { measure: true, composeMap: true, levels: m.tiles ? require('./tile_align').levelsFor(m.tiles.main, m.tiles.sub) : undefined }); } finally { d.red.delete(); }
@@ -1025,7 +1063,8 @@ var handlers = {
     var px = warpColour(cv, bmp, { W: meta.W, map: map }, { cols: meta.Wr, rows: meta.Hr }, meta.refW0, meta.refH0);
     lastJob = { file: m.file, W: meta.W, Wr: meta.Wr, Hr: meta.Hr, w0: meta.refW0, h0: meta.refH0 };
     var res = { w: meta.refW0, h: meta.refH0, pixels: px.buffer, stored: true, colour_s: (performance.now() - t0) / 1000,
-      unmatched_tiles: meta.unmatched_tiles, unmatched_rough: meta.unmatched_rough, sparse: meta.sparse, ink_density: meta.ink_density, margin_moved: 0, movement: null };
+      unmatched_tiles: meta.unmatched_tiles, unmatched_rough: meta.unmatched_rough, sparse: meta.sparse, ink_density: meta.ink_density, margin_moved: 0, movement: null,
+      box: meta.box || null, quad: meta.quad || null };
     res.transfer = [px.buffer];
     if (st.mv) { var mvpx = new Uint8ClampedArray(st.mv); res.movement = { w: meta.mvw, h: meta.mvh, pixels: mvpx.buffer, max: meta.max, hint: meta.hint }; res.transfer.push(mvpx.buffer); }
     return res;
@@ -1065,6 +1104,7 @@ var handlers = {
       var bin = m.store ? await packMovement(r, mv, { w0: d.w0, h0: d.h0 }) : null;          // (kept by the page when this pair is one with the reference, V10)
       var res = { w: refState.w0, h: refState.h0, pixels: px.buffer, decode_s: d.decode_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s, colour_s: (performance.now() - t0) / 1000,
         unmatched_rough: r.unmatched.rough, unmatched_tiles: r.unmatched.tiles, sparse: r.sparse, ink_density: r.density, margin_moved: r.margin ? r.margin.moved.length : 0,
+        box: refState.autoBoxF, quad: refState.quad || null,
         movement: { w: mv.w, h: mv.h, pixels: mv.pixels, max: mv.max, hint: mv.hint } };
       res.transfer = [px.buffer, mv.pixels];
       if (bin) { res.bin = bin; res.transfer.push(bin); }

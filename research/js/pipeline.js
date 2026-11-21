@@ -65,6 +65,37 @@ function prepareReference(cv, red) {
   return { ref, box, boxInfo: pick, times: { box_s: (t2 - t1) / 1000, ink_ref_s: (t1 - t0) / 1000 } };
 }
 
+/* V2b (21 Nov 2026): the printed area corrected by hand, as a shape with four free corners (quad: x, y of the corners clockwise from the top left,
+   as fractions 0-1 of the picture). Everything outside the shape is left out of the alignment - in the reference AND in the other copy (after the
+   rough step) - so a dark binding edge or a sliver of the next page no longer pulls the alignment; the box becomes the rectangle around the shape. */
+function quadOk(q) {
+  if (!Array.isArray(q) || q.length !== 8 || !q.every(v => typeof v === 'number' && isFinite(v) && v >= 0 && v <= 1)) return false;
+  let a = 0; for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; a += q[2 * i] * q[2 * j + 1] - q[2 * j] * q[2 * i + 1]; }
+  return Math.abs(a) / 2 > 0.02;                                                     // (at least 2 % of the picture)
+}
+function quadMask(W, H, q) {
+  const px = [], py = [], m = new Uint8Array(W * H);
+  for (let i = 0; i < 4; i++) { px.push(q[2 * i] * W); py.push(q[2 * i + 1] * H); }
+  for (let y = 0; y < H; y++) {
+    const yc = y + 0.5, xs = [];
+    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; if ((py[i] <= yc) !== (py[j] <= yc)) xs.push(px[i] + (yc - py[i]) * (px[j] - px[i]) / (py[j] - py[i])); }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) { const a = Math.max(0, Math.ceil(xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(xs[k + 1] - 0.5)); for (let x = a; x <= b; x++) m[y * W + x] = 1; }
+  }
+  return m;
+}
+function applyQuad(refState, quad) {
+  if (!quadOk(quad)) return false;
+  const W = refState.ref.cols, H = refState.ref.rows, m = quadMask(W, H, quad), d = refState.ref.data32F;
+  for (let i = 0; i < m.length; i++) if (!m[i]) d[i] = 0;
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  for (let i = 0; i < 4; i++) { const x = quad[2 * i] * W, y = quad[2 * i + 1] * H; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  refState.autoBox = refState.box;
+  refState.box = [Math.max(0, Math.floor(x0)), Math.max(0, Math.floor(y0)), Math.min(W, Math.ceil(x1)), Math.min(H, Math.ceil(y1))];
+  refState.mask = m; refState.quad = quad.slice();
+  return true;
+}
+
 /* aligns one more copy (red channel Mat) onto the prepared reference. Set opts.measure to also compute the unmatched-ink shares
    (not counted in the times). Returns { aligned (Mat, caller deletes), rough (Mat or null), W, tbox, stats, times, unmatched } */
 function alignCopy(cv, refState, red, opts = {}) {
@@ -76,6 +107,7 @@ function alignCopyIn(cv, refState, red, opts, S) {
   const mov = S.add(inkMap(cv, red)); tm.ink_s = (now() - t) / 1000; t = now();
   const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true }); tm.rough_s = (now() - t) / 1000; t = now();
   const rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); tm.warp_s = (now() - t) / 1000;
+  if (refState.mask) { const d = rough.data32F, mk = refState.mask; for (let i = 0; i < mk.length; i++) if (!mk[i]) d[i] = 0; }     // V2b: outside the hand-set shape
   const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows;
   const envRing = (typeof process !== 'undefined' && process.env && process.env.BC_RING) ? +process.env.BC_RING : null;     // research only (A2): ring width as a fraction of the longer box side
   const envEdge = (typeof process !== 'undefined' && process.env && process.env.BC_EDGE) ? +process.env.BC_EDGE : null;     // research only (A2): strip along the scan edge that is never fine-aligned (px)
@@ -110,4 +142,4 @@ function alignCopyIn(cv, refState, red, opts, S) {
   return out;
 }
 
-module.exports = { prepareReference, alignCopy, unmatchedShare, now };
+module.exports = { prepareReference, alignCopy, unmatchedShare, now, applyQuad, quadOk, quadMask };

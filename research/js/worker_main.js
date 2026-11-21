@@ -1,6 +1,7 @@
 /* Entry of the browser worker: the alignment chain (printed area, rough step, tiles) on scans, off the page's main thread.
    Messages in:  { id, cmd: 'init' }  |  { id, cmd: 'reference', file }  |  { id, cmd: 'align', file, measure }  |  { id, cmd: 'alignColor', file, tiles, store }
-                 { id, cmd: 'alignStore', refFile, refKey, file, tiles }  (background alignment, V8-V10: only the movement comes back, packed for storing)
+                 { id, cmd: 'alignStore', refFile, refKey, file, tiles, quad }  (background alignment, V8-V10: only the movement comes back, packed for storing)
+                 (quad, also for 'reference': the printed area set by hand for the reference scan, V2b)
                  { id, cmd: 'warpStored', file, bin }                     (a stored movement applied to the copy: no aligning)
    (tiles: { main, sub }, the tile settings of this copy on this page, V15; left out = standard)
    Messages out: { id, ok: true, result } or { id, ok: false, error }
@@ -80,12 +81,16 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
   return out;
 }
 
-async function setReference(cv, file, key) {
+// quad (V2b): the printed area set by hand for this scan (four corners, fractions of the picture), or nothing = the automatic box
+async function setReference(cv, file, key, quad) {
   var Pl = require('./pipeline');
   if (refState) { refState.ref.delete(); refState = null; } lastJob = null;
   var d = await decodeRed(cv, file);
   try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
   refState.w0 = d.w0; refState.h0 = d.h0; refState.key = key || null;
+  var Wr = refState.ref.cols, Hr = refState.ref.rows, b = refState.box;
+  refState.autoBoxF = [b[0] / Wr, b[1] / Hr, b[2] / Wr, b[3] / Hr];                   // the automatic box, as fractions (shown in the Compare tab)
+  if (quad) Pl.applyQuad(refState, quad);
   return d;
 }
 // the movement of one aligned page, packed for storing (V10, stored_movement.js): compressed bytes
@@ -93,6 +98,7 @@ async function packMovement(r, mv, extra) {
   var Sm = require('./stored_movement'), Wr = refState.ref.cols, Hr = refState.ref.rows;
   var s = r.map ? Sm.downsample(r.map.mx.data32F, r.map.my.data32F, Wr, Hr) : null;
   var meta = Object.assign({ W: Array.prototype.slice.call(r.W), Wr: Wr, Hr: Hr, refW0: refState.w0, refH0: refState.h0, mvw: mv.w, mvh: mv.h, max: mv.max, hint: mv.hint,
+    box: refState.autoBoxF, quad: refState.quad || null,
     unmatched_tiles: r.unmatched ? r.unmatched.tiles : null, unmatched_rough: r.unmatched ? r.unmatched.rough : null, sparse: !!r.sparse, ink_density: r.density }, extra || {});
   return (await Sm.compress(Sm.pack(meta, s, mv.pixels))).buffer;
 }
@@ -101,13 +107,13 @@ var handlers = {
   init: async function () { var o = await loadOpenCv(); return { load_s: o.load_s }; },
   reference: async function (m) {
     var cv = (await loadOpenCv()).cv;
-    var d = await setReference(cv, m.file, null);
-    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
+    var d = await setReference(cv, m.file, null, m.quad);
+    return { w: d.w0, h: d.h0, decode_s: d.decode_s, box: refState.box, auto_box: refState.autoBoxF, quad: refState.quad || null, box_which: refState.boxInfo.which, box_why: refState.boxInfo.why, box_s: refState.times.box_s, ink_s: refState.times.ink_ref_s };
   },
   // background alignment (V8-V10): the copy onto the reference page (prepared again only when it is another page), only the movement comes back
   alignStore: async function (m) {
     var cv = (await loadOpenCv()).cv, Pl = require('./pipeline'), t0 = performance.now();
-    if (!refState || !m.refKey || refState.key !== m.refKey) await setReference(cv, m.refFile, m.refKey);
+    if (!refState || !m.refKey || refState.key !== m.refKey) await setReference(cv, m.refFile, m.refKey, m.quad);
     var d = await decodeRed(cv, m.file), r = null;
     try {
       try { r = Pl.alignCopy(cv, refState, d.red, { measure: true, composeMap: true, levels: m.tiles ? require('./tile_align').levelsFor(m.tiles.main, m.tiles.sub) : undefined }); } finally { d.red.delete(); }
@@ -128,7 +134,8 @@ var handlers = {
     var px = warpColour(cv, bmp, { W: meta.W, map: map }, { cols: meta.Wr, rows: meta.Hr }, meta.refW0, meta.refH0);
     lastJob = { file: m.file, W: meta.W, Wr: meta.Wr, Hr: meta.Hr, w0: meta.refW0, h0: meta.refH0 };
     var res = { w: meta.refW0, h: meta.refH0, pixels: px.buffer, stored: true, colour_s: (performance.now() - t0) / 1000,
-      unmatched_tiles: meta.unmatched_tiles, unmatched_rough: meta.unmatched_rough, sparse: meta.sparse, ink_density: meta.ink_density, margin_moved: 0, movement: null };
+      unmatched_tiles: meta.unmatched_tiles, unmatched_rough: meta.unmatched_rough, sparse: meta.sparse, ink_density: meta.ink_density, margin_moved: 0, movement: null,
+      box: meta.box || null, quad: meta.quad || null };
     res.transfer = [px.buffer];
     if (st.mv) { var mvpx = new Uint8ClampedArray(st.mv); res.movement = { w: meta.mvw, h: meta.mvh, pixels: mvpx.buffer, max: meta.max, hint: meta.hint }; res.transfer.push(mvpx.buffer); }
     return res;
@@ -168,6 +175,7 @@ var handlers = {
       var bin = m.store ? await packMovement(r, mv, { w0: d.w0, h0: d.h0 }) : null;          // (kept by the page when this pair is one with the reference, V10)
       var res = { w: refState.w0, h: refState.h0, pixels: px.buffer, decode_s: d.decode_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s, colour_s: (performance.now() - t0) / 1000,
         unmatched_rough: r.unmatched.rough, unmatched_tiles: r.unmatched.tiles, sparse: r.sparse, ink_density: r.density, margin_moved: r.margin ? r.margin.moved.length : 0,
+        box: refState.autoBoxF, quad: refState.quad || null,
         movement: { w: mv.w, h: mv.h, pixels: mv.pixels, max: mv.max, hint: mv.hint } };
       res.transfer = [px.buffer, mv.pixels];
       if (bin) { res.bin = bin; res.transfer.push(bin); }

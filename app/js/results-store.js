@@ -3,8 +3,8 @@
    is kept in the folder "<project>.bookcompare results" next to the project file, one file per pair of scans, plus index.json:
      m-<code>.bin      the packed movement (about 150-250 KB)
      index.json        for every stored pair: which two scans (copy and file), and what it is valid for
-   A stored result is used only while it still fits: the same two scan files (size and date), the same tile setting (V15) and the
-   same alignment engine (ENGINE below). Otherwise the page is aligned again and the result replaced. The scans are never touched.
+   A stored result is used only while it still fits: the same two scan files (size and date), the same printed area of the reference scan
+   (automatic or set by hand, V2b), the same tile setting (V15) and the same alignment engine (ENGINE below). Otherwise the page is aligned again and the result replaced. The scans are never touched.
    The website has no results folder: there nothing is stored (decided 21 Nov 2026). */
 (function () {
   'use strict';
@@ -18,8 +18,8 @@
   // one file per pair of scans: reference copy and file, other copy and file (the row may change when the grid is edited; this does not)
   function nameFor(p) { var s = p.c0 + '|' + p.k0 + '|' + p.c1 + '|' + p.k1; return 'm-' + fnv(s, 0x811c9dc5) + fnv(s, 0x01234567) + '.bin'; }
   function validity(p) {
-    var t = p.tiles ? p.tiles.main + 'x' + p.tiles.sub : 'std';
-    return [ENGINE, p.i0.size, p.i0.mtime, p.i1.size, p.i1.mtime, t].join('|');
+    var t = p.tiles ? p.tiles.main + 'x' + p.tiles.sub : 'std', q = p.quad ? p.quad.map(function (v) { return (+v).toFixed(4); }).join(',') : 'auto';
+    return [ENGINE, p.i0.size, p.i0.mtime, p.i1.size, p.i1.mtime, q, t].join('|');
   }
   function fileInfo(f) { return f ? { size: f.size, mtime: f.mtime != null ? f.mtime : f.lastModified } : null; }
 
@@ -40,7 +40,7 @@
     })();
     return mine.loading;
   }
-  // p: { c0, k0, c1, k1, i0, i1, tiles }   (c = copy id, k = the file in that copy, i = { size, mtime } of the scan)
+  // p: { c0, k0, c1, k1, i0, i1, tiles, quad }   (c = copy id, k = the file in that copy, i = { size, mtime } of the scan, quad = V2b shape or null)
   async function find(p) {
     if (!p || !p.i0 || !p.i1) return null;
     var idx = await index(); if (!idx) return null;

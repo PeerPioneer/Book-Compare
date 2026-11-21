@@ -287,7 +287,7 @@
 
   /* ---------------------------------------------------------------- state */
   function blank() {
-    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
+    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -352,6 +352,15 @@
   // tile settings (V15): main tiles 4-16, sub-tiles 1-4; anything else is dropped
   function cleanTile(t) { var m = Math.round(+t.main), u = Math.round(+t.sub); return (m >= 4 && m <= 16 && u >= 1 && u <= 4) ? { main: m, sub: u } : null; }
   function cleanTiles(o) { var out = {}; if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { var c = /^[\w-]+\|\d+$/.test(k) && cleanTile(o[k] || {}); if (c) out[k] = c; }); return out; }
+  // V2b: the printed area set by hand, per scan ("copy id|file key"): four corners as fractions, clockwise from the top left
+  function cleanQuad(q) {
+    if (!Array.isArray(q) || q.length !== 8) return null;
+    var v = q.map(function (x) { return Math.round(Math.min(1, Math.max(0, +x)) * 10000) / 10000; });
+    if (v.some(function (x) { return !isFinite(x); })) return null;
+    var a = 0; for (var i = 0; i < 4; i++) { var j = (i + 1) % 4; a += v[2 * i] * v[2 * j + 1] - v[2 * j] * v[2 * i + 1]; }
+    return Math.abs(a) / 2 > 0.02 ? v : null;
+  }
+  function cleanBoxes(o) { var out = {}; if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { var q = /^\d+\|.+$/.test(k) && cleanQuad(o[k]); if (q) out[k] = q; }); return out; }
   function maxAnnId() { var m = 0; Object.keys(S.annots).forEach(function (k) { S.annots[k].forEach(function (a) { if (a.id > m) m = a.id; }); }); return m; }
   function findAnnot(row, id) { var l = S.annots[row] || []; for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
   function selected() {
@@ -373,12 +382,12 @@
 
   /* ---------------------------------------------------------------- undo / redo */
   function snap() {
-    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, ti: S.tiles, s: S.sel, p: S.pair, rf: S.ref });
+    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, ti: S.tiles, bx: S.boxes, s: S.sel, p: S.pair, rf: S.ref });
   }
   function restore(str) {
     var o = JSON.parse(str);
     S.copies = o.c.map(function (r) { var c = REG[r.id]; c.name = r.name; c.cells = r.cells; return c; });
-    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.tiles = o.ti || {}; S.sel = o.s; S.pair = o.p; S.ref = o.rf != null ? o.rf : null;
+    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.tiles = o.ti || {}; S.boxes = o.bx || {}; S.sel = o.s; S.pair = o.p; S.ref = o.rf != null ? o.rf : null;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
     anchor = null;
   }
@@ -694,7 +703,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, boxes: S.boxes, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
@@ -869,7 +878,7 @@
     S = blank(); REG = {}; anchor = null;
     S.projectId = json.projectId || uid();
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
-    S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1); S.tiles = cleanTiles(json.tiles);
+    S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1); S.tiles = cleanTiles(json.tiles); S.boxes = cleanBoxes(json.boxes);
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
     (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
@@ -1178,6 +1187,8 @@
       '<li>A copy with missing pages has <b>empty cells</b>. Select a cell and use <b>Insert gap here</b> to push the following files down, or <b>Close gap</b> to pull them up.</li>' +
       '<li>Covers, flyleaves and duplicates can be removed from the grid with <b>Delete file</b>. The scan itself stays on your disk, and <b>Add files to this copy</b> brings it back.</li>' +
       '<li><b>Add files to this copy</b> also adds pictures from another folder, for example pages that were scanned later.</li>' +
+      '<li><b>More → Reference copy …</b> chooses the copy the others are compared with (★ in its heading). ' + (HELPER ? '<b>More → Align copies in the background …</b> aligns the other copies onto it page by page and keeps the results next to the project file, so that comparisons with the reference open at once.' : 'In the desktop program the other copies can be aligned onto it in the background.') + '</li>' +
+      '<li>What the comparison cannot show (light inks such as red, small shifts, ...) is explained in the Compare tab, left panel, under “What the comparison cannot show”.</li>' +
       '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later under <b>More</b>. Double-click a row name to rename it.</li>' +
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
       '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>COMPARE</b>: they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The <b>Pages</b> tab or <b>Back</b> there brings you here again.</li>' +
@@ -1604,6 +1615,17 @@
       var k = copyId + '|' + row, now = S.tiles[k] || null, c = t ? cleanTile(t) : null;
       if (JSON.stringify(now) === JSON.stringify(c)) return;
       commit(); if (c) S.tiles[k] = c; else delete S.tiles[k]; touch();
+    },
+    // The printed area set by hand (V2b) for the scan of a copy on a page: four corners (fractions), or null = the automatic box.
+    // It belongs to the scan, so it moves with the scan when the grid is changed. setBoxSetting returns false for a shape that is too small.
+    boxSetting: function (row, copyId) { var c = copyById(copyId), k = c && c.cells[row]; var q = k ? S.boxes[copyId + '|' + k] : null; return q ? q.slice() : null; },
+    setBoxSetting: function (row, copyId, q) {
+      var c = copyById(copyId), k = c && c.cells[row]; if (!k) return false;
+      var key = copyId + '|' + k, now = S.boxes[key] || null, v = q == null ? null : cleanQuad(q);
+      if (q != null && !v) return false;
+      if (JSON.stringify(now) === JSON.stringify(v)) return true;
+      commit(); if (v) S.boxes[key] = v; else delete S.boxes[key]; touch();
+      return true;
     },
     flagColors: FLAG_COLORS.slice(), flagNames: FLAG_NAMES.slice(), flagPath: FLAG_PATH,
     // colour 0-5 puts a flag on the row, null takes it away (every change can be undone in the Pages view)
