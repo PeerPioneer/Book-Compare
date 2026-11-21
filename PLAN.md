@@ -539,7 +539,7 @@ to cite it. Before the launch, decide about signing the installer (V5d): unsigne
 warns "unknown publisher", which puts many people off. Signing costs money (a certificate or a
 signing service, yearly or monthly), so this is the owner's decision.
 
-**Where (owner):** academia.edu, LinkedIn, Xing, Facebook. **Suggestions to check before the
+**Where (owner):** academia.edu, LinkedIn, Xing, Facebook, the Berlin Book Studies Network (added 21 Nov). **Suggestions to check before the
 launch** (which ones still exist, and whether announcements are welcome there):
 - Musicology and music libraries: AMS-L (American Musicological Society), IAML and MLA-L (music
   libraries), the Gesellschaft für Musikforschung, the Medieval and Renaissance Music Conference.
@@ -1064,7 +1064,7 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 | P6 | Other visualization modes, quality dots, wrong-page check, look and feel (§5.6) | later |
 | P7 | Mac version from the same code, if colleagues ask | later |
 | P8 | **Finding the subtle differences** (§5.7, owner 21 Nov): research overview first; test pages with planted letter changes (*Ligurinus*, script-made + owner's blind ones); catalogue of subtle differences (text and music); then methods (difference finder / jump list C4, letter by letter, OCR + text comparison, flicker magnifier), each measured against the test pages | later (after version 1) |
-| P9 | **The launch** (§5.8, owner 21 Nov): where to announce; screen-recorded video with the owner's voice or captions (no AI video), screenshots, GIF; download page, DOI; decide about signing the installer and how to speak about AI in the code | later (after version 1) |
+| P9 | **The launch** (§5.8, owner 21 Nov): where to announce (academia.edu, LinkedIn, Xing, Facebook, Berlin Book Studies Network, and the suggestions in §5.8); screen-recorded video with the owner's voice or captions (no AI video), screenshots, GIF; download page, DOI; decide about signing the installer and how to speak about AI in the code | later (after version 1) |
 
 ### 11.3 The owner's own tasks and material
 
