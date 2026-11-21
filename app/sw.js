@@ -31,6 +31,8 @@ const staticAssets = [
     './js/speedtest.js',
     './js/align-engine.js',
     './js/align-worker.js',
+    './js/results-store.js',
+    './js/background-align.js',
     './js/compare-tab.js',
     './js/compare-tab.css',
     './js/viz.js',

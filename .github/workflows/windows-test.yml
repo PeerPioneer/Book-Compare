@@ -12,12 +12,13 @@ on:
       - 'app/**'
       - 'desktop/server.js'
       - 'tests/workspace/**'
+      - 'research/js/**'
       - '.github/workflows/windows-test.yml'
   workflow_dispatch:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       PYTHONUTF8: '1'
     steps:
@@ -49,12 +50,21 @@ jobs:
           set RC=%ERRORLEVEL%
           type "%TEMP%\bc-compare-test.txt"
           exit /b %RC%
+      - name: Reference copy, background alignment and stored alignments
+        if: always()
+        shell: cmd
+        timeout-minutes: 15
+        run: |
+          python tests\workspace\test_background.py > "%TEMP%\bc-background-test.txt" 2>&1
+          set RC=%ERRORLEVEL%
+          type "%TEMP%\bc-background-test.txt"
+          exit /b %RC%
       - name: Windows test output (shown as a note on this job)
         if: always()
         shell: powershell
         run: |
           $text = ''
-          foreach ($f in @('bc-server-test.txt', 'bc-compare-test.txt')) {
+          foreach ($f in @('bc-server-test.txt', 'bc-compare-test.txt', 'bc-background-test.txt')) {
             $p = Join-Path $env:TEMP $f
             $text += "=== $f`r`n"
             if (Test-Path $p) { $c = Get-Content $p -Raw -Encoding UTF8; if ($c.Length -gt 6000) { $c = '...' + $c.Substring($c.Length - 6000) }; $text += $c } else { $text += "(not written)" }
@@ -82,7 +92,7 @@ jobs:
           python -m http.server 8765 --directory app > /dev/null 2>&1 &
           sleep 2
           rc=0
-          (node research/js/build_worker.js --check && python tests/workspace/test_align_worker.py) > /tmp/bc-worker-test.txt 2>&1 || rc=1
+          (node research/js/build_worker.js --check && node research/js/test_stored.js && python tests/workspace/test_align_worker.py) > /tmp/bc-worker-test.txt 2>&1 || rc=1
           (python tests/workspace/test_modes.py > /tmp/bc-modes-test.txt 2>&1 && python tests/workspace/test_workspace.py > /tmp/bc-workspace-test.txt 2>&1 && python tests/workspace/test_roots.py > /tmp/bc-roots-test.txt 2>&1) || rc=1
           python tests/workspace/test_desktop_links.py > /tmp/bc-desktop-links-test.txt 2>&1 || rc=1
           exit $rc

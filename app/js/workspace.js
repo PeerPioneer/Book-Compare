@@ -287,7 +287,7 @@
 
   /* ---------------------------------------------------------------- state */
   function blank() {
-    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null] };
+    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -373,12 +373,12 @@
 
   /* ---------------------------------------------------------------- undo / redo */
   function snap() {
-    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, ti: S.tiles, s: S.sel, p: S.pair });
+    return JSON.stringify({ c: S.copies.map(function (c) { return { id: c.id, name: c.name, cells: c.cells }; }), l: S.labels, ns: S.ns, f: S.folio, sk: S.skip, fl: S.flags, an: S.annots, ti: S.tiles, s: S.sel, p: S.pair, rf: S.ref });
   }
   function restore(str) {
     var o = JSON.parse(str);
     S.copies = o.c.map(function (r) { var c = REG[r.id]; c.name = r.name; c.cells = r.cells; return c; });
-    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.tiles = o.ti || {}; S.sel = o.s; S.pair = o.p;
+    S.labels = o.l; S.ns = o.ns; S.folio = !!o.f; S.skip = o.sk; S.flags = o.fl || {}; S.annots = o.an || {}; S.tiles = o.ti || {}; S.sel = o.s; S.pair = o.p; S.ref = o.rf != null ? o.rf : null;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
     anchor = null;
   }
@@ -694,7 +694,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
@@ -785,6 +785,8 @@
       return toast(niceError(e));
     }
     var before = { target: proj.target, legacy: proj.legacy, name: proj.name };
+    if (window.BCBackground) window.BCBackground.stop(true);        // (the results belong next to the project file: a new place, new results)
+    if (window.BCResults) window.BCResults.reset();
     proj.target = t; proj.legacy = null; proj.name = targetName(t);
     await saveNow();
     if (proj.state === 'error') {
@@ -859,8 +861,11 @@
     if (!(await mayReplace())) return false;
     return readProject({ dir: new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name), file: j.file });
   }
+  // another project replaces this one: a background alignment of this one stops, its stored results are written out
+  function projectChanging() { if (window.BCBackground) window.BCBackground.stop(true); if (window.BCResults) window.BCResults.reset(); }
   async function adopt(json, t) {
     if (!json || json.format !== 'book-compare-project' || !Array.isArray(json.copies)) { toast('This is not a Book Compare project file.'); return false; }
+    projectChanging();
     S = blank(); REG = {}; anchor = null;
     S.projectId = json.projectId || uid();
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
@@ -875,6 +880,7 @@
       if (!c.locs.length) legacy.push(c);
     }
     S.nextCopy = Math.max(json.nextCopy || 1, maxId + 1);
+    S.ref = json.ref != null && copyById(json.ref) ? json.ref : null;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
     hist = { undo: [], redo: [] };
     thumbMem.clear();
@@ -1045,7 +1051,7 @@
     S.copies.forEach(function (c, i) {
       var cnt = 0; c.cells.forEach(function (x) { if (x) cnt++; });
       var k = c.id === S.pair[0] ? ' k1' : c.id === S.pair[1] ? ' k2' : '', lost = copyLost(c);
-      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
+      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (c.id === S.ref ? '<span class="ws-star" title="Reference copy: the other copies are aligned onto it (More → Reference copy …)">★</span> ' : '') + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
     });
     h += '<div class="ws-addcell"><button class="ws-addbtn" data-act="add"><span class="plus">+</span><small>Add new copy</small></button></div></div><div id="ws-rowshost"></div></div></div>';
     gb.innerHTML = h;
@@ -1441,6 +1447,8 @@
       '<button data-m="folio"><span class="tick"></span>' + (S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') + '</button>' +
       '<button data-m="colw"><span class="tick"></span>Standard width for all columns</button>' +
       '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
+      '<button data-m="ref"' + (S.copies.length < 2 ? ' disabled' : '') + '><span class="tick"></span>Reference copy …</button>' +
+      (HELPER ? '<button data-m="bg"' + (S.copies.length < 2 ? ' disabled' : '') + '><span class="tick"></span>' + (window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …') + '</button>' : '') +
       '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
       '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
       (DESKTOP ? '' : '<hr><button data-m="download"><span class="tick"></span>Desktop program for Windows …</button>');
@@ -1469,7 +1477,77 @@
     var f1, f2;
     try { f1 = await getScan(a, a.cells[r]); f2 = await getScan(b, b.cells[r]); }
     catch (e) { if (HELPER && e && e.name === 'Lost') throw refusal(e.message); throw refusal(e && e.name === 'Lost' ? 'Book Compare cannot find the scans of ' + (usedRoots().some(function (x) { return !x.handle && !x.files; }) ? 'these copies on this computer. Click “Choose scan folder” at the top.' : 'these copies. Click “Allow access now” at the top.') : 'Could not open the scan: ' + niceError(e)); }
-    return { urls: [URL.createObjectURL(f1), URL.createObjectURL(f2)], names: [f1.name, f2.name], files: [f1, f2], key: a.id + '#' + a.cells[r] };
+    return { urls: [URL.createObjectURL(f1), URL.createObjectURL(f2)], names: [f1.name, f2.name], files: [f1, f2], key: a.id + '#' + a.cells[r],
+      ids: [a.id, b.id], keys: [a.cells[r], b.cells[r]], row: r };
+  }
+  // the two scans of another row of the same pair, for preparing the next page (no question to the browser: null when a folder is locked)
+  async function loadRow(r) {
+    var a = copyById(S.pair[0]), b = copyById(S.pair[1]);
+    if (!a || !b || !a.cells[r] || !b.cells[r]) return null;
+    try { return { files: [await getScan(a, a.cells[r]), await getScan(b, b.cells[r])], ids: [a.id, b.id], keys: [a.cells[r], b.cells[r]], row: r }; }
+    catch (e) { return null; }
+  }
+
+  /* ---------------------------------------------------------------- the reference copy (V7) */
+  // The other copies are aligned onto it (in the background, V8-V10). Where it has no page, the first copy from the left that has one stands in.
+  function refFor(row) {
+    var r = copyById(S.ref); if (!r || S.copies.indexOf(r) < 0) return null;
+    if (r.cells[row]) return r.id;
+    for (var i = 0; i < S.copies.length; i++) { var c = S.copies[i]; if (c.id !== r.id && c.cells[row]) return c.id; }
+    return null;
+  }
+  async function firstScanSize(c) {
+    var key = null; for (var i = 0; i < c.cells.length && !key; i++) key = c.cells[i];
+    if (!key) return null;
+    try { var st = await statScan(c, key); if (st) return st.size; } catch (e) { /* not known */ }
+    try { var sk = splitKey(key), l = c.locs && c.locs[sk.n], rt = l && rootById(l.root); if (rootReady(rt)) return (await getScan(c, key)).size; } catch (e) { /* not known */ }
+    return null;
+  }
+  // proposed: the copy with the most pages; with equally many, the one with the bigger scans (more detail), then the one further left
+  function proposeRef(sizes) {
+    var best = null, bp = -1, bs = -1;
+    S.copies.forEach(function (c) {
+      var p = c.cells.filter(Boolean).length, z = sizes[c.id] || 0;
+      if (p > bp || (p === bp && z > bs)) { best = c; bp = p; bs = z; }
+    });
+    return best ? best.id : null;
+  }
+  async function refDialog() {
+    if (S.copies.length < 2) return toast('Add at least two copies first.');
+    var sizes = {};
+    for (var i = 0; i < S.copies.length; i++) sizes[S.copies[i].id] = await firstScanSize(S.copies[i]);
+    var prop = proposeRef(sizes), cur = S.ref != null ? S.ref : prop;
+    var h = '<h3>Reference copy</h3><p>The other copies are compared with the reference copy. ' + (HELPER ? 'Book Compare can align them onto it in the background (More → Align copies in the background …) and keeps the results next to the project file, so that a comparison with the reference opens at once.' : 'In the desktop program, Book Compare can align the other copies onto it in the background, so that a comparison with the reference opens at once.') +
+      ' Where the reference copy has no page, the first copy from the left that has the page stands in for it.</p><div class="ws-reflist">';
+    S.copies.forEach(function (c) {
+      var p = c.cells.filter(Boolean).length, z = sizes[c.id];
+      var tie = S.copies.some(function (x) { return x !== c && x.cells.filter(Boolean).length === p; });
+      h += '<label><input type="radio" name="ws-ref" value="' + c.id + '"' + (c.id === cur ? ' checked' : '') + '> <b>' + esc(c.name) + '</b> · ' + p + ' page' + (p === 1 ? '' : 's') +
+        (z ? ' · first scan ' + (z / 1048576).toFixed(1) + ' MB' : '') + (c.id === prop ? ' <i>(proposed: ' + (tie ? 'as many pages as another copy, bigger scans' : 'most pages') + ')</i>' : '') + '</label>';
+    });
+    h += '</div><div class="acts"><button class="ws-tb" data-close>Cancel</button>' + (S.ref != null ? '<button class="ws-tb" id="rf-none">No reference copy</button>' : '') + '<button class="ws-tb primary" id="rf-ok">Use this copy</button></div>';
+    var sc = modal(h);
+    sc.querySelector('#rf-ok').onclick = function () {
+      var v = sc.querySelector('input[name=ws-ref]:checked'), id = v ? +v.value : null;
+      closeModal(); if (id == null || id === S.ref) return;
+      commit(); S.ref = id; touch(); renderAll();
+      toast('“' + copyById(id).name + '” is the reference copy now.' + (HELPER ? ' More → Align copies in the background … aligns the others onto it.' : ''));
+    };
+    var none = sc.querySelector('#rf-none');
+    if (none) none.onclick = function () { closeModal(); commit(); S.ref = null; touch(); renderAll(); toast('No reference copy.'); };
+  }
+  function resultsDir() {
+    var t = proj.target;
+    if (!HELPER || !t || !t.dir || !t.dir.isHelper) return null;
+    return new HDir(t.dir.ref, joinPath(t.dir.rel, t.file + ' results'), t.file + ' results');
+  }
+  function goTo(copyId, row) {
+    var ci = -1; S.copies.forEach(function (c, i) { if (c.id === copyId) ci = i; });
+    if (ci < 0 || row < 0 || row >= rows()) return;
+    if (!root || root.hidden) show();
+    S.sel = { ci: ci, row: row }; anchor = null;
+    renderAll();
+    var vp = $('#ws-vp'); if (vp) { vp.scrollTop = Math.max(0, HEAD_H + row * ROW_H - vp.clientHeight / 2); vp.scrollLeft = Math.max(0, colLeft(ci) - 40); }
   }
   // COMPARE in the Pages view: check that the two scans can be read (errors stay here as a message), then open the Compare tab.
   async function compareNow() {
@@ -1547,6 +1625,25 @@
       }
       return Promise.resolve({ none: true });
     },
+    // ---- for the reference copy and the background alignment (js/results-store.js, js/background-align.js, V7-V10)
+    refCopy: function () { return S.ref; },
+    refFor: refFor,
+    refDialog: refDialog,
+    cellKey: function (copyId, row) { var c = copyById(copyId); return (c && S.copies.indexOf(c) >= 0 && c.cells[row]) || null; },
+    scanFile: function (copyId, row) { var c = copyById(copyId); if (!c || !c.cells[row]) return Promise.reject(new Error('no page')); return getScan(c, c.cells[row]); },
+    scanInfo: function (copyId, row) { var c = copyById(copyId); if (!c || !c.cells[row]) return Promise.resolve(null); return statScan(c, c.cells[row]).catch(function () { return null; }); },
+    loadRow: loadRow,
+    rowCount: rows,
+    copyList: function () { return S.copies.map(function (c) { return { id: c.id, name: c.name, pages: c.cells.filter(Boolean).length }; }); },
+    resultsDir: resultsDir,
+    resultsId: function () { var t = proj.target; return t && t.dir ? (t.dir.rootPath || t.dir.name) + '|' + t.file : ''; },
+    isDesktop: function () { return !!HELPER; },
+    hasProjectFile: function () { return !!proj.target; },
+    saveAs: function () { return saveProjectAs(); },
+    goTo: goTo,
+    bgSlot: function () { return root ? $('#ws-bg') : null; },
+    rowLabel: function (i) { return rowLabel(i); },
+    toast: function (t) { toast(t); },
     // ---- for the speed test (js/speedtest.js): it reads scans and changes nothing in the project
     modal: modal, closeModal: closeModal,
     // Which page to time: the selected row if copy 1 and another copy have a page there, otherwise the row that most copies share with copy 1.
@@ -1675,6 +1772,8 @@
       else if (m === 'help') helpDialog();
       else if (m === 'colw') resetWidths();
       else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
+      else if (m === 'ref') refDialog();
+      else if (m === 'bg') { if (window.BCBackground) window.BCBackground.open(); }
       else if (m === 'new') newProject();
       else if (m === 'download') openDownloadPage();
       return;
@@ -1711,7 +1810,7 @@
       case 'closegap': if (s) { var n2 = Math.max(1, parseInt($('#gapN').value, 10) || 1); commit(); var k = closeGap(s.c, s.row, n2); trim(s.c); changed(); toast(k ? 'Closed ' + k + ' gap' + (k > 1 ? 's' : '') + '.' : 'Nothing to close.', true); } return;
       case 'del': return deleteSelected();
       case 'remove':
-        var ci = +a.dataset.c, nm = S.copies[ci].name; commit(); S.copies.splice(ci, 1);
+        var ci = +a.dataset.c, nm = S.copies[ci].name; commit(); if (S.copies[ci].id === S.ref) S.ref = null; S.copies.splice(ci, 1);
         S.sel.ci = S.copies.length ? Math.min(S.sel.ci == null ? 0 : S.sel.ci, S.copies.length - 1) : null; ensurePair();
         changed(); toast('Removed ' + nm + ' from the project. Your scan files were not touched.', true); return;
       case 'rename': var ci2 = +a.dataset.c, cc = S.copies[ci2]; startRename(a, function () { return cc.name; }, function (v) {
@@ -1808,6 +1907,7 @@
   }
   async function newProject() {
     if (S.copies.length && dirty && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
+    projectChanging();
     S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.target = null; proj.legacy = null; proj.state = 'none'; proj.name = ''; dirty = false;
     renderAll();
   }
@@ -1819,7 +1919,7 @@
     root.innerHTML =
       '<div class="ws-head"><div class="ws-headtext"><h1>Copies and pages</h1><p>Each column is one copy, each row one page position. Check that every row shows the same page in all copies, then mark two pages and compare them.</p></div>' +
       '<button class="ws-save" id="ws-save" data-act="savechip"></button><button class="ws-icon" data-act="help" aria-label="Help">?</button></div>' +
-      '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-update" id="ws-update" hidden></div>' +
+      '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-update" id="ws-update" hidden></div><div class="ws-banner ws-bg" id="ws-bg" hidden></div>' +
       '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-summary" id="ws-summary"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
       '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div></aside></div>' +
       '<div class="ws-bar"><button class="ws-side" id="ws-back" data-act="back"><span class="g">&#8249;</span>Back</button><button class="ws-compare" id="ws-compare" data-act="compare">COMPARE</button><button class="ws-side" id="ws-more" data-act="more"><span class="g">&#8942;</span>More</button><div class="ws-menu" id="ws-menu" hidden></div></div>' +

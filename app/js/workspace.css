@@ -191,3 +191,17 @@
 .sp-tbl tr.bad td:first-child { white-space: nowrap; }
 .ws-rl { display: block; margin: 6px auto 2px; font: inherit; font-size: 11.5px; padding: 3px 10px; border: 1px solid var(--ws-teal); background: var(--ws-surface); color: var(--ws-teal); border-radius: 4px; cursor: pointer; }
 .ws-rl:hover { background: var(--ws-teal); color: #fff; }
+
+/* reference copy (V7) and background alignment (V8-V10) */
+.ws-star { color: #c99a00; font-size: 14px; }
+.ws-reflist { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; max-height: 50vh; overflow: auto; }
+.ws-reflist label { display: block; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+.ws-reflist label:hover { background: var(--ws-band); }
+.ws-reflist i { color: var(--ws-muted); }
+.ws-banner.ws-bg { border-color: var(--ws-line); background: var(--ws-surface); }
+.ws-banner.ws-bg.warn { border-color: var(--ws-note-line); background: var(--ws-note-bg); }
+.ws-bgbar { flex: 0 0 160px; height: 8px; border-radius: 4px; background: var(--ws-line-soft); overflow: hidden; }
+.ws-bgbar > i { display: block; height: 100%; background: var(--ws-teal); }
+.ws-bgopts { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 10px; }
+.ws-bgopts label { cursor: pointer; }
+.ws-bgfail { max-height: 50vh; overflow: auto; font-size: 13px; }

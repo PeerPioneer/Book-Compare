@@ -33,7 +33,8 @@
     focus: false,                       // focus mode: only the pictures are shown
     shownRow: null, shownPair: null,    // the row and the two copies of the picture on screen (annotations belong to this row)
     filter: 'all', fcol: null,          // page list: all pages / flagged pages, and one flag colour only
-    pin: false                          // the book map stays open
+    pin: false,                         // the book map stays open
+    dir: 1                              // the way the pages were last stepped through (the next page is prepared in that direction)
   };
   var TRANSFORMS = [['perspective', 'Perspective (older)'], ['affine', 'Affine (older)'], ['tps', 'Thin Plate Spline (older)']];
   if (window.AlignEngine && AlignEngine.supported()) TRANSFORMS.unshift(['tiles', 'Tiles (recommended)']);
@@ -580,6 +581,7 @@
     if (st.focus) { var r = W().rowInfo(i); toast(r.label + ' · position ' + (i + 1) + ' of ' + s.rows + (r.flag != null ? ' · flagged' : '')); }
   }
   function stepPage(dir) {
+    st.dir = dir < 0 ? -1 : 1;
     var s = W().state(), i = s.row + dir;
     while (i >= 0 && i < s.rows && st.skip && !comparable(i)) i += dir;
     if (i < 0 || i >= s.rows) return note(dir > 0 ? 'This is the last page to compare.' : 'This is the first page to compare.');
@@ -621,6 +623,44 @@
   var eng = null, chain = Promise.resolve(), MAX_JOBS = 40;
   function serial(fn) { var p = chain.then(fn, fn); chain = p.catch(function () { }); return p; }
   function dropEngine() { if (eng) { try { eng.e.terminate(); } catch (x) { /* ignore */ } } eng = null; }
+  // Stored alignments (V10, desktop program): a pair whose copy 1 is the reference copy (or stands in for it on this page) is kept in the
+  // results folder; when it is there and still fits, the page is shown from it at once. Other pairs are aligned directly, and the next page
+  // in the direction of travel is prepared meanwhile (D2, kept in memory only, prepared by a second helper).
+  function storeKey(d) {
+    if (!d.ids || !window.BCResults || !BCResults.available() || !W().refFor || W().refFor(d.row) !== d.ids[0]) return null;
+    return { c0: d.ids[0], k0: d.keys[0], c1: d.ids[1], k1: d.keys[1], i0: BCResults.fileInfo(d.files[0]), i1: BCResults.fileInfo(d.files[1]), tiles: d.tiles || null };
+  }
+  function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null)].join('|') : null; }
+  var pre = { e: null, ready: false, jobs: 0, cache: new Map(), busy: null };          // the helper that prepares the next page, and what it prepared
+  function preTake(d) { var k = preKey(d), v = k && pre.cache.get(k); if (v) pre.cache.delete(k); return v || null; }
+  async function stored(d) {
+    var hit = preTake(d); if (hit) return hit;
+    var p = storeKey(d); return p ? BCResults.read(p) : null;
+  }
+  function prepareNext(s) {
+    if (st.transform !== 'tiles' || !st.on) return;
+    var n = s.rows, i = s.row + st.dir;
+    while (i >= 0 && i < n && !comparable(i)) i += st.dir;
+    if (i < 0 || i >= n || pre.busy != null) return;
+    var my = st.token;
+    pre.busy = i;
+    (async function () {
+      try {
+        var d = await W().loadRow(i); if (!d || my !== st.token) return;
+        d.tiles = W().tileSetting(i, d.ids[1]);
+        var k = preKey(d); if (pre.cache.has(k)) return;
+        var p = storeKey(d); if (p && await BCResults.has(p)) return;                       // stored already: nothing to prepare
+        if (pre.e && pre.jobs >= MAX_JOBS) { try { pre.e.terminate(); } catch (x) { /* ignore */ } pre.e = null; }
+        if (!pre.e) { pre.e = AlignEngine.create(); pre.ready = false; pre.jobs = 0; }
+        if (!pre.ready) { await pre.e.init(); pre.ready = true; }
+        var r = await pre.e.alignStore(d.files[0], d.ids[0] + '#' + d.keys[0] + '#' + d.files[0].size + '#' + d.files[0].lastModified, d.files[1], d.tiles);
+        pre.jobs++;
+        if (p) BCResults.save(p, r.bin, { u: r.unmatched_tiles, max: r.max, sparse: !!r.sparse }).catch(function () { });
+        else { pre.cache.set(k, r.bin); while (pre.cache.size > 3) pre.cache.delete(pre.cache.keys().next().value); }
+      } catch (e) { if (pre.e) { try { pre.e.terminate(); } catch (x) { /* ignore */ } } pre.e = null; }
+      finally { pre.busy = null; }
+    })();
+  }
   async function tileJob(d, my) {
     if (my !== st.token) { d.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (x) { /* ignore */ } }); return null; }   // no longer wanted: let the pictures go
     if (eng && eng.jobs >= MAX_JOBS) dropEngine();
@@ -630,6 +670,20 @@
     try {
       if (!g.ready) { setBusy('Starting the alignment helper … (the first time, the browser loads about 13 MB)'); await g.e.init(); g.ready = true; }
       if (my !== st.token) return null;
+      var bin = null; try { bin = await stored(d); } catch (x) { bin = null; }
+      if (bin && my === st.token) {
+        setBusy('Showing the stored alignment …');
+        try {
+          var rs = await g.e.warpStored(d.files[1], bin);
+          await loading;
+          if (my !== st.token) return null;
+          st.fineImg = new ImageData(new Uint8ClampedArray(rs.pixels), rs.w, rs.h); st.fineNames = d.names;
+          E.compare.show_aligned(d.names, st.fineImg);
+          rs.pixels = null;
+          return rs;
+        } catch (x) { /* a stored result that cannot be used: aligned again below */ }
+      }
+      if (my !== st.token) return null;
       if (g.ref !== d.key) {
         setBusy('Preparing copy 1 (finding the printed area) …');
         g.ref = null; await g.e.reference(d.files[0]); g.ref = d.key;
@@ -637,7 +691,9 @@
       if (my !== st.token) return null;
       setBusy('Aligning copy 2 onto copy 1 … (rough position, then the fine alignment in tiles; a few seconds)');
       g.jobs++;
-      var r = await g.e.alignColor(d.files[1], d.tiles);
+      var sk = storeKey(d), r = await g.e.alignColor(d.files[1], d.tiles, !!sk);
+      if (sk && r.bin) BCResults.save(sk, r.bin, { u: r.unmatched_tiles, max: r.movement && r.movement.max, sparse: !!r.sparse }).catch(function () { });
+      r.bin = null;
       await loading;
       if (my !== st.token) return null;
       st.fineImg = new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h); st.fineNames = d.names;
@@ -684,6 +740,7 @@
     clearStale(); setBusy(null);
     if (info && info.sparse) note('This page has almost no ink: only the whole-page alignment was used, without the fine alignment in tiles.');
     if (window.CompareAnnot) CompareAnnot.refresh();
+    if (tiles) prepareNext(s);
   }
   // the panels say which copy and page they show (the file names stay the names of the exported files)
   function labelPanels(s) {
@@ -729,6 +786,7 @@
     isOpen: function () { return st.on; },
     inFocus: function () { return st.on && st.focus; },
     transform: function () { return st.transform === 'tiles' ? 'perspective' : st.transform; },   // the OLDER alignment type to time in the speed test (it measures the tiles separately)
-    lastTiles: function () { return st.lastTiles || null; }                                  // what the tile alignment of the picture on screen reported (tests)
+    lastTiles: function () { return st.lastTiles || null; },                                 // what the tile alignment of the picture on screen reported (tests)
+    prepared: function () { return { busy: pre.busy, cached: pre.cache.size }; }             // the next page being prepared (tests)
   };
 })();

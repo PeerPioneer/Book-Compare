@@ -45,3 +45,13 @@ On GitHub (`.github/workflows/windows-test.yml`) the tests run automatically aft
 Loads the two sample scans of the traherne pair in Chromium, runs the tile-based alignment engine (js/align-engine.js, js/align-worker.js, OpenCV.js) on them
 and checks that every step reports a time, that the tile step improves the match, and that a file that is not a picture gives a clear error.
 Same way to run as the others: `python3 -m http.server 8765 -d app`, then `python3 tests/workspace/test_align_worker.py`.
+
+## test_background.py
+The reference copy (V7), the background alignment (V8, V9) and the stored alignments (V10), with the desktop program's scan reader and
+real folders on disk (sample pictures, three copies, one with a wrong page): the project saved as a file, the reference copy proposed,
+chosen (star in the heading), saved and undone; the background run with its strip, the pause on the page whose ink has no partner,
+"Go to the page", "Continue, do not ask again", the finished summary and the files in the results folder; started again, everything is
+skipped; the Compare tab shows a pair with the reference from the stored movement, aligns another pair directly and prepares the next
+page; a changed tile setting is aligned again. Chromium (BOOKCOMPARE_BROWSERS=chromium,firefox for both). Needs Node.
+
+    python3 tests/workspace/test_background.py    # prints ALL BACKGROUND ALIGNMENT TESTS PASSED
