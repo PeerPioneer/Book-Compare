@@ -180,8 +180,12 @@ def scenario(p, kind):
     lt = pg.evaluate("CompareTab.lastTiles()"); assert lt and lt.get('stored') is True and lt['w'] > 100, lt
     print('  %s: reference pair shown from the stored movement in %.1f s' % (kind, took))
     # the help text on what cannot be seen (B5)
+    # (0.11.0: in the help dialog of the "?" button)
+    pg.click('#ct_helpbtn'); pg.wait_for_timeout(300)
     assert not pg.is_visible('#ct_help li'); pg.click('#ct_help summary'); pg.wait_for_timeout(200)
-    assert 'Lighter inks' in pg.inner_text('#ct_help') and 'Small shifts' in pg.inner_text('#ct_help'); pg.click('#ct_help summary')
+    assert 'Lighter inks' in pg.inner_text('#ct_help') and 'Small shifts' in pg.inner_text('#ct_help')
+    pg.click('#ws-float [data-close]'); pg.wait_for_timeout(300)
+    if pg.get_attribute('#ct_alhead', 'aria-expanded') != 'true': pg.click('#ct_alhead'); pg.wait_for_timeout(150)      # the folded section "Alignment of this page"
     pg.select_option('#ct_c1', label='B-Test'); pg.wait_for_timeout(300); pg.select_option('#ct_c2', label='C-Test'); wait_aligned(pg, 'B against C')
     lt = pg.evaluate("CompareTab.lastTiles()"); assert not lt.get('stored'), 'B against C is not a pair with the reference: aligned directly'
     for _ in range(240):

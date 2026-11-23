@@ -1075,6 +1075,25 @@ Built 22-23 Nov 2026 as **version 0.10.0** (details in CHANGELOG.txt).
 | N5, N6 | Gap goes above (said and asked); first column resizable | **done 0.10.0** |
 | N7 | Leftovers removed (prototypes/, dev-readme, .prettierignore, tour animations, two logos, experiment scripts, the Python prototype) | **done 0.10.0** |
 
+### 11.1d The owner's decisions of 23 November 2026 (open items of 11.1c)
+
+Built 23 Nov 2026 as **version 0.11.0** (details in CHANGELOG.txt).
+
+| ID | Item | Status |
+|----|------|--------|
+| R1 | Left panel: option C (copies right under each other, no Swap; one folded section "Alignment of this page"; page list fills the rest); "Without fine alignment" and the alignment-type menu removed; B5 note moved into the help | **done 0.11.0** |
+| R6a | ‹ › beside copy 2 and the keys , . (previous / next copy as copy 2) | **done 0.11.0** |
+| R8 | Annotation tools folded behind a pen button in the zoom column, above ▲ (not at the top) | **done 0.11.0** |
+| R10 | "Clean paper" switch | **dropped (owner)** |
+| R11 | Colour pairs Blue / red (default, blue = copy 1), Teal / pink, Green / red, Blue / orange | **done 0.11.0** |
+| R19 | Pictures in the grid: switch, off at first, kept per project | **done 0.11.0** |
+| R36 | No background alignment on the website: the two items shown greyed, "only in the desktop program" | **done 0.11.0**; storing everything (also the alignments) in the one project file: explained to the owner 23 Nov (rewrite on every save, crash risk, cloud folders upload the whole file; possible with an append-only part and smaller tile shifts) – **waiting for the owner** |
+| N3 | Examples project instead of the two-picture screens (welcome page + Image Compare's book, music and puzzle pairs; photos left out) | **done 0.11.0**; better example pages: **the owner looks for them** |
+| N8 | Whole page tinted in one copy's colour | **done 0.11.0** (paper measured on the page and part by part; "Paper …" per copy) |
+| N9 | Printed area: one outline, found on copy 1, cuts both copies (answered; no change) | answered |
+| N10 | Melopoiae p. 6 (A-Wn1 / D-W, a photo taken at a slant): perspective correction in the first step (B1) | **done 0.11.0**; the staff lines still lie apart in places (separate impression of the staves, or page curl) |
+| N11 | Continue opens the Compare tab at the last pair and page; auto-save made visible (chip with time, tooltip, toast, help, Ctrl+S); "directly in the folder" ticked in Add copy | **done 0.11.0** |
+
 ### 11.2 After version 1
 
 | ID | Item | Status |

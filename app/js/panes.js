@@ -555,6 +555,14 @@
             b.addEventListener('click', () => document.dispatchEvent(new CustomEvent('opendiffcolors')));
             main.label.appendChild(document.createElement('br'));
             main.label.appendChild(b);
+            if (window.BC_COPY_NAMES) {                     // Compare tab: make the paper of a copy whiter (0.11.0)
+                const p = document.createElement('button');
+                p.type = 'button'; p.className = 'pane__lblbtn'; p.id = 'legend_paper';
+                p.textContent = 'Paper …'; p.title = 'Paper still tinted in a copy\'s colour? Make the paper of one copy whiter (only the picture on screen changes)';
+                p.addEventListener('click', () => document.dispatchEvent(new CustomEvent('openpaper')));
+                main.label.appendChild(document.createTextNode(' '));
+                main.label.appendChild(p);
+            }
         }
     };
 

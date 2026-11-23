@@ -63,10 +63,24 @@ with sync_playwright() as p:
         pg.evaluate("k=>window.__picks.push(window.__h[k])", target); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(400)
         assert 'scan folder' in pg.inner_text('#ws-toast'), 'saving into a scan folder must be refused'
     pg.evaluate("window.__picks.push(window.__h.proj)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(900)
-    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Book project' in pg.inner_text('#ws-save'), pg.inner_text('#ws-save')
+    assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Book project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
     assert project_files(pg) == ['Book project.bookcompare'], project_files(pg)        # the project is one file
     d = read_project(pg); assert [c['name'] for c in d['copies']] == ['A-Test', 'B-Test', 'C-Test'] and d['labels'] == {'2': 'Index'} and d['folio'] is True
     assert d['version'] == 2 and len(d['roots']) == 3 and all(len(c['locs']) == 1 for c in d['copies']) and 'tray' not in d
+    # 0.11.0: the chip says that saving is automatic, with the time; Ctrl+S saves at once and says so
+    import re as _re; assert _re.search(r'\d\d:\d\d', pg.inner_text('#ws-save')), pg.inner_text('#ws-save')
+    pg.locator('#ws-vp').focus(); pg.keyboard.press('Control+s'); pg.wait_for_timeout(600)
+    assert 'Saved in' in pg.inner_text('#ws-toast') and 'saved automatically' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
+    # 0.11.0: pictures in the grid (off at first, kept in the project; taller rows)
+    assert pg.get_attribute('#ws-pics', 'aria-pressed') == 'false' and pg.locator('#ws .ws-cell .tn').count() == 0 and read_project(pg).get('thumbs') is False
+    h40 = pg.locator('#ws .ws-row').first.bounding_box()['height']
+    pg.click('#ws-pics'); pg.wait_for_timeout(300)
+    assert pg.get_attribute('#ws-pics', 'aria-pressed') == 'true' and pg.locator('#ws .ws-row').first.bounding_box()['height'] > h40 + 40
+    pg.wait_for_function("document.querySelectorAll('#ws .ws-cell .tn img').length >= 3", timeout=20000)
+    pg.wait_for_timeout(1200); assert read_project(pg)['thumbs'] is True
+    pg.click('#ws-pics'); pg.wait_for_timeout(300); assert pg.locator('#ws .ws-cell .tn').count() == 0 and abs(pg.locator('#ws .ws-row').first.bounding_box()['height'] - h40) < 1
+    # the website shows the desktop-only items of the menu greyed, with a note
+    pg.click('#ws-more'); assert pg.is_disabled('#ws-menu [data-m=bg]') and 'only in the desktop program' in pg.inner_text('#ws-menu [data-m=bg]'); pg.click('#ws-more')
     # column width, moving a copy, deleting a range of files with Shift (the grid is left as it was)
     import gridchecks; gridchecks.run(pg, col, lambda: read_project(pg))
     # N2: the project's name, in the top bar; kept in the project file

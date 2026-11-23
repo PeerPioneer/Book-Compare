@@ -271,14 +271,19 @@ function compose(A, B) {   // [A;0 0 1] * [B;0 0 1], top two rows
   return [A[0] * B[0] + A[1] * B[3], A[0] * B[1] + A[1] * B[4], A[0] * B[2] + A[1] * B[5] + A[2],
           A[3] * B[0] + A[4] * B[3], A[3] * B[1] + A[4] * B[4], A[3] * B[2] + A[4] * B[5] + A[5]];
 }
-function matOf(cv, W) { const m = new cv.Mat(2, 3, cv.CV_32F); m.data32F.set(W); return m; }
+function matOf(cv, W) { const m = W.length === 9 ? new cv.Mat(3, 3, cv.CV_32F) : new cv.Mat(2, 3, cv.CV_32F); m.data32F.set(W); return m; }
+/* W: 6 numbers (affine, reference -> other scan) or 9 numbers (perspective, a 3 x 3 matrix, B1: photographed pages) */
 function warp(cv, src, W, w, h) {
   const m = matOf(cv, W), d = new cv.Mat();
-  try { cv.warpAffine(src, d, m, new cv.Size(w, h), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0)); }
+  try {
+    if (W.length === 9) cv.warpPerspective(src, d, m, new cv.Size(w, h), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+    else cv.warpAffine(src, d, m, new cv.Size(w, h), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+  }
   catch (e) { d.delete(); throw e; }
   finally { m.delete(); }
   return d;
 }
+function mul3(A, B) { const C = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let v = 0; for (let k = 0; k < 3; k++) v += A[3 * i + k] * B[3 * k + j]; C.push(v); } return C; }
 
 /* local correlation of two pictures (window sigma s) */
 function localCorrelation(cv, a, b, s) {
@@ -381,10 +386,41 @@ function roughAlignIn(cv, ref, mov, box, opts, S) {
     if (cc2 > 0) { Ws = W2; cc = cc2; }
     for (const m of [warped, lc, bl, agreeM]) m.delete();
   }
-  return { W: bg(Ws), ecc: cc, score: mx, scale: s };
+  const out = { W: bg(Ws), ecc: cc, score: mx, scale: s };
+  if (opts.perspective) {                                                                // B1: a second candidate with perspective (the caller chooses)
+    const P = perspectiveIn(cv, refS, movS, Ws, maskS, sw, sh, S);
+    if (P) out.Wp = [P[0], P[1], P[2] * q, P[3], P[4], P[5] * q, P[6] / q, P[7] / q, P[8]];
+  }
+  return out;
 }
 
-module.exports = { roughAlign, warp, gauss, scaled };
+/* B1 (23 Nov 2026, Melopoiae p.6, D-W photographed at a slant): a photo taken at an angle makes the page narrower at one end, which a whole-page
+   move / turn / scale (affine) cannot undo; on that page the rough step left the copy off by up to one staff-line spacing near the bottom, and the
+   tile step then caught the neighbouring line in the empty staves. Here the affine result is refined once more allowing perspective (ECC with
+   MOTION_HOMOGRAPHY, inside the printed area). Returns the 3 x 3 matrix at the small scale, or null (failed, or implausibly strong). */
+function perspectiveIn(cv, refS, movS, Ws, maskS, sw, sh, S) {
+  let H = [Ws[0], Ws[1], Ws[2], Ws[3], Ws[4], Ws[5], 0, 0, 1], ok = false;
+  for (const [sigma, iterations] of [[4, 200], [2, 300], [1.5, 300]]) {
+    const L = scope();
+    try {
+      const Hm = L.add(new cv.Mat(3, 3, cv.CV_32F)); Hm.data32F.set(H);
+      const wv = L.add(new cv.Mat());
+      cv.warpPerspective(movS, wv, Hm, new cv.Size(sw, sh), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+      const br = L.add(gauss(cv, refS, sigma)), bm = L.add(gauss(cv, wv, sigma)), C = L.add(cv.Mat.eye(3, 3, cv.CV_32F));
+      const crit = new cv.TermCriteria(cv.TermCriteria_EPS | cv.TermCriteria_COUNT, iterations, ECC_EPS);
+      try { cv.findTransformECC(br, bm, C, cv.MOTION_HOMOGRAPHY, crit, maskS, 5); H = mul3(H, Array.from(C.data32F)); ok = true; }
+      catch (e) { return null; }
+    } finally { L.free(); }
+  }
+  if (!ok || !H.every(isFinite) || Math.abs(H[8]) < 1e-9) return null;
+  H = H.map(v => v / H[8]);
+  // plausible: the page keeps its orientation, and the two ends differ in scale by at most 30 %
+  const k = Math.abs(H[6]) * sw + Math.abs(H[7]) * sh, det = H[0] * H[4] - H[1] * H[3];
+  if (!(k < 0.3) || !(det > 0)) return null;
+  return H;
+}
+
+module.exports = { roughAlign, warp, gauss, scaled, mul3 };
 
 };
 __defs["tile_align"] = function (module, exports, require) {
@@ -734,9 +770,21 @@ function alignCopy(cv, refState, red, opts = {}) {
 function alignCopyIn(cv, refState, red, opts, S) {
   const { ref, box } = refState, tm = {}; let t = now();
   const mov = S.add(inkMap(cv, red)); tm.ink_s = (now() - t) / 1000; t = now();
-  const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true }); tm.rough_s = (now() - t) / 1000; t = now();
-  const rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); tm.warp_s = (now() - t) / 1000;
-  if (refState.mask) { const d = rough.data32F, mk = refState.mask; for (let i = 0; i < mk.length; i++) if (!mk[i]) d[i] = 0; }     // V2b: outside the hand-set shape
+  const persp = opts.perspective !== false && !(typeof process !== 'undefined' && process.env && process.env.BC_NOPERSP === '1');
+  const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true, perspective: persp }); tm.rough_s = (now() - t) / 1000; t = now();
+  const cut = (m) => { if (refState.mask) { const d = m.data32F, mk = refState.mask; for (let i = 0; i < mk.length; i++) if (!mk[i]) d[i] = 0; } };      // V2b: outside the hand-set shape
+  let rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); cut(rough);
+  let model = 'affine', roughCmp = null;
+  if (res.Wp) {
+    /* B1: the perspective candidate is kept only when it clearly fits better: at least 3 points less unmatched ink (of the box) and at least
+       10 % less in relation. On flat scans the two are practically the same, and the simpler whole-page step stays. */
+    const rp = S.add(warp(cv, mov, res.Wp, ref.cols, ref.rows)); cut(rp);
+    const ua = unmatchedShare(cv, ref, rough, box).share, up = unmatchedShare(cv, ref, rp, box).share;
+    roughCmp = { affine: +ua.toFixed(4), perspective: +up.toFixed(4) };
+    if (up <= ua - 0.03 && up <= 0.9 * ua) { rough.delete(); rough = rp; res.W = res.Wp; model = 'perspective'; }
+    else rp.delete();
+  }
+  tm.warp_s = (now() - t) / 1000;
   const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows;
   const envRing = (typeof process !== 'undefined' && process.env && process.env.BC_RING) ? +process.env.BC_RING : null;     // research only (A2): ring width as a fraction of the longer box side
   const envEdge = (typeof process !== 'undefined' && process.env && process.env.BC_EDGE) ? +process.env.BC_EDGE : null;     // research only (A2): strip along the scan edge that is never fine-aligned (px)
@@ -763,7 +811,7 @@ function alignCopyIn(cv, refState, red, opts, S) {
   tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
   mov.delete();
-  const out = { field, map, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
+  const out = { field, map, aligned, rough, W: res.W, model, roughCmp, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
   if (opts.measure) out.unmatched = { rough: unmatchedShare(cv, ref, rough, box).share, tiles: unmatchedShare(cv, ref, aligned, box).share };
   if (!opts.keepRough) { rough.delete(); out.rough = null; }
   S.release(aligned); if (out.rough) S.release(rough);                          // handed to the caller, who deletes them
@@ -837,7 +885,7 @@ module.exports = { movementMap, movementArrows, MV_BIG, MV_EDGE };
 __defs["stored_movement"] = function (module, exports, require) {
 /* Stored alignments (V10): how one copy's page was bent onto the reference page, kept small enough to keep for a whole book.
    Only the MOVEMENT is stored (decided 21 Nov 2026), never a picture of the result:
-     - W: the rough (whole-page) step, 6 numbers
+     - W: the rough (whole-page) step, 6 numbers (affine) or 9 (perspective, B1)
      - the fine movement of the tiles: for every 4th working pixel of the reference (working height 3000 px) how far the place in the
        other copy lies from where the rough step puts it, in 1/16 px (16-bit numbers), and "outside the scan" as a special value
      - the colour picture of the movement map (V16), cells of 4 x 4 working pixels, mostly transparent
@@ -994,7 +1042,7 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
   ctx.drawImage(bmp, 0, 0); bmp.close();
   var src = cv.matFromImageData(ctx.getImageData(0, 0, mw, mh)); oc.width = oc.height = 1;
   var Wr = ref.cols, Hr = ref.rows, Wm = Math.round(mw * 3000 / mh), Hm = 3000;          // working sizes (reference and other copy)
-  var W = r.W, mxA = r.map ? r.map.mx.data32F.slice() : null, myA = r.map ? r.map.my.data32F.slice() : null;
+  var W = r.W, P = W.length === 9, mxA = r.map ? r.map.mx.data32F.slice() : null, myA = r.map ? r.map.my.data32F.slice() : null;
   var out = new Uint8ClampedArray(refW0 * refH0 * 4), STRIP = 256;
   // for every column / row of the result: the two neighbouring working pixels and the weight
   function axis(n0, n) { var i0 = new Int32Array(n0), wt = new Float32Array(n0), f = n / n0; for (var k = 0; k < n0; k++) { var v = Math.min(Math.max((k + 0.5) * f - 0.5, 0), n - 1.001); i0[k] = Math.floor(v); wt[k] = v - i0[k]; } return { i: i0, w: wt }; }
@@ -1016,6 +1064,7 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
               py = (myA[p00] * (1 - wx) + myA[p01] * wx) * (1 - wy) + (myA[p10] * (1 - wx) + myA[p11] * wx) * wy;
             } else { px = i + wx; py = j + wy; }
             var u = W[0] * px + W[1] * py + W[2], v = W[3] * px + W[4] * py + W[5];           // working place in the other copy
+            if (P) { var dn = W[6] * px + W[7] * py + W[8]; u /= dn; v /= dn; }                 // (B1: a perspective rough step)
             ax[o + x] = (u + 0.5) * sx - 0.5; ay[o + x] = (v + 0.5) * sy - 0.5;               // its full-size place
           }
         }

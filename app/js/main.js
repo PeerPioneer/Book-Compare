@@ -2,11 +2,8 @@ class MainView {
     constructor(container, snackbar) {
         this.c = container;
         this.snackbar = snackbar;
+        // (0.11.0: "Compare two single pictures" and "Try the samples" are gone; the examples are a project, see js/examples.js)
         this.select_images_btn = document.getElementById('image_select_btn');
-        this.samples_btn = document.getElementById('try_samples_btn');
-        this.samples_btn.onclick = () => {
-            this.c.dispatchEvent(new CustomEvent('samples'));
-        }
         this.books_btn = document.getElementById('books_btn');
         this.books_btn.onclick = () => {
             this.c.dispatchEvent(new CustomEvent('books'));
@@ -14,8 +11,8 @@ class MainView {
 
         this.file_input = document.getElementById('image_select_input');
 
-        this.select_images_btn.onclick = this.select_images.bind(this);
-        this.file_input.onchange = this.handle_files.bind(this);
+        if (this.select_images_btn) this.select_images_btn.onclick = this.select_images.bind(this);
+        if (this.file_input) this.file_input.onchange = this.handle_files.bind(this);
     }
 
     async select_images() {

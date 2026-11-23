@@ -19,14 +19,14 @@ const COLOR_CHANNELS = {
 // The user can change them via More > "Change colors (Difference mode)";
 // the choice is remembered in this browser (if it allows storing).
 const DIFF_PRESETS = [
-    { id: "red-green",   name: "Red / green",   c1: "#FF0000", c2: "#00961E", n1: "Red",    n2: "Green",
-      note: "Default. Hard to tell apart with red-green colour blindness." },
-    { id: "orange-blue", name: "Orange / blue", c1: "#E66100", c2: "#005AC8", n1: "Orange", n2: "Blue",
-      note: "Clear for all common forms of colour blindness." },
-    { id: "red-blue",    name: "Red / blue",    c1: "#E60000", c2: "#0046C8", n1: "Red",    n2: "Blue",
-      note: "Keeps the red; clear for all common forms of colour blindness." },
+    { id: "blue-red",    name: "Blue / red",    c1: "#0046C8", c2: "#E60000", n1: "Blue",   n2: "Red",
+      note: "Default. Clear for all common forms of colour blindness." },
     { id: "teal-pink",   name: "Teal / pink",   c1: "#00A09A", c2: "#E6007E", n1: "Teal",   n2: "Pink",
       note: "Hard to tell apart with red-green colour blindness (the two look alike)." },
+    { id: "green-red",   name: "Green / red",   c1: "#00961E", c2: "#FF0000", n1: "Green",  n2: "Red",
+      note: "Hard to tell apart with red-green colour blindness." },
+    { id: "blue-orange", name: "Blue / orange", c1: "#005AC8", c2: "#E66100", n1: "Blue",   n2: "Orange",
+      note: "Clear for all common forms of colour blindness." },
 ];
 let DIFF_COLOR_1 = DIFF_PRESETS[0].c1;
 let DIFF_COLOR_2 = DIFF_PRESETS[0].c2;
@@ -44,45 +44,102 @@ const set_diff_colors = (c1, c2) => {
 };
 
 // Turns the picture on this canvas into an "ink layer": blank paper becomes
-// white and printed ink is tinted with `color`. The paper brightness is
-// measured for each scan, so slightly yellowed or darker pages still come
-// out white in the background.
-const inkLayer = (_ctx, color) => {
-    const c = _ctx.canvas;
-    // Put the scan on white (areas outside the aligned page count as blank paper)
+// white and printed ink is tinted with `color`.
+// 0.11.0 (whole pages tinted in one copy's colour): the paper is measured
+//  - only on the page itself: the parts of the canvas outside the aligned
+//    copy (transparent) no longer count as "paper" (they made the paper
+//    level pure white, so the real paper came out tinted), and
+//  - locally: a coarse map of the paper brightness (darker towards the
+//    binding, uneven light, a photographed page) is divided out first
+//    ("flat field"), so every part of the paper comes out white. The map may
+//    only lighten the page by a limited amount, so large areas of ink (a
+//    woodcut) stay dark.
+// `lighten` (0..1, optional, per copy) pushes light grey (paper tone,
+// show-through, stains) further towards white.
+const PAPER_GRID = 48;          // cells across the longer side of the page
+const inkLayer = (_ctx, color, lighten = 0) => {
+    const c = _ctx.canvas, W = c.width, H = c.height;
+    if (!W || !H) return;
+    // a medium-size copy for measuring (transparent = outside the page)
+    const k = Math.min(1, 720 / Math.max(W, H));
+    const mw = Math.max(1, Math.round(W * k)), mh = Math.max(1, Math.round(H * k));
+    const med = document.createElement("canvas");
+    med.width = mw; med.height = mh;
+    const mctx = med.getContext("2d", { willReadFrequently: true });
+    mctx.drawImage(c, 0, 0, mw, mh);
+    const d = mctx.getImageData(0, 0, mw, mh).data;
+    const lum = new Uint8Array(mw * mh), on = new Uint8Array(mw * mh);
+    const hist = new Uint32Array(256);
+    let n = 0;
+    for (let i = 0, j = 0; j < lum.length; i += 4, j++) {
+        if (d[i + 3] < 200) continue;                       // outside the page
+        const v = (d[i] * 77 + d[i + 1] * 151 + d[i + 2] * 28) >> 8;
+        lum[j] = v; on[j] = 1; hist[v]++; n++;
+    }
+    let level = 255;
+    if (n) { let acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= 0.9 * n) { level = v; break; } } }
+    const g = Math.min(1, Math.max(0.5, level / 255));      // the paper of the whole page (90th percentile)
+
+    // the paper map: per cell the 90th percentile, then the brightest of the
+    // neighbouring cells (a cell full of notes is not paper), limited to
+    // 80-100 % of the whole page's paper
+    const cs = Math.max(4, Math.round(Math.max(mw, mh) / PAPER_GRID));
+    const gw = Math.ceil(mw / cs), gh = Math.ceil(mh / cs);
+    const cell = new Float32Array(gw * gh).fill(-1);
+    const ch = new Uint32Array(256);
+    for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+        ch.fill(0); let m = 0;
+        const x1 = Math.min(mw, (gx + 1) * cs), y1 = Math.min(mh, (gy + 1) * cs);
+        for (let y = gy * cs; y < y1; y++) for (let x = gx * cs, o = y * mw + x; x < x1; x++, o++) if (on[o]) { ch[lum[o]]++; m++; }
+        if (m < cs * cs * 0.3) continue;                    // mostly outside the page
+        let acc = 0, v = 255; for (let t = 0; t < 256; t++) { acc += ch[t]; if (acc >= 0.9 * m) { v = t; break; } }
+        cell[gy * gw + gx] = v / 255;
+    }
+    const pm = document.createElement("canvas");
+    pm.width = gw; pm.height = gh;
+    const pctx = pm.getContext("2d");
+    const pd = pctx.createImageData(gw, gh);
+    for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+        let best = -1;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const x = gx + dx, y = gy + dy;
+            if (x < 0 || y < 0 || x >= gw || y >= gh) continue;
+            best = Math.max(best, cell[y * gw + x]);
+        }
+        const v = best < 0 ? g : Math.min(1, Math.max(0.8 * g, best));
+        const inv = Math.round((1 - v) * 255), o = (gy * gw + gx) * 4;
+        pd.data[o] = pd.data[o + 1] = pd.data[o + 2] = inv; pd.data[o + 3] = 255;
+    }
+    pctx.putImageData(pd, 0, 0);
+
+    // put the scan on white (outside the page = blank paper), grey
     _ctx.save();
     _ctx.globalCompositeOperation = "destination-over";
     _ctx.fillStyle = "#FFF";
-    _ctx.fillRect(0, 0, c.width, c.height);
+    _ctx.fillRect(0, 0, W, H);
     _ctx.restore();
     grayscale(_ctx);
+    // divide by the paper map: colour-dodge with (1 - paper) = scan / paper
+    _ctx.save();
+    _ctx.globalCompositeOperation = "color-dodge";
+    _ctx.imageSmoothingEnabled = true;
+    _ctx.imageSmoothingQuality = "high";
+    _ctx.drawImage(pm, 0, 0, W, H);
+    _ctx.restore();
 
-    // Estimate the paper brightness from a small copy (90th percentile)
-    const k = Math.min(1, 200 / Math.max(c.width, c.height));
-    const small = document.createElement("canvas");
-    small.width = Math.max(1, Math.round(c.width * k));
-    small.height = Math.max(1, Math.round(c.height * k));
-    const sctx = small.getContext("2d");
-    sctx.drawImage(c, 0, 0, small.width, small.height);
-    const d = sctx.getImageData(0, 0, small.width, small.height).data;
-    const hist = new Uint32Array(256);
-    for (let i = 0; i < d.length; i += 4) hist[d[i]]++;
-    const total = small.width * small.height;
-    let acc = 0, level = 255;
-    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= 0.9 * total) { level = v; break; } }
-    const p = Math.min(1, Math.max(0.5, level / 255));
-
-    // Stretch so that paper -> white and the darker ink -> full ink strength
+    // stretch so that paper -> white and the darker ink -> full ink strength
+    const L = Math.min(Math.max(+lighten || 0, 0), 1);
+    const p = 0.95 - 0.15 * L;                             // light grey (paper texture) counts as paper; "whiter" goes further
     const lo = 0.45 * p;
     const m = 1 / (p - lo);
     const q = -lo * m;
     const cc = 1 - 2 * q;
     const b = m / cc;
     const tmp = document.createElement("canvas");
-    tmp.width = c.width; tmp.height = c.height;
+    tmp.width = W; tmp.height = H;
     tmp.getContext("2d").drawImage(c, 0, 0);
     _ctx.save();
-    _ctx.clearRect(0, 0, c.width, c.height);
+    _ctx.clearRect(0, 0, W, H);
     _ctx.filter = `brightness(${b}) contrast(${cc})`;
     _ctx.drawImage(tmp, 0, 0);
     _ctx.restore();
@@ -91,7 +148,7 @@ const inkLayer = (_ctx, color) => {
     _ctx.save();
     _ctx.globalCompositeOperation = "screen";
     _ctx.fillStyle = color;
-    _ctx.fillRect(0, 0, c.width, c.height);
+    _ctx.fillRect(0, 0, W, H);
     _ctx.restore();
 };
 
@@ -456,13 +513,14 @@ class Visualization {
         const tcanvas = this.aligned;
 
         // image 1
+        const paper = window.BC_PAPER || [0, 0];        // "Whiter paper" per copy (Compare tab, 0.11.0)
         copyImage(dctx, input_image);
-        inkLayer(dctx, DIFF_COLOR_1);
+        inkLayer(dctx, DIFF_COLOR_1, paper[0]);
         this._draw_image(dcanvas, true);
 
         // image 2, multiplied onto image 1
         copyImage(dctx, tcanvas);
-        inkLayer(dctx, DIFF_COLOR_2);
+        inkLayer(dctx, DIFF_COLOR_2, paper[1]);
         bctx.save();
         bctx.globalCompositeOperation = "multiply";
         this._draw_image(dcanvas, false);

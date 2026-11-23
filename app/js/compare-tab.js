@@ -64,46 +64,38 @@
 
     ui.side = el('aside', 'ct-side');
     ui.side.innerHTML =
+      // option C (owner 23 Nov 2026): the two copies right under each other (no Swap button), then ONE folded section for the alignment of
+      // this page, so that the page list gets the rest of the height
       '<div class="ct-copies">' +
       '<div class="ct-copy c1"><span class="ct-lab">Copy 1</span><select id="ct_c1" aria-label="Copy 1"></select><span class="ct-n" id="ct_n1"></span></div>' +
-      '<button class="ct-swap" id="ct_swap" title="Swap copy 1 and copy 2" aria-label="Swap copy 1 and copy 2">&#8645;</button>' +
       '<div class="ct-copy c2"><span class="ct-lab">Copy 2</span><div class="ct-row"><select id="ct_c2" aria-label="Copy 2"></select>' +
-      '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2" aria-label="Previous copy">&#9650;</button>' +
-      '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2" aria-label="Next copy">&#9660;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
+      '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2 (key ,)" aria-label="Previous copy">&#8249;</button>' +
+      '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2 (key .)" aria-label="Next copy">&#8250;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
       '</div>' +
-      '<label class="ct-align"><span>Alignment</span><select id="ct_tf" title="How the second page is bent onto the first. Tiles is the alignment made for printed pages (best in most cases); the older types bend the whole page at once.">' +
-      TRANSFORMS.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('') + '</select></label>' +
-      // V15: tile settings for copy 2 on this page (owner's Aruspix idea, decided 17 Nov)
-      '<div class="ct-tiles" id="ct_tiles"><div class="ct-tlab" id="ct_tlab">Fine alignment on this page</div>' +
-      '<div class="ct-seg" role="group" aria-label="Fine alignment on this page">' +
-      '<button data-tp="stiff" title="Larger regions move together. Try this when the alignment bends something it should not.">Stiffer</button>' +
-      '<button data-tp="std" title="The standard setting">Standard</button>' +
-      '<button data-tp="flex" title="Smaller pieces may move on their own. Try this when parts of the page stay doubled. Can also pull real differences into place.">More flexible</button></div>' +
+      '<div class="ct-alsec" id="ct_tiles">' +
+      '<button class="ct-alhead" id="ct_alhead" aria-expanded="false" aria-controls="ct_albody"><span class="ct-tri" aria-hidden="true"></span><span class="ct-altitle">Alignment of this page</span><span class="ct-alval" id="ct_alval">Standard</span></button>' +
+      '<div class="ct-albody" id="ct_albody" hidden>' +
+      // V15: how freely the tiles of copy 2 may move on this page (owner's Aruspix idea, decided 17 Nov)
+      '<div class="ct-seg" role="group" aria-label="Fine alignment of copy 2 on this page">' +
+      '<button data-tp="stiff" title="Larger regions move together. Real differences are not pulled away, but paper and scanning show more. Try this when the alignment bends something it should not.">Stiffer</button>' +
+      '<button data-tp="std" title="The standard setting: 8 main tiles across the height of the page, each split 3 times">Standard</button>' +
+      '<button data-tp="flex" title="Smaller pieces may move on their own. Fixes lines that stay doubled, but can hide a real difference.">Flexible</button></div>' +
       '<button class="ct-tadvbtn" id="ct_tadvbtn" aria-expanded="false">Advanced …</button>' +
       '<div class="ct-tadv" id="ct_tadv" hidden>' +
       '<label title="How many large tiles cover the height of the page (standard 8)">Main tiles <input type="number" id="ct_tmain" min="4" max="16" step="1"></label>' +
       '<label title="How many times each tile is split again (standard 3)">Sub-tiles <input type="number" id="ct_tsub" min="1" max="4" step="1"></label>' +
       '<button class="ct-tapply" id="ct_tapply">Apply</button></div>' +
       '<p class="ct-tnote" id="ct_tnote"></p>' +
+      // V16: what the fine alignment did
+      '<div class="ct-check"><label title="Colours and arrows over the picture: how far, and in which direction, the fine alignment moved each part of copy 2"><input type="checkbox" id="ct_mv"> Movement map</label></div>' +
       // V2b: the printed area, shown and corrected by hand (js/compare-box.js)
       '<div class="ct-check ct-boxrow"><label title="Show the area the alignment works on; its corners can be dragged"><input type="checkbox" id="ct_box"> Printed area</label>' +
       '<button class="ct-tadvbtn" id="ct_boxauto" hidden title="Forget the shape set by hand and use the box found automatically">Back to automatic</button></div>' +
       '<p class="ct-tnote" id="ct_boxnote" hidden></p>' +
-      // V16: what the fine alignment did - movement map, the rough alignment alone, and the hint for sharp shifts
-      '<div class="ct-check"><label title="Colours over the picture: how far the fine alignment moved each part of copy 2"><input type="checkbox" id="ct_mv"> Movement map</label>' +
-      '<label title="Show copy 2 placed by the whole-page step only, without the fine alignment in tiles"><input type="checkbox" id="ct_rough"> Without fine alignment</label></div>' +
-      '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span><br><b class="ct-mvarr">&#8599;</b> arrows: the direction in which that part of copy 2 was moved (longer = moved further; drawn longer than the real shift)</p>' +
+      '</div></div>' +
+      '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span><br><b class="ct-mvarr">&#8599;</b> arrows: the direction in which that part of copy 2 was moved (drawn longer than the real shift)</p>' +
       '<p class="ct-hint" id="ct_hint" hidden></p>' +
       '<div class="ct-warn" id="ct_warn" hidden></div>' +
-      // B5: what the comparison cannot show (owner 18 Nov / 21 Nov)
-      '<details class="ct-help" id="ct_help"><summary>What the comparison cannot show</summary><ul>' +
-      '<li><b>Lighter inks.</b> Only dark ink takes part in the alignment and in the differences. Red print (staves, rubrics, initials) and other light colours are not looked at: a difference that exists only in red ink cannot be seen here. Look at the two scans side by side for those.</li>' +
-      '<li><b>Small shifts.</b> The fine alignment bends small parts of the page onto each other. A line, a note or a block moved by a few pixels (up to about one staff space) is pulled into place and does not show as a difference. “Movement map” and “Without fine alignment” show where the alignment moved something; a sharp shift of about 15 px or more is pointed out. Shifts of a few pixels cannot be detected at all.</li>' +
-      '<li><b>Tile settings.</b> “More flexible” can pull real differences into place; “Stiffer” is safer but shows more differences that are only paper and scanning.</li>' +
-      '<li><b>Pages with almost no ink</b> (title pages, blank pages) are placed by the whole-page step only.</li>' +
-      '<li><b>Outside the printed area</b> set by hand nothing is aligned; there the picture only follows the nearest aligned parts.</li>' +
-      '<li><b>Paper and scanning</b> (stains, show-through, pencil, a curved page, a dark binding edge) can show as differences. A wrong page in one copy shows as a page full of differences (more than 30 % of the ink without partner is pointed out).</li>' +
-      '</ul></details></div>' +
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
@@ -150,11 +142,17 @@
     ui.tealbar = tealbar;
     ui.rc = rc;
     [ui.top, ui.side, ui.bar, ui.view].forEach(function (e) { e.hidden = true; });
+    // the coloured edge of the two copy boxes shows the colours chosen for the Superimposed view (0.11.0)
+    var paintCopies = function () {
+      try { ui.side.style.setProperty('--ct-c1', DIFF_COLOR_1); ui.side.style.setProperty('--ct-c2', DIFF_COLOR_2); } catch (e) { /* viz.js not loaded */ }
+    };
+    paintCopies();
+    document.addEventListener('diffcolorschange', paintCopies);
 
     var $ = function (id) { return document.getElementById(id); };
     ui.c1 = $('ct_c1'); ui.c2 = $('ct_c2'); ui.list = $('ct_list'); ui.q = $('ct_q'); ui.where = $('ct_where');
     ui.vpill = $('ct_vpill'); ui.vpop = $('ct_vpop'); ui.vlab = $('ct_vlab'); ui.vdots = $('ct_vdots');
-    ui.tf = $('ct_tf'); ui.skip = $('ct_skip');
+    ui.skip = $('ct_skip');
     ui.filters = $('ct_filters'); ui.fcols = $('ct_fcols'); ui.flag = $('ct_flag'); ui.pal = $('ct_flagpal');
     ui.svg = $('ct_mapsvg'); ui.tip = $('ct_tip'); ui.hov = $('ct_maphov'); ui.pin = $('ct_pin');
     ui.flagpath = $('ct_flagpath'); ui.flagpath.setAttribute('d', W().flagPath);
@@ -191,19 +189,24 @@
     });
     ui.leave.onclick = function () { setFocus(false); };
     $('ct_tab_pages').onclick = toPages;
-    $('ct_swap').onclick = function () { W().swap(); afterCopies(); };
     ui.c1.onchange = function () { W().setCopy(0, ui.c1.value); afterCopies(); };
     ui.c2.onchange = function () { W().setCopy(1, ui.c2.value); afterCopies(); };
     $('ct_c2up').onclick = function () { stepCopy(1, -1); };
     $('ct_c2dn').onclick = function () { stepCopy(1, 1); };
-    ui.tf.onchange = function () { st.transform = ui.tf.value; E.compare.current_transform = st.transform; st.lastTiles = null; st.fineImg = null; renderTiles(); markStale(); drawMovement(); if (window.CompareBox) CompareBox.refresh(); schedule(80); };
     ui.tiles = $('ct_tiles');
+    // the section "Alignment of this page" is folded at first; whether it is open is remembered on this computer
+    var alOpen = false; try { alOpen = localStorage.getItem('bookcompare_alsec') === 'open'; } catch (x) { /* private mode */ }
+    var setAl = function (open, keep) {
+      $('ct_albody').hidden = !open; $('ct_alhead').setAttribute('aria-expanded', String(open)); ui.tiles.classList.toggle('open', open);
+      if (keep) { try { localStorage.setItem('bookcompare_alsec', open ? 'open' : 'folded'); } catch (x) { /* private mode */ } }
+    };
+    setAl(alOpen, false);
+    $('ct_alhead').onclick = function () { setAl($('ct_albody').hidden, true); };
     ui.tiles.querySelector('.ct-seg').onclick = function (e) {
       var b = e.target.closest('button[data-tp]'); if (!b) return;
       setTiles(PRESETS[b.dataset.tp]);
     };
     $('ct_mv').onchange = function () { st.mvOn = this.checked; drawMovement(); };
-    $('ct_rough').onchange = function () { showRough(this.checked); };
     $('ct_tadvbtn').onclick = function () { var a = $('ct_tadv'); a.hidden = !a.hidden; this.setAttribute('aria-expanded', String(!a.hidden)); };
     $('ct_tapply').onclick = function () {
       var m = Math.round(+$('ct_tmain').value), u = Math.round(+$('ct_tsub').value);
@@ -261,6 +264,35 @@
       if (st.on && w > 0 && Math.abs(w - mapW) >= 1) renderMap();
     }).observe(ui.svg);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('openpaper', function () { if (st.on) paperDialog(); });
+  }
+
+  // "Paper …" next to the colour legend (0.11.0): blank paper is made white automatically (measured on the page itself and part by
+  // part); where a copy's paper still shows its colour (stains, a grey photo, show-through) it can be made whiter, per copy, display only
+  var PAPER_L = [0, 0.5, 1];
+  function setPaperNow() {
+    var s = W().state();
+    window.BC_PAPER = [PAPER_L[W().paper(s.pair[0])] || 0, PAPER_L[W().paper(s.pair[1])] || 0];
+  }
+  function paperDialog() {
+    var s = W().state(), names = [copyName(0), copyName(1)], cols = [DIFF_COLOR_1, DIFF_COLOR_2];
+    var row = function (k) {
+      var v = W().paper(s.pair[k]);
+      return '<div class="ct-prow"><span class="ct-psw" style="background:' + cols[k] + '"></span><b>' + esc(names[k]) + '</b><div class="ct-seg" data-k="' + k + '" role="group" aria-label="Paper of ' + esc(names[k]) + '">' +
+        [['0', 'Normal'], ['1', 'Whiter'], ['2', 'Whitest']].map(function (o) { return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + (String(v) === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+    };
+    var sc = W().modal('<h3>Paper</h3><p>Before the two copies are laid over each other, Book Compare makes blank paper white. Where the paper of a copy still shows that copy’s colour (a stain, a grey photo, ink showing through from the other side of the leaf), make it whiter here.</p>' +
+      row(0) + row(1) +
+      '<p class="ct-pnote">Only the picture on screen changes, not the alignment. The setting is kept for the copy in the project. “Whitest” can also make very pale ink disappear.</p>' +
+      '<div class="acts"><button class="ws-tb primary" data-close>Done</button></div>');
+    if (!sc) return;
+    sc.addEventListener('click', function (e) {
+      var b = e.target.closest('.ct-seg button[data-v]'); if (!b) return;
+      var k = +b.parentNode.dataset.k, v = +b.dataset.v;
+      b.parentNode.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      W().setPaper(W().state().pair[k], v); setPaperNow();
+      document.dispatchEvent(new CustomEvent('paperchange'));
+    });
   }
 
   /* ---------------------------------------------------------------- showing the pieces */
@@ -349,7 +381,8 @@
     var t = W().tileSetting(s.row, s.pair[1]), cur = !t ? 'std' : (t.main === 8 && t.sub === 2) ? 'stiff' : (t.main === 8 && t.sub === 4) ? 'flex' : 'custom';
     Array.prototype.forEach.call(ui.tiles.querySelectorAll('.ct-seg button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.tp === cur)); });
     $('ct_tmain').value = t ? t.main : 8; $('ct_tsub').value = t ? t.sub : 3;
-    $('ct_tlab').textContent = 'Fine alignment of ' + copyName(1) + ' on this page';
+    $('ct_alval').textContent = cur === 'std' ? 'Standard' : cur === 'stiff' ? 'Stiffer' : cur === 'flex' ? 'Flexible' : t.main + ' × ' + t.sub;
+    $('ct_alhead').title = 'How ' + copyName(1) + ' is bent onto ' + copyName(0) + ' on this page: tile settings, movement map, printed area';
     var looser = t && (t.sub > 3 || t.main > 8);
     $('ct_tnote').textContent = !t ? '' : 'Only for ' + copyName(1) + ' on this page' + (cur === 'custom' ? ' (' + t.main + ' main tiles, ' + t.sub + ' sub-tiles)' : '') + '.' +
       (looser ? ' More flexible settings can also pull real differences into place.' : '');
@@ -415,7 +448,7 @@
     h.hidden = false;
     h.title = 'Part of this page was moved by about ' + m.hint.px + ' px by the fine alignment, with a sharp edge: a line or block may have been re-set or shifted here.';
     h.innerHTML = '<b>Shifted block, about ' + m.hint.px + ' px</b> <button class="ct-hintbtn" id="ct_hintshow">Show</button>';
-    $('ct_hintshow').onclick = function () { $('ct_mv').checked = true; st.mvOn = true; if (st.roughOn) { $('ct_rough').checked = false; showRough(false); } drawMovement(); };
+    $('ct_hintshow').onclick = function () { $('ct_mv').checked = true; st.mvOn = true; drawMovement(); };
   }
   // the rough view: copy 2 placed by the whole-page step only; switching back shows the fine result again (kept, not computed again)
   async function showRough(on) {
@@ -428,7 +461,7 @@
       var r = await serial(function () { return eng && eng.ready ? eng.e.roughColor() : null; });
       if (my !== st.token || !st.roughOn) return;
       if (r) E.compare.show_aligned(st.fineNames, new ImageData(new Uint8ClampedArray(r.pixels), r.w, r.h));
-    } catch (e) { note('The rough view could not be shown (' + ((e && e.message) || e) + ').'); $('ct_rough').checked = false; st.roughOn = false; }
+    } catch (e) { note('The rough view could not be shown (' + ((e && e.message) || e) + ').'); st.roughOn = false; }
     setBusy(null); drawMovement();
   }
   function setTiles(t) {
@@ -438,8 +471,37 @@
   }
   function render() {
     var s = W().state();
-    renderCopies(s); renderList(); renderBar(s); renderMap(s); renderView(); layout();
-    ui.tf.value = st.transform;
+    renderCopies(s); renderList(); renderBar(s); renderMap(s); renderView(); layout(); renderExCard();
+  }
+
+  /* ---------------------------------------------------------------- the examples project (0.11.0, js/examples.js): a card per example */
+  var exHidden = {};
+  function renderExCard() {
+    var pane = document.getElementById('pane_main'); if (!pane) return;
+    var card = document.getElementById('ct_excard');
+    var X = window.BCExamples, s = st.on && W().examples() ? W().state() : null, ex = s && X && X.list[s.row];
+    if (!ex || exHidden[s.row]) { if (card) card.hidden = true; return; }
+    if (!card) {
+      card = el('div', 'ct-excard'); card.id = 'ct_excard'; card.setAttribute('role', 'note');
+      pane.appendChild(card);
+      card.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-ex]'); if (!b) return;
+        var a = b.dataset.ex;
+        if (a === 'close') { exHidden[W().state().row] = true; renderExCard(); }
+        else if (a === 'next') stepPage(1);
+        else if (a === 'own') { toPages(); BookWorkspace.startAction('new'); }
+      });
+    }
+    var n = X.list.length, last = s.row >= n - 1;
+    var sq = function (c) { return '<span class="sq" style="background:' + c + '"></span>'; };
+    card.innerHTML = '<button class="x" data-ex="close" aria-label="Close this note" title="Close this note">&times;</button>' +
+      '<div class="k">Example ' + (s.row + 1) + ' of ' + n + '</div><h4>' + esc(ex.title) + '</h4><p>' + esc(ex.text) + '</p>' +
+      (ex.welcome ? '<p class="leg">' + sq(DIFF_COLOR_1) + ' only in copy A &nbsp; ' + sq(DIFF_COLOR_2) + ' only in copy B &nbsp; ' + sq('#2a1a24') + ' in both</p>' +
+        '<p>Page Down (or the arrow at the bottom) goes to the next example. The “?” at the top explains the rest.</p>' : '') +
+      '<div class="acts">' + (last ? '' : '<button class="ct-btn pri" data-ex="next">Next example &#8250;</button>') +
+      '<button class="ct-btn' + (last ? ' pri' : '') + '" data-ex="own">Start your own project</button></div>' +
+      (ex.welcome ? '<small>' + esc(X.credit) + '</small>' : '');
+    card.hidden = false;
   }
 
   /* ---------------------------------------------------------------- flags */
@@ -649,7 +711,7 @@
   function goRow(i) {
     var s = W().state();
     if (i === s.row && !st.stale) return;
-    closePalette(); W().setRow(i); markCurrent(); renderBar(); markStale(); schedule(350);
+    closePalette(); W().setRow(i); markCurrent(); renderBar(); markStale(); schedule(350); renderExCard();
     if (st.focus) { var r = W().rowInfo(i); toast(r.label + ' · position ' + (i + 1) + ' of ' + s.rows + (r.flag != null ? ' · flagged' : '')); }
   }
   function stepPage(dir) {
@@ -683,6 +745,8 @@
     else if (e.key === 'PageDown') stepPage(1);                                              // (the arrow keys are left alone: they move the picture)
     else if (e.key === 'PageUp') stepPage(-1);
     else if (/^[1-6]$/.test(e.key) && !e.shiftKey) setView(+e.key - 1, true);
+    else if (e.key === ',') stepCopy(1, -1);                                                 // previous / next copy as copy 2 (item 6a)
+    else if (e.key === '.') stepCopy(1, 1);
     else return;
     e.preventDefault();
   }
@@ -695,6 +759,7 @@
       '<table class="ct-keytbl"><tbody>' +
       '<tr><td>' + k('Page Down') + ' ' + k('Page Up') + '</td><td>next / previous page</td></tr>' +
       '<tr><td>' + k('1') + ' … ' + k('6') + '</td><td>view: 1 Superimposed, 2 Toggle, 3 Top and bottom, 4 Left and right, 5 Copy 1, 6 Copy 2</td></tr>' +
+      '<tr><td>' + k(',') + ' ' + k('.') + '</td><td>previous / next copy as copy 2</td></tr>' +
       '<tr><td>' + k('F') + '</td><td>flag this page (or take the flag away)</td></tr>' +
       '<tr><td>arrow keys</td><td>move the picture (click the picture first)</td></tr>' +
       '<tr><td>mouse wheel</td><td>zoom in and out</td></tr>' +
@@ -705,7 +770,18 @@
       '<li><b>Copy 1 and copy 2</b> can be shown in two small panels beside the superimposed picture: the strip at the right edge opens them.</li>' +
       '<li><b>Copy 2 view</b> (key 6): <b>Aligned</b> shows copy 2 as the alignment moved it, <b>Original scan</b> as it was scanned. Copy 1 is never changed.</li>' +
       '<li><b>Movement map</b> (left panel) colours the parts of copy 2 that the fine alignment moved, with arrows for the direction.</li>' +
+      '<li><b>Alignment of this page</b> (left panel, folded at first): Stiffer / Standard / Flexible sets how small the pieces of copy 2 may be that move on their own; the movement map shows what moved; “Printed area” shows the area that is aligned, and its corners can be dragged.</li>' +
+      '<li><b>Annotations:</b> the pen button in the zoom column of the superimposed picture (above the ▲ arrow) unfolds the tools: circle, rectangle, text note, colour, and the eye that hides all annotations. A small orange dot on the pen means that this page has annotations.</li>' +
       '<li>The arrows button at the top right is <b>focus mode</b>: only the pictures. Esc brings everything back.</li></ul>' +
+      // B5: what the comparison cannot show (owner 18 Nov / 21 Nov; was at the bottom of the left panel)
+      '<details class="ct-help" id="ct_help"><summary>What the comparison cannot show</summary><ul>' +
+      '<li><b>Lighter inks.</b> Only dark ink takes part in the alignment and in the differences. Red print (staves, rubrics, initials) and other light colours are not looked at: a difference that exists only in red ink cannot be seen here. Look at the two scans side by side for those.</li>' +
+      '<li><b>Small shifts.</b> The fine alignment bends small parts of the page onto each other. A line, a note or a block moved by a few pixels (up to about one staff space) is pulled into place and does not show as a difference. The movement map shows where the alignment moved something; a sharp shift of about 15 px or more is pointed out. Shifts of a few pixels cannot be detected at all.</li>' +
+      '<li><b>Tile settings.</b> “Flexible” can pull real differences into place; “Stiffer” is safer but shows more differences that are only paper and scanning.</li>' +
+      '<li><b>Pages with almost no ink</b> (title pages, blank pages) are placed by the whole-page step only.</li>' +
+      '<li><b>Outside the printed area</b> set by hand nothing is aligned; there the picture only follows the nearest aligned parts.</li>' +
+      '<li><b>Paper and scanning</b> (stains, show-through, pencil, a curved page, a dark binding edge) can show as differences. A photo taken at a slant is straightened as a whole first; a wrong page in one copy shows as a page full of differences (more than 30 % of the ink without partner is pointed out).</li>' +
+      '</ul></details>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
   }
 
@@ -819,20 +895,20 @@
     await frames(2);
     if (my !== st.token) return;
     var done = false, tiles = st.transform === 'tiles' && d.files, info = null;
+    setPaperNow();
     window.BC_COPY_NAMES = [copyName(0), copyName(1)];                                       // the colour note of the Difference view names the copies (js/panes.js)
     try {
       if (tiles) { d.tiles = W().tileSetting(s.row, s.pair[1]); d.quad = W().boxSetting(s.row, s.pair[0]); info = await serial(function () { return tileJob(d, my); }); done = !!info; }
       else done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; });
     }
     catch (e) {
-      if (my === st.token) setBusy('Book Compare could not align these two pages (' + ((e && e.message) || e) + '). Try another alignment (left panel) or another page.', true,
-        tiles ? [['Try Perspective', function () { ui.tf.value = 'perspective'; ui.tf.onchange(); }], ['Go to the pages', toPages]]
-          : [['Try Affine', function () { ui.tf.value = 'affine'; ui.tf.onchange(); }], ['Go to the pages', toPages]]);
+      if (my === st.token) setBusy('Book Compare could not align these two pages (' + ((e && e.message) || e) + '). Try another setting under “Alignment of this page”, correct the printed area, or go to another page.', true,
+        [['Stiffer', function () { setTiles(PRESETS.stiff); }], ['Go to the pages', toPages]]);
       return;
     }
     if (!done || my !== st.token) return;
     st.lastTiles = info;                                                                     // (unmatched ink, near-empty page, movement map: tests and V16)
-    st.mvStamp = (st.mvStamp || 0) + 1; st.roughOn = false; $('ct_rough').checked = false;
+    st.mvStamp = (st.mvStamp || 0) + 1; st.roughOn = false;
     if (!info) st.fineImg = null;
     drawMovement(); showHint(); showMismatch();
     st.shown = key(s); st.shownRow = s.row; st.shownPair = s.pair.slice();
@@ -871,7 +947,7 @@
   }
   function toPages() {
     st.token++; clearTimeout(st.timer); setBusy(null); closePalette(); hideTip();
-    st.focus = false; st.on = false; layout(); closeView();
+    st.focus = false; st.on = false; layout(); closeView(); renderExCard();
     window.BC_COPY_NAMES = null; window.BC_PANE_NAMES = null;
     W().showPages();
   }

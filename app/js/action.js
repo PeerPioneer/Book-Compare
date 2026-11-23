@@ -39,9 +39,9 @@ class Action {
         }
 
         this.draw = this._draw.bind(this);
-        document.addEventListener('diffcolorschange', () => {
+        ['diffcolorschange', 'paperchange'].forEach((ev) => document.addEventListener(ev, () => {
             if (this.result && this.MODE === 'diff') this.result.draw_diff_image();
-        });
+        }));
         this.updating = false;
 
         const { add: hover_add, remove: hover_remove } = this.hoverSwitch(this.result_container);

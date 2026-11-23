@@ -5,7 +5,7 @@
   --ws-bg: #f6f9f9; --ws-surface: #ffffff; --ws-line: #cfdcdc; --ws-line-soft: #e2ebeb; --ws-fg: #1b2a2a; --ws-muted: #5a6d6d;
   --ws-teal: #008080; --ws-band: #e1f1f1; --ws-sel: #bfe3e3; --ws-hatch: #eef3f3;
   --ws-ok: #2e7d32; --ws-bad: #c62828; --ws-warn: #a85d00; --ws-note-bg: #fff6df; --ws-note-line: #e8cf8c;
-  --ws-c1: #e60000; --ws-c2: #00961e;
+  --ws-c1: #0046c8; --ws-c2: #e60000;
   --ws-shadow: 0 2px 10px rgba(0, 40, 40, .18);
   --ws-mono: ui-monospace, Consolas, "Roboto Mono", monospace;
 }
@@ -241,3 +241,12 @@
 .ws-corner .ws-rz { right: -5px; }
 /* a page aligned onto the reference copy and stored (item 21) */
 .ws-cell .ws-st { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ws-teal); margin-left: 4px; box-shadow: 0 0 0 1.5px var(--ws-surface); }
+
+/* 0.11.0: pictures in the grid (toolbar "Pictures in the grid", kept in the project) */
+.ws-tb.ws-tog { display: inline-flex; align-items: center; gap: 5px; }
+.ws-tb.ws-tog[aria-pressed="true"] { background: var(--ws-sel); border-color: var(--ws-teal); color: var(--ws-teal-dark, #00605c); }
+.ws.ws-pics .ws-cell { align-items: center; padding: 6px 8px; }
+.ws-cell .tn { flex: 0 0 60px; width: 60px; height: 84px; display: grid; place-items: center; background: var(--ws-line-soft); border-radius: 2px; overflow: hidden; }
+.ws-cell .tn img { max-width: 60px; max-height: 84px; display: block; box-shadow: 0 0 0 1px rgba(0, 0, 0, .12); }
+.ws.ws-pics .ws-cell .fn { white-space: normal; word-break: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; line-height: 1.25; font-size: 12px; }
+.ws-menu button .ws-mdesk { display: block; font-size: 11.5px; color: var(--ws-muted); margin-top: 1px; }

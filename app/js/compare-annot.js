@@ -16,7 +16,7 @@
 
   var H = null;                         // { W: () => BookWorkspace.tab, shown: () => {row, pair} | null, stale: () => bool, say: (text) => void, changed: () => void }
   var ui = null;
-  var st = { tool: 'select', col: 0, on: true, sel: null, row: -1, draft: null, typed: false, active: false };
+  var st = { tool: 'select', col: 0, on: true, sel: null, row: -1, draft: null, typed: false, active: false, open: false };   // open: the tools are unfolded (0.11.0: folded behind the pen button by default)
 
   var ICON = {
     select: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5 3l14 8-6 2-2 6z"/></svg>',
@@ -25,6 +25,7 @@
     note: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>',
     eye: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>',
     eyeoff: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>',
+    pen: '<svg viewBox="0 0 24 24" aria-hidden="true" class="fill"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zm17.71-10.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>',
     trash: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
   };
   var TOOLS = [['select', 'Select, move and resize an annotation'], ['ellipse', 'Circle: drag on the picture'], ['rect', 'Rectangle: drag on the picture'], ['note', 'Text note: click on the picture']];
@@ -93,6 +94,29 @@
     var t = st.on ? 'Hide annotations' : 'Show annotations';
     ui.eye.title = t; ui.eye.setAttribute('aria-label', t);
     ui.main.box.classList.toggle('draw', st.tool !== 'select');
+    ui.tools.classList.toggle('open', st.open);
+    if (ui.pen) {
+      ui.pen.setAttribute('aria-expanded', String(st.open));
+      ui.pen.classList.toggle('on', st.open);
+      var n = st.active && H.shown() ? W().annList(H.shown().row).length : 0;
+      var pt = (st.open ? 'Hide the annotation tools' : 'Annotate: circle, rectangle, text note') + (n ? ' (' + n + ' on this page)' : '');
+      ui.pen.title = pt; ui.pen.setAttribute('aria-label', pt);
+      ui.pen.classList.toggle('has', n > 0);
+      placeTools();
+    }
+  }
+  // the unfolded tools stand in a column to the left of the pen button
+  function placeTools() {
+    if (!ui || !ui.pen || !st.open) return;
+    var pr = ui.main.pane.getBoundingClientRect(), br = ui.pen.getBoundingClientRect();
+    if (!br.height) return;
+    ui.tools.style.top = Math.max(4, br.top - pr.top) + 'px';
+  }
+  function setOpen(on) {
+    st.open = !!on;
+    if (!st.open) { st.tool = 'select'; st.draft = null; closePalette(); }
+    renderAll();
+    if (st.open) { var b = ui.tools.querySelector('button[data-t=select]'); if (b) b.focus(); }
   }
   function closePalette() { if (ui && ui.pal) ui.pal.hidden = true; }
   function openPalette() {
@@ -217,6 +241,17 @@
       '<span class="ct-tsep"></span><button class="ct-acol" id="ct_acol" aria-haspopup="true"></button><span class="ct-tsep"></span>' +
       '<button class="ct-tbtn" id="ct_aeye" aria-pressed="false"></button><div class="ct-apal" id="ct_apal" hidden role="group" aria-label="Annotation colour"></div>';
     ui.main.pane.appendChild(ui.tools);
+    // the pen button in the zoom column of the superimposed picture, right above the "Scroll up" arrow (owner, 23 Nov 2026)
+    var vbar = ui.main.pane.querySelector('.pane__vbar');
+    if (vbar) {
+      ui.pen = el('button', 'pane__btn ct-penbtn', ICON.pen); ui.pen.type = 'button'; ui.pen.id = 'ct_pen';
+      ui.pen.setAttribute('aria-expanded', 'false'); ui.pen.setAttribute('aria-controls', 'ct_atools');
+      var up = vbar.querySelector('.pane__btn[title="Scroll up"]');
+      vbar.insertBefore(ui.pen, up || vbar.firstChild.nextSibling);
+      ui.pen.addEventListener('click', function () { setOpen(!st.open); });
+      if (window.ResizeObserver) new ResizeObserver(placeTools).observe(ui.main.pane);
+    } else st.open = true;
+    ui.tools.id = 'ct_atools';
     ui.acol = ui.tools.querySelector('#ct_acol'); ui.eye = ui.tools.querySelector('#ct_aeye'); ui.pal = ui.tools.querySelector('#ct_apal');
 
     ui.tools.addEventListener('click', function (e) {
@@ -279,6 +314,7 @@
         if (ui.pal && !ui.pal.hidden) { closePalette(); return true; }
         if (st.sel != null) { st.sel = null; renderAll(); return true; }
         if (st.tool !== 'select') { st.tool = 'select'; renderAll(); return true; }
+        if (st.open && ui.pen && ui.tools.contains(document.activeElement)) { setOpen(false); ui.pen.focus(); return true; }
       }
       return false;
     }

@@ -1,16 +1,27 @@
-"""Visualization modes of the two-image screen (Chromium, no helper needed).
+"""The examples project and the views of the Compare tab (Chromium, no helper needed).
 
-Loads one of the sample pairs, presses Compare, then walks through every entry of the Visualization menu and checks that
- * the menu offers exactly: Superimposed, Toggle, Top and bottom, Left and right, Only image 1, Only image 2 (the Slide mode is gone),
- * every mode can be chosen without a script error and without breaking the picture panels,
- * nothing of the old Slide mode is left on the page (its bar, its slider line, its Horizontal/Vertical switch).
+0.11.0: the old two-image screens of Image Compare ("Compare two single pictures", "Try the samples") are gone. "Try the examples" on
+the start screen opens a small project made of pictures that come with Book Compare; this test checks that
+ * the start screen offers "Try the examples" and no longer the two old links,
+ * the examples open in the Compare tab at the welcome page, with its card; the page list holds one row per example,
+ * every example aligns, and the card follows the page ("Next example" goes on),
+ * every view (keys 1-6: Superimposed, Toggle, Top and bottom, Left and right, Copy 1, Copy 2) can be chosen without a script
+   error and shows a picture,
+ * nothing is saved: the chip says so, Ctrl+S explains it, and "Start your own project" leads to an empty project.
 Run:  python3 -m http.server 8765 -d app   (in the repository folder), then   python3 tests/workspace/test_modes.py"""
 import sys
 from playwright.sync_api import sync_playwright
 import common
 from common import URL, errs
 
-EXPECT = ['diff', 'toggle', 'topbottom', 'leftright', 'onlyimage1', 'onlyimage2']
+VIEWS = ['diff', 'toggle', 'topbottom', 'leftright', 'onlyimage1', 'onlyimage2']
+
+def wait_aligned(pg, why, secs=120):
+    for _ in range(secs * 4):
+        pg.wait_for_timeout(250)
+        if pg.evaluate("!document.querySelector('.ct-busy').offsetParent && !document.querySelector('div.result_container').classList.contains('ct-stale')"): return
+        if pg.locator('.ct-busy.bad:visible').count(): raise AssertionError(why + ': ' + pg.inner_text('.ct-busy'))
+    raise AssertionError(why + ': the alignment did not finish. ' + pg.inner_text('.ct-busy'))
 
 def main():
     with sync_playwright() as p:
@@ -19,49 +30,49 @@ def main():
         pg.on('pageerror', lambda e: errs.append('PAGEERROR ' + str(e)))
         pg.on('console', lambda m: errs.append('CONSOLE ' + m.text) if m.type == 'error' and '/api/' not in (m.location or {}).get('url', '') else None)
         pg.goto(URL); pg.wait_for_timeout(900)
-        for _ in range(8):                                                   # the first-visit tour
-            btn = pg.locator('#onboarding button:visible').last
-            if btn.count() == 0: break
-            txt = btn.inner_text().strip(); btn.click(); pg.wait_for_timeout(300)
-            if 'NEXT' not in txt.upper(): break
 
-        # a sample pair -> Compare screen -> Compare
-        pg.click('#try_samples_btn'); pg.wait_for_timeout(500)
-        pg.locator('.samples li.mdc-list-item').first.click(); pg.wait_for_timeout(800)
-        pg.click('#compare')
-        pg.wait_for_function("document.querySelector('#visualisation_select') && !document.querySelector('#visualisation_select').classList.contains('hide')", timeout=90000)
-        pg.wait_for_timeout(1500)
+        # the start screen
+        assert pg.is_visible('#start_examples') and 'Try the examples' in pg.inner_text('#start_examples')
+        assert pg.locator('#image_select_btn').count() == 0 and pg.locator('#try_samples_btn').count() == 0 and pg.locator('div.samples').count() == 0, 'the old two-image entries are gone'
 
-        # 1. the menu
-        pg.click('#visualisation_select .mdc-select__anchor'); pg.wait_for_timeout(400)
-        values = pg.eval_on_selector_all('#visualisation_select li[data-value]', 'els => els.map(e => e.dataset.value)')
-        assert values == EXPECT, 'Visualization menu offers ' + str(values) + ', expected ' + str(EXPECT)
-        names = pg.eval_on_selector_all('#visualisation_select li[data-value]', 'els => els.map(e => e.innerText.trim())')
-        assert not any('slide' in n.lower() for n in names), 'a Slide entry is still in the menu: ' + str(names)
-        pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+        # the examples: Compare tab, welcome page and its card
+        pg.click('#start_examples')
+        pg.wait_for_function("document.querySelector('.ct-top') && document.querySelector('.ct-top').offsetParent", timeout=60000)
+        wait_aligned(pg, 'welcome page')
+        n = pg.evaluate("BCExamples.list.length")
+        assert pg.locator('#ct_list li[data-i]').count() == n and 'Welcome' in pg.inner_text('#ct_list li[data-i="0"]'), pg.inner_text('#ct_list')
+        assert pg.is_visible('#ct_excard') and 'Welcome to Book Compare' in pg.inner_text('#ct_excard') and 'example 1 of %d' % n in pg.inner_text('#ct_excard').lower()
+        t = pg.evaluate("CompareTab.lastTiles()"); assert t and t['unmatched_tiles'] < 0.2, ('the welcome pair aligns', t)
+        assert 'Examples' in pg.inner_text('.ct-top') and 'not saved' in pg.inner_text('.ct-top'), pg.inner_text('.ct-top')
+        pg.evaluate("document.activeElement && document.activeElement.blur()")
+        pg.keyboard.press('Control+s'); pg.wait_for_timeout(300)
+        assert 'not saved' in pg.inner_text('.ct-toast'), pg.inner_text('.ct-toast')
 
-        # 2. nothing of the old mode is left
-        left = pg.evaluate("""() => ({ slideBar: !!document.getElementById('slide'), seg: !!document.getElementById('slide_seg'),
-            line: !!document.querySelector('.image_slider'), radios: !!document.querySelector('input[name=radio-slider]') })""")
-        assert not any(left.values()), 'leftovers of the Slide mode on the page: ' + str(left)
-
-        # 3. every mode can be chosen, and the picture panels stay usable
-        for v in EXPECT * 2:                                                 # twice, so that coming back from every mode is tested
-            pg.click('#visualisation_select .mdc-select__anchor'); pg.wait_for_timeout(350)
-            pg.click('#visualisation_select li[data-value="%s"]' % v); pg.wait_for_timeout(600)
-            shown = pg.evaluate("document.querySelector('#visualisation_select .mdc-select__selected-text').textContent.trim()")
-            assert shown, 'no mode name shown after choosing ' + v
+        # every view on the welcome page
+        for v in VIEWS * 2:                                                   # twice, so that coming back from every view is tested
+            pg.keyboard.press(str(VIEWS.index(v) + 1)); pg.wait_for_timeout(500)
+            assert pg.evaluate("CompareTab.view ? CompareTab.view() : null") in (v, None)
             vis = pg.evaluate("""() => [...document.querySelectorAll('#compare_container canvas')].filter(c => c.offsetWidth > 20 && c.offsetHeight > 20).length""")
-            assert vis >= 1, 'no picture visible in mode ' + v
-            print('ok ', v, '->', shown, '(', vis, 'picture panel(s) )')
+            assert vis >= 1, 'no picture visible in view ' + v
+            print('ok ', v, '(', vis, 'picture panel(s) )')
+        pg.keyboard.press('1'); pg.wait_for_timeout(300)
 
-        # 4. zoom buttons still work after all that
-        pg.click('#zoom_in') if pg.locator('#zoom_in').count() else None
-        pg.wait_for_timeout(300)
+        # the other examples, one after the other with the card's button
+        for i in range(1, n):
+            pg.click('#ct_excard [data-ex=next]'); wait_aligned(pg, 'example %d' % (i + 1))
+            assert pg.evaluate("BookWorkspace.tab.state().row") == i and ('example %d of %d' % (i + 1, n)) in pg.inner_text('#ct_excard').lower()
+            t = pg.evaluate("CompareTab.lastTiles()"); print('ok  example', i + 1, pg.evaluate("BCExamples.list[%d].label" % i), 'unmatched %.1f %%' % (100 * t['unmatched_tiles']))
+            assert t['unmatched_tiles'] < 0.45, t
+        assert pg.locator('#ct_excard [data-ex=next]').count() == 0, 'the last example has no "Next"'
+        pg.click('#ct_excard [data-ex=close]'); pg.wait_for_timeout(200); assert not pg.is_visible('#ct_excard'), 'the card can be closed'
+
+        # "Start your own project": an empty project, nothing of the examples is left
+        pg.click('#ct_prev'); wait_aligned(pg, 'back one'); pg.click('#ct_excard [data-ex=own]'); pg.wait_for_timeout(800)
+        assert pg.is_visible('#ws') and pg.locator('#ws .ws-empty').count() == 1 and pg.locator('#ws .ws-hname').count() == 0, 'an empty new project'
         b.close()
     bad = [e for e in errs if 'favicon' not in e]
     assert not bad, 'script errors: ' + '; '.join(bad[:5])
-    print('MODES OK')
+    print('EXAMPLES AND VIEWS OK')
 
 if __name__ == '__main__':
     try: main()

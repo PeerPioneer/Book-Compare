@@ -336,7 +336,7 @@
     return out.join(win ? '\\' : '/') || null;
   }
   function blank() {
-    return { title: '', lblw: 0, projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
+    return { title: '', lblw: 0, projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, paper: {}, thumbs: false, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -411,6 +411,8 @@
     return Math.abs(a) / 2 > 0.02 ? v : null;
   }
   function cleanBoxes(o) { var out = {}; if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { var q = /^\d+\|.+$/.test(k) && cleanQuad(o[k]); if (q) out[k] = q; }); return out; }
+  // 0.11.0: "whiter paper" per copy (display only: 1 = whiter, 2 = whitest), keyed by copy id
+  function cleanPaper(o) { var out = {}; if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { var v = +o[k]; if (/^\d+$/.test(k) && (v === 1 || v === 2)) out[k] = v; }); return out; }
   function maxAnnId() { var m = 0; Object.keys(S.annots).forEach(function (k) { S.annots[k].forEach(function (a) { if (a.id > m) m = a.id; }); }); return m; }
   function findAnnot(row, id) { var l = S.annots[row] || []; for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
   function selected() {
@@ -692,15 +694,15 @@
   }
 
   /* ---------------------------------------------------------------- thumbnails (small copies made in the browser; the scans are not changed) */
-  var thumbMem = new Map(), thumbQueue = [], thumbActive = 0, THUMB_W = 260, thumbFail = {};
+  var thumbMem = new Map(), thumbUrl = new Map(), thumbQueue = [], thumbActive = 0, THUMB_W = 260, thumbFail = {};
   function thumbPromise(copy, key) {
     var mk = copy.id + '|' + key;
     if (thumbMem.has(mk)) return thumbMem.get(mk);
     var p = new Promise(function (resolve) { thumbQueue.push({ copy: copy, key: key, resolve: resolve, mk: mk }); pumpThumbs(); });
     thumbMem.set(mk, p);
     // a picture that could not be loaded is not remembered for long: the next look (or "Reload") tries again
-    p.then(function (r) { if (r && r.err) { thumbFail[mk] = true; setTimeout(function () { if (thumbMem.get(mk) === p) { thumbMem.delete(mk); delete thumbFail[mk]; } }, 4000); } else delete thumbFail[mk]; });
-    if (thumbMem.size > 700) { var first = thumbMem.keys().next().value; var old = thumbMem.get(first); thumbMem.delete(first); old.then(function (r) { if (r && r.url) URL.revokeObjectURL(r.url); }); }
+    p.then(function (r) { if (r && r.url && thumbMem.get(mk) === p) thumbUrl.set(mk, r.url); if (r && r.err) { thumbFail[mk] = true; setTimeout(function () { if (thumbMem.get(mk) === p) { thumbMem.delete(mk); delete thumbFail[mk]; } }, 4000); } else delete thumbFail[mk]; });
+    if (thumbMem.size > 700) { var first = thumbMem.keys().next().value; var old = thumbMem.get(first); thumbMem.delete(first); thumbUrl.delete(first); old.then(function (r) { if (r && r.url) URL.revokeObjectURL(r.url); }); }
     return p;
   }
   function pumpThumbs() {
@@ -753,7 +755,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(), title: S.title || '', lblw: S.lblw || 0, bgRun: S.bgRun || null,
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, boxes: S.boxes, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, boxes: S.boxes, paper: S.paper, thumbs: !!S.thumbs, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         if (!path) return { id: r.id, name: r.name };
@@ -786,7 +788,7 @@
     proj.saving = true; proj.state = 'saving'; renderSave();
     try {
       await targetWrite(proj.target, JSON.stringify(serialize(), null, 1));
-      proj.state = 'saved'; dirty = false;
+      proj.state = 'saved'; dirty = false; proj.savedAt = new Date();
     } catch (e) { proj.state = 'error'; proj.err = niceError(e); }
     proj.saving = false;
     if (proj.again) { proj.again = false; proj.timer = setTimeout(saveNow, 50); }
@@ -796,7 +798,7 @@
   // index written (item 32) without asking; only a project that has never been saved needs a question.
   async function beforeClose() {
     try { if (window.BCBackground) BCBackground.stop(); if (window.BCResults) await BCResults.flush(); } catch (e) { /* closing anyway */ }
-    if (!S || !S.copies.length || !dirty) return { ok: true };
+    if (!S || !S.copies.length || !dirty || S.examples) return { ok: true };
     if (proj.target && proj.state !== 'error') { await flushSave(); return { ok: !dirty }; }
     return { ok: false, err: proj.state === 'error' ? proj.err : '' };
   }
@@ -809,7 +811,7 @@
   // true if the work so far may be replaced by another project (asks when there are changes that are saved nowhere)
   async function mayReplace() {
     await flushSave();
-    if (!S || !S.copies.length || !dirty || proj.target) return true;
+    if (!S || !S.copies.length || !dirty || proj.target || S.examples) return true;
     return confirmDialog('The project is not saved', 'The changes to the project you are working on are not saved anywhere. Open the other project anyway?', 'Open anyway');
   }
   function renderSave() {
@@ -822,6 +824,7 @@
   function saveChip() {
     var t = '', cls = 'ws-save';
     if (!S) return { text: '', cls: cls, title: '' };
+    if (S.examples) return { text: 'Examples · not saved', cls: cls, title: 'The examples come with Book Compare. What you change here is not kept; start your own project with ⋮ → New project.' };
     if (!HAS_FSA) { t = dirty ? 'Not saved · save project file' : 'Project file saved'; cls += dirty ? ' warn' : ' ok'; }
     else if (!proj.target) {
       t = !S.copies.length ? 'No project yet' : proj.legacy ? 'Older project · save it as a project file' : 'Not saved yet · save the project';
@@ -829,13 +832,22 @@
     }
     else if (proj.state === 'saving' || proj.state === 'dirty') { t = 'Saving …'; }
     else if (proj.state === 'error') { t = 'Could not save · ' + proj.err; cls += ' bad'; }
-    else { t = '✓ Saved · “' + proj.name + '”'; cls += ' ok'; }
+    else { t = '✓ Saved automatically' + (proj.savedAt ? ' · ' + hhmm(proj.savedAt) : ''); cls += ' ok'; }
     return { text: t, cls: cls,
-      title: proj.target ? 'Project file: ' + targetFile(proj.target) + '. Changes are saved automatically.'
+      title: proj.target ? 'Every change is saved by itself in the project file “' + targetFile(proj.target) + '”, about a second after you make it. You never have to save by hand (Ctrl+S saves at once).'
       : proj.legacy ? 'This project was saved by an older version of Book Compare. Save it as a project file to keep your changes; the old project folder stays as it is.'
       : 'Save the project as a file (not in one of your scan folders).' };
   }
-  function chipClick() { return proj.target ? (proj.state === 'error' ? saveNow() : toast('Project file: “' + targetFile(proj.target) + '”. Changes are saved automatically.')) : saveProjectAs(); }
+  function hhmm(d) { return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function chipClick() { if (S && S.examples) return toast('The examples are not saved. Start your own project with ⋮ → New project.'); return proj.target ? (proj.state === 'error' ? saveNow() : toast('Every change is saved automatically in “' + targetFile(proj.target) + '”' + (proj.savedAt ? ' (last time at ' + hhmm(proj.savedAt) + ')' : '') + '. You never have to save by hand.')) : saveProjectAs(); }
+  // Ctrl+S (0.11.0): saves at once (a project without a file asks where to save it)
+  async function saveKey() {
+    if (!S || !S.copies.length) return;
+    if (S.examples) return toast('The examples are not saved. Start your own project with ⋮ → New project.');
+    if (!proj.target) return HAS_FSA ? saveProjectAs() : downloadProject();
+    await saveNow();
+    if (proj.state === 'saved') toast('Saved in “' + targetFile(proj.target) + '”. (Every change is also saved automatically.)');
+  }
   // the start screen (index.html): Continue / Open project … / New project
   async function startInfo() {
     if (S && S.copies.length) return { open: true, name: S.title || proj.name || 'this project' };
@@ -848,6 +860,7 @@
     show();
     if (kind === 'continue') { if (!had && lastProject) await continueLast(); }
     else if (kind === 'open') await openProject();
+    else if (kind === 'examples') await openExamples();
     else if (kind === 'new') { if (had) await newProject(); }
   }
   function suggestedName() {
@@ -946,7 +959,11 @@
       if (perm !== 'granted') perm = await h.requestPermission({ mode: mode });
       if (perm !== 'granted') return toast('The browser did not give access to the project file.');
     } catch (e) { return toast(niceError(e)); }
-    await readProject(t);
+    if (!(await readProject(t))) return;
+    // 0.11.0 (owner): "Continue" goes straight on in the Compare tab, with the pair of copies and the page that were open
+    // (only when both scans can be read without a question: a locked or missing folder is dealt with in the Pages view first)
+    var r = S.sel.row, ready = function (c) { var k = c && c.cells[r]; if (!k) return false; var l = c.locs && c.locs[splitKey(k).n]; return rootReady(l && rootById(l.root)); };
+    if (S.copies.length >= 2 && ready(copyById(S.pair[0])) && ready(copyById(S.pair[1]))) await compareNow();
   }
   // desktop program: a project file that was double-clicked in Explorer
   async function openPending() {
@@ -970,6 +987,7 @@
     S.bgRun = json.bgRun && Array.isArray(json.bgRun.ids) ? { ids: json.bgRun.ids.filter(function (x) { return typeof x === 'number'; }), n: +json.bgRun.n || 0 } : null;
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
     S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1); S.tiles = cleanTiles(json.tiles); S.boxes = cleanBoxes(json.boxes);
+    S.paper = cleanPaper(json.paper); S.thumbs = json.thumbs === true;
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
     (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', rel: typeof r.rel === 'string' ? r.rel : null, handle: null, files: null, ok: false }); });
@@ -1023,7 +1041,7 @@
     var copies = S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies');
     if (unsafe) toast('This project file lies in a folder that holds scans, so automatic saving is switched off. Save the project in another folder (menu ⋮ → Save project as …).');
     else if (oldFormat) toast('Project opened (' + copies + '). It was saved by an older version of Book Compare: to keep your changes, save it as a project file (menu ⋮ → Save project as …). The old project folder stays as it is.');
-    else toast('Project opened: ' + copies + '.');
+    else toast('Project opened: ' + copies + '.' + (proj.target ? ' Changes are saved automatically.' : ''));
     if (HELPER && proj.target && S.bgRun && window.BCBackground && BCBackground.offer) BCBackground.offer(S.bgRun);   // a run that did not finish (item 21)
     if (S.copies.length >= 2 && window.CompareTab && CompareTab.preload) setTimeout(CompareTab.preload, 1500);         // item 33
     return true;
@@ -1124,7 +1142,10 @@
       '<button class="ws-tb" data-act="undo"' + (hist.undo.length ? '' : ' disabled') + ' title="Undo (Ctrl+Z)">Undo</button>' +
       '<button class="ws-tb" data-act="redo"' + (hist.redo.length ? '' : ' disabled') + ' title="Redo (Ctrl+Y)">Redo</button>' +
       '<span class="ws-vsep"></span>' +
-      '<button class="ws-tb" id="ws-cellmore" data-act="cellmenu"' + (s ? '' : ' disabled') + ' aria-haspopup="true" title="More for this cell, its row and its copy (also with the right mouse button)">More for this cell &#9662;</button>';
+      '<button class="ws-tb" id="ws-cellmore" data-act="cellmenu"' + (s ? '' : ' disabled') + ' aria-haspopup="true" title="More for this cell, its row and its copy (also with the right mouse button)">More for this cell &#9662;</button>' +
+      '<span class="ws-vsep"></span>' +
+      '<button class="ws-tb ws-tog" id="ws-pics" data-act="pics" aria-pressed="' + !!S.thumbs + '" title="Show a small picture of every page in the grid (kept in the project). The rows get taller.">' +
+      '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg> Pictures in the grid</button>';
   }
   // the menu for a cell (right mouse button, or "More for this cell"): its copy, its row
   function cellMenuHtml() {
@@ -1209,6 +1230,8 @@
   }
   function renderGridShell() {
     var gb = $('#ws-gridbox');
+    ROW_H = S.thumbs ? 96 : 40;                                       // 0.11.0: taller rows with a small picture of every page
+    if (root) { root.style.setProperty('--ws-rowh', ROW_H + 'px'); root.classList.toggle('ws-pics', !!S.thumbs); }
     if (!S.copies.length) {
       gb.innerHTML = '<div class="ws-empty"><h2>No copies yet</h2><p>Add the first copy to start. Each copy is one folder of scans on your disk. You can add the others one by one afterwards.</p><div class="acts"><button class="ws-tb primary" data-act="add" style="padding:10px 18px;font-size:15px">Add first copy</button><button class="ws-tb" data-act="openproj" style="padding:10px 18px;font-size:15px">Open project …</button>' +
         (lastProject ? '<button class="ws-tb" data-act="continue" style="padding:10px 18px;font-size:15px">Continue “' + esc(lastProject.name) + '”</button>' : '') + '</div></div>';
@@ -1266,13 +1289,28 @@
         var key = c.cells[i] || null, sel = (S.sel.ci === ci && S.sel.row === i) ? ' sel' : (rg && rg.ci === ci && i >= rg.lo && i <= rg.hi ? ' rng' : ''), wst = ' style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px"';
         var pm = c.id === S.pair[0] ? '<b class="pm m1">1</b>' : c.id === S.pair[1] ? '<b class="pm m2">2</b>' : '';
         var dot = isStored(stE, c, i, key) ? '<i class="ws-st" title="Aligned onto the reference copy and stored: comparing it with the reference opens at once"></i>' : '';
-        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '><i class="ico"></i><span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + dot + pm + '</div>'; }
+        var pic = '<i class="ico"></i>';
+        if (key && S.thumbs) { var tu = thumbUrlNow(c, key); pic = '<span class="tn" data-mk="' + esc(c.id + '|' + key) + '">' + (tu ? '<img alt="" src="' + tu + '">' : '') + '</span>'; }
+        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '>' + pic + '<span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + dot + pm + '</div>'; }
         else cells += '<div class="ws-cell empty' + sel + '" data-c="' + ci + '" data-r="' + i + '"' + wst + '><span class="gap">no page</span></div>';
       });
       var sk = !!S.skip[i], small = sk ? 'not compared' : (i === S.ns && S.ns > 0 ? 'starts here' : n + ' of ' + S.copies.length + ' copies');
       h += '<div class="ws-row' + (S.sel.row === i ? ' selrow' : '') + (sk ? ' skipped' : '') + (i === S.ns && S.ns > 0 ? ' numstart' : '') + '" style="top:' + (HEAD_H + i * ROW_H) + 'px" data-r="' + i + '"><div class="ws-lbl" data-act="lbl" data-r="' + i + '"><b>' + esc(rowLabel(i)) + '</b><small>' + small + '</small>' + flagMark(i) + '</div>' + cells + '</div>';
     }
     host.innerHTML = h;
+    if (S.thumbs) fillGridPics(a, b);
+  }
+  // the small pictures in the grid: the ones already made are put in at once, the others when they are ready
+  function thumbUrlNow(c, key) { var mk = c.id + '|' + key; return thumbMem.has(mk) ? thumbUrl.get(mk) || null : null; }
+  function fillGridPics(a, b) {
+    for (var i = a; i <= b; i++) S.copies.forEach(function (c, ci) {
+      var key = c.cells[i]; if (!key || thumbUrlNow(c, key)) return;
+      thumbPromise(c, key).then(function (r) {
+        if (!S.thumbs || !r || !r.url) return;
+        var el = root.querySelector('.ws-cell[data-c="' + ci + '"][data-r="' + i + '"] .tn');
+        if (el && el.dataset.mk === c.id + '|' + key && !el.firstChild) el.innerHTML = '<img alt="" src="' + r.url + '">';
+      });
+    });
   }
   var pvTok = 0;
   function renderPreview() {
@@ -1285,7 +1323,7 @@
       if (!key) { h += '<div class="ws-th miss"><div class="pg">no page in this copy</div><div class="nm">' + esc(c.name) + '</div></div>'; return; }
       var cls = (ci === S.sel.ci ? ' cur' : '') + (c.id === S.pair[0] ? ' p1' : c.id === S.pair[1] ? ' p2' : '');
       h += '<div class="ws-th' + cls + '"><div class="pg" data-ci="' + ci + '" data-act="selcell"><span class="ws-nopv">Loading …</span></div><div class="nm">' + esc(c.name) + '</div><div class="fnm" title="' + esc(key) + '">' + esc(baseName(key)) + '</div>' +
-        '<div class="pick"><button data-act="pick" data-ci="' + ci + '" data-slot="0" class="' + (c.id === S.pair[0] ? 'on1' : '') + '" title="Use this page as copy 1 (red)">1</button><button data-act="pick" data-ci="' + ci + '" data-slot="1" class="' + (c.id === S.pair[1] ? 'on2' : '') + '" title="Use this page as copy 2 (green)">2</button></div></div>';
+        '<div class="pick"><button data-act="pick" data-ci="' + ci + '" data-slot="0" class="' + (c.id === S.pair[0] ? 'on1' : '') + '" title="Use this page as copy 1">1</button><button data-act="pick" data-ci="' + ci + '" data-slot="1" class="' + (c.id === S.pair[1] ? 'on2' : '') + '" title="Use this page as copy 2">2</button></div></div>';
     });
     $('#ws-thumbs').innerHTML = h;
     for (var ci = S.copies.length - 1; ci >= 0; ci--) {
@@ -1378,19 +1416,21 @@
   function helpDialog() {
     modal('<h3>How this screen works</h3><ul>' +
       '<li>The <b>name of the project</b> goes into the field at the top left. It is shown in both tabs and proposed as the name of the project file.</li>' +
+      '<li><b>Saving:</b> once the project has a file (⋮ → Save project …), every change is saved into it by itself, about a second after you make it. The chip next to the name says “✓ Saved automatically” and the time. Ctrl+S saves at once.</li>' +
       '<li>Each <b>column</b> is one copy: a folder of scans on your disk. Each <b>row</b> is one page position. The pages in a row will be compared with each other.</li>' +
       '<li>Book Compare only <b>reads</b> your scan folders. Everything you do here (gaps, renaming, deleting files) changes only the project, never a scan file.</li>' +
       '<li>A copy with missing pages has <b>empty cells</b>. Select a cell and use <b>Insert gap here</b> to push the following files down, or <b>Close gap</b> to pull them up.</li>' +
       '<li>Covers, flyleaves and duplicates can be removed from the grid with <b>Delete file</b>. The scan itself stays on your disk, and <b>Add files to this copy</b> brings it back.</li>' +
       '<li><b>Add files to this copy</b> also adds pictures from another folder, for example pages that were scanned later.</li>' +
       '<li><b>⋮ → Reference copy …</b> chooses the copy the others are compared with (★ in its heading). ' + (HELPER ? '<b>⋮ → Align copies in the background …</b> aligns the other copies onto it page by page and keeps the results next to the project file, so that comparisons with the reference open at once.' : 'In the desktop program the other copies can be aligned onto it in the background.') + '</li>' +
-      '<li>What the comparison cannot show (light inks such as red, small shifts, ...) is explained in the Compare tab, left panel, under “What the comparison cannot show”.</li>' +
+      '<li>What the comparison cannot show (light inks such as red, small shifts, ...) is explained in the help of the Compare tab (its “?” button), under “What the comparison cannot show”.</li>' +
       '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later in the menu <b>⋮</b>. Double-click a row name to rename it.</li>' +
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
       '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>Compare 1 and 2</b> (or the tab <b>Compare</b> at the top): they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The tab <b>Pages</b> brings you here again.</li>' +
       '<li>When you reopen a saved project the browser asks once for permission to read your scans again. Click <b>Allow access to scans</b>; you do not have to pick the folders again.</li>' +
       '<li><b>Delete several files at once:</b> click the first cell, hold <b>Shift</b> and click the last one (or press Shift + the up/down arrow). The whole range is marked; <b>Delete</b> removes it and the pages below move up.</li>' +
       '<li><b>Column width:</b> drag the right edge of a column heading; a double-click fits the longest file name. <b>⋮ → Standard width for all columns</b> resets them.</li>' +
+      '<li><b>Pictures in the grid</b> (toolbar) shows a small picture of every page in the cells; the rows get taller. It is kept in the project.</li>' +
       '<li><b>Moving a copy:</b> drag its heading to another place, or use <b>Move copy</b> in the toolbar. Undo works for this too.</li>' +
       '<li>If a preview says it could not be loaded, press <b>Reload</b> under it. Ctrl+Z undoes the last change. Arrow keys move the selection.</li>' +
       '<li><b>⋮ → Measure speed on this computer</b> aligns a few real pages one after the other and shows how long each step takes here. It only reads your scans.</li></ul>' +
@@ -1491,12 +1531,12 @@
       var total = pictureCount(pk.groups), used = usedPictures(pk.root.id);
       info.textContent = pk.only ? total + ' single picture' + (total === 1 ? '' : 's') + ' chosen in “' + pk.name + '”' : '“' + pk.name + '”: ' + total + ' picture' + (total === 1 ? '' : 's') + ignoredNote(pk.ignored);
       pk.groups.forEach(function (g) {
-        g.chosen = {}; if (pk.groups.length === 1) g.keys.forEach(function (k) { g.chosen[k] = true; });          // one folder: all of it is the default
+        g.chosen = {}; if (pk.groups.length === 1 || !g.path) g.keys.forEach(function (k) { g.chosen[k] = true; });          // one folder, or the pictures directly in the chosen folder (0.11.0): ticked at first
         g.by = used[joinPath(pk.path, g.keys[0])] || '';
       });
       var h = '<div class="note">' + (pk.groups.length === 1 ? 'Folder used:' : 'The pictures are in several folders. Tick the ones that belong to this copy:') + '</div><div class="groups big">';
       pk.groups.forEach(function (g, i) {
-        h += '<details data-gi="' + i + '"><summary><label><input type="checkbox" data-g="' + i + '"' + (pk.groups.length === 1 ? ' checked' : '') + '> ' + (g.path ? esc(g.path) : 'directly in “' + esc(pk.name) + '”') + ' <span class="note">· <span data-gn="' + i + '"></span></span></label></summary><div class="flist" data-gl="' + i + '"></div></details>';
+        h += '<details data-gi="' + i + '"><summary><label><input type="checkbox" data-g="' + i + '"' + (pk.groups.length === 1 || !g.path ? ' checked' : '') + '> ' + (g.path ? esc(g.path) : 'directly in “' + esc(pk.name) + '”') + ' <span class="note">· <span data-gn="' + i + '"></span></span></label></summary><div class="flist" data-gl="' + i + '"></div></details>';
       });
       gr.innerHTML = h + '</div><div class="note">Only some of the pictures? Click the little arrow in front of a folder and tick them one by one.</div>';
       pk.groups.forEach(function (g, i) { syncGroup(gr, i); });
@@ -1653,12 +1693,15 @@
     var item = function (m, label, off, tip) { return '<button role="menuitem" data-m="' + m + '"' + (off ? ' disabled' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '><span class="tick"></span>' + label + '</button>'; };
     var notHere = 'In the Compare tab: these export the two pages shown there.';
     var h = '<div class="ws-mhead">Project</div>' +
-      item('save', HAS_FSA ? (proj.target ? 'Save project as …' : 'Save project …') : 'Download project file') +
+      item('save', HAS_FSA ? (proj.target ? 'Save project as …' : 'Save project …') : 'Download project file', !!S.examples, S.examples ? 'The examples are not saved' : '') +
       item('open', 'Open project …') + item('new', 'New project') +
       (lost ? item('reconnect', 'Choose scan folder again …') : '') +
       item('ref', 'Reference copy …', !two) +
-      (HELPER ? item('bg', window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …', !two) : '') +
+      (HELPER ? item('bg', window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …', !two || !!S.examples) : '') +
       (HELPER ? item('stored', 'Stored alignments …', !proj.target) : '') +
+      // the website (0.11.0): shown, greyed, so that it is known that the desktop program can do it
+      (HELPER ? '' : item('bg', '<span>Align copies in the background …<small class="ws-mdesk">only in the desktop program</small></span>', true, 'Only in the desktop program: aligns the other copies onto the reference copy page by page and keeps the results') +
+        item('stored', '<span>Stored alignments …<small class="ws-mdesk">only in the desktop program</small></span>', true, 'Only in the desktop program')) +
       item('start', 'Back to the start screen');
     if (!cmp) h += '<hr><div class="ws-mhead">Grid</div>' +
       item('folio', S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') +
@@ -1897,6 +1940,10 @@
       commit(); if (v) S.boxes[key] = v; else delete S.boxes[key]; touch();
       return true;
     },
+    // "whiter paper" of a copy in the Superimposed view (0.11.0; display only, not part of undo)
+    examples: function () { return !!(S && S.examples); },
+    paper: function (copyId) { return S.paper[copyId] || 0; },
+    setPaper: function (copyId, v) { v = v === 1 || v === 2 ? v : 0; if ((S.paper[copyId] || 0) === v || !copyById(copyId)) return; if (v) S.paper[copyId] = v; else delete S.paper[copyId]; touch(); },
     flagColors: FLAG_COLORS.slice(), flagNames: FLAG_NAMES.slice(), flagPath: FLAG_PATH,
     // colour 0-5 puts a flag on the row, null takes it away (every change can be undone in the Pages view)
     setFlag: function (i, c) {
@@ -2087,7 +2134,7 @@
     var a = t.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, s = selected();
     switch (act) {
-      case 'add': return addDialog();
+      case 'add': if (S.examples) return toast('The examples cannot be extended. Start your own project with ⋮ → New project.'); return addDialog();
       case 'addfiles': closeCellMenu(); return addFilesDialog();
       case 'undo': return undo();
       case 'redo': return redo();
@@ -2095,6 +2142,7 @@
       case 'back': return leave();
       case 'more': renderMenu(); $('#ws-menu').hidden = !$('#ws-menu').hidden; return;
       case 'compare': return compareNow();
+      case 'pics': S.thumbs = !S.thumbs; touch(); renderAll(); return;
       case 'savechip': return chipClick();
       case 'openproj': return openProject();
       case 'continue': return continueLast();
@@ -2234,10 +2282,42 @@
     S.sel = { ci: ci, row: mv.row }; changed();
   }
   async function newProject() {
-    if (S.copies.length && dirty && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
+    if (S.copies.length && dirty && !S.examples && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
     projectChanging();
     S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.target = null; proj.legacy = null; proj.state = 'none'; proj.name = ''; dirty = false;
     renderAll();
+  }
+
+  /* ---------------------------------------------------------------- the examples project (0.11.0, js/examples.js) */
+  // A project made of pictures that come with Book Compare: one row per example, two copies. It lives in memory only (nothing is
+  // saved); its pictures are fetched from the program's own files and kept as File objects, like scans from a folder chosen in Firefox.
+  async function openExamples() {
+    var X = window.BCExamples; if (!X) return false;
+    show();
+    if (S && S.copies.length && !S.examples && !(await mayReplace())) return false;
+    var files = [{}, {}], keys = [[], []];
+    try {
+      for (var i = 0; i < X.list.length; i++) for (var k = 0; k < 2; k++) {
+        var src = X.list[i].files[k], name = (i + 1) + ' ' + X.list[i].label + ' - ' + src.split('/').pop();
+        var resp = await fetch(src); if (!resp.ok) throw new Error(src + ': ' + resp.status);
+        var blob = await resp.blob();
+        files[k][name] = new File([blob], name, { type: blob.type || 'image/jpeg', lastModified: 0 }); keys[k].push(name);
+      }
+    } catch (e) { toast('The examples could not be loaded (' + ((e && e.message) || e) + ').'); return false; }
+    projectChanging();
+    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null;
+    S.examples = true; S.title = 'Examples'; S.projectId = 'examples';
+    for (var c = 0; c < 2; c++) {
+      var r = newRoot(X.copies[c]); r.files = files[c];
+      var cp = { id: c + 1, name: X.copies[c], folder: r.name, w: 0, keys: keys[c].slice(), cells: keys[c].slice(), locs: [{ root: r.id, path: '' }] };
+      REG[cp.id] = cp; S.copies.push(cp);
+    }
+    S.nextCopy = 3; X.list.forEach(function (e, j) { S.labels[String(j)] = e.label; });
+    S.pair = [1, 2]; S.sel = { ci: 0, row: 0 };
+    proj.target = null; proj.legacy = null; proj.state = 'none'; proj.name = 'Examples'; dirty = false;
+    renderAll(); renderSave();
+    await compareNow();
+    return true;
   }
 
   /* ---------------------------------------------------------------- showing and hiding the layer */
@@ -2260,10 +2340,19 @@
       '<div id="ws-layer"></div>' +
       '<input type="file" id="ws-dirinput" class="ws-hidden" webkitdirectory multiple><input type="file" id="ws-jsoninput" class="ws-hidden" accept=".bookcompare,.json,application/json">';
     document.body.appendChild(root);
+    // the marks "1" and "2" have the colours chosen for the Superimposed view (0.11.0)
+    var paintPair = function () { try { root.style.setProperty('--ws-c1', DIFF_COLOR_1); root.style.setProperty('--ws-c2', DIFF_COLOR_2); } catch (e) { /* viz.js not loaded */ } };
+    paintPair(); document.addEventListener('diffcolorschange', paintPair);
     root.addEventListener('click', onClick);
     root.addEventListener('dblclick', onDblClick);
     root.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('keydown', function (e) { if (root && !root.hidden) onKey(e); });
+    document.addEventListener('keydown', function (e) {                       // Ctrl+S saves at once, in both views (0.11.0)
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || String(e.key).toLowerCase() !== 's') return;
+      var on = (root && !root.hidden) || !!document.querySelector('div.result_container.ct-on');
+      if (!on || !S || !S.copies.length || $('#ws-scrim')) return;
+      e.preventDefault(); saveKey();
+    }, true);
     root.addEventListener('dragstart', onDragStart);
     root.addEventListener('dragover', onDragOver);
     root.addEventListener('drop', onDrop);
@@ -2319,6 +2408,7 @@
     beforeClose: beforeClose,
     saveForClose: saveForClose,
     startAction: startAction,
+    openExamples: openExamples,
     tab: tabApi
   };
   // desktop program: a project file that was double-clicked opens at once

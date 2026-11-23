@@ -238,7 +238,7 @@ def scenario(p, kind):
     assert 'scan folder' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
     assert not [f for f in os.listdir(os.path.join(BOOKS, 'Copy-B ä')) if 'bookcompare' in f]
     push_pick(os.path.join(BOOKS, 'Project', 'Book project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
-    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Book project' in pg.inner_text('#ws-save'), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
+    assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Book project' in (pg.get_attribute('#ws-save', 'title') or ''), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
     assert os.listdir(os.path.join(BOOKS, 'Project')) == ['Book project.bookcompare'], os.listdir(os.path.join(BOOKS, 'Project'))
     d = project_json()
     assert d['version'] == 2 and len(d['roots']) == 3 and all(os.path.normcase(r['path']).startswith(os.path.normcase(BOOKS)) for r in d['roots']), d['roots']
@@ -256,12 +256,18 @@ def scenario(p, kind):
     d = project_json(); assert len(d['copies']) == 4 and len(d['roots']) == 3, (len(d['copies']), d['roots'])          # the folder lies inside Copy-C: no new root
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(1500)
     assert pg.locator('#ws .ws-hname').count() == 3 and len(project_json()['copies']) == 3, 'undo should remove the fourth copy'
+    pg.evaluate("BookWorkspace.tab.setRow(1)"); pg.wait_for_timeout(1500)                    # (as if page 2 had been open in the Compare tab: saved by itself)
+    assert project_json()['sel']['row'] == 1, project_json()['sel']
     c.close(); stop_helper()
     # --- the helper and the browser were closed: start both again --------------------------------------------------------
     start_helper(); c, pg = session(); open_workspace(pg)
     pg.wait_for_timeout(500)
     assert pg.locator('#ws .ws-empty [data-act=continue]').count() == 1, pg.inner_text('#ws')
-    pg.click('#ws .ws-empty [data-act=continue]'); pg.wait_for_timeout(2000)
+    pg.click('#ws .ws-empty [data-act=continue]'); pg.wait_for_timeout(2500)
+    # 0.11.0: "Continue" goes straight on in the Compare tab, with the pair and the page that were open
+    assert pg.evaluate("document.getElementById('ws').hidden") and pg.is_visible('.ct-top'), 'Continue should open the Compare tab'
+    st0 = pg.evaluate("BookWorkspace.tab.state()"); assert st0['row'] == project_json()['sel']['row'] and st0['pair'] == project_json()['pair'], (st0, project_json()['sel'])
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(800)
     assert pg.locator('#ws .ws-hname').count() == 3 and pg.inner_text('#ws .ws-hname >> nth=0') == 'A-Renamed'
     assert pg.evaluate("document.getElementById('ws-banner').hidden"), 'no question, no banner: ' + pg.inner_text('#ws-banner')
     assert pg.locator('#ws .ws-hmeta.lost').count() == 0 and pg.locator('#ws-thumbs img').count() >= 2
@@ -299,7 +305,7 @@ def scenario(p, kind):
     pg.click('#ct_flag'); pg.wait_for_timeout(1800)                                          # a flag is saved with the project (by itself)
     assert project_json().get('flags') == {'1': 0}, project_json().get('flags')
     pg.wait_for_function("!document.querySelector('div.result_container').classList.contains('ct-stale')", timeout=120000)       # (annotations need the aligned picture)
-    pg.click('.ct-atools [data-t=rect]'); bx = pg.locator('#pane_main .ct-ann svg').bounding_box()
+    pg.click('#ct_pen'); pg.click('.ct-atools [data-t=rect]'); bx = pg.locator('#pane_main .ct-ann svg').bounding_box()
     pg.mouse.click(bx['x'] + bx['width'] * 0.5, bx['y'] + bx['height'] * 0.5); pg.wait_for_timeout(200); pg.keyboard.type('Ä ö mark'); pg.wait_for_timeout(1800)      # an annotation too
     an = project_json().get('annotations', {}).get('1'); assert an and an[0]['t'] == 'rect' and an[0]['text'] == 'Ä ö mark' and len(an[0]['pair']) == 2, project_json().get('annotations')
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(700)
@@ -358,7 +364,7 @@ def scenario(p, kind):
     push_pick(os.path.join(old, 'Old project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
     assert sorted(os.listdir(old)) == ['Old project.bookcompare', 'book-compare-project.json'] and open(os.path.join(old, 'book-compare-project.json'), 'rb').read() == oldtext
     assert json.load(open(os.path.join(old, 'Old project.bookcompare'), encoding='utf-8'))['copies'][0]['name'] == 'Old-A'
-    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Old project' in pg.inner_text('#ws-save'), pg.inner_text('#ws-save')
+    assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Old project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

@@ -105,9 +105,21 @@ function alignCopy(cv, refState, red, opts = {}) {
 function alignCopyIn(cv, refState, red, opts, S) {
   const { ref, box } = refState, tm = {}; let t = now();
   const mov = S.add(inkMap(cv, red)); tm.ink_s = (now() - t) / 1000; t = now();
-  const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true }); tm.rough_s = (now() - t) / 1000; t = now();
-  const rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); tm.warp_s = (now() - t) / 1000;
-  if (refState.mask) { const d = rough.data32F, mk = refState.mask; for (let i = 0; i < mk.length; i++) if (!mk[i]) d[i] = 0; }     // V2b: outside the hand-set shape
+  const persp = opts.perspective !== false && !(typeof process !== 'undefined' && process.env && process.env.BC_NOPERSP === '1');
+  const res = roughAlign(cv, ref, mov, box, { q: 4, fastScales: true, perspective: persp }); tm.rough_s = (now() - t) / 1000; t = now();
+  const cut = (m) => { if (refState.mask) { const d = m.data32F, mk = refState.mask; for (let i = 0; i < mk.length; i++) if (!mk[i]) d[i] = 0; } };      // V2b: outside the hand-set shape
+  let rough = S.add(warp(cv, mov, res.W, ref.cols, ref.rows)); cut(rough);
+  let model = 'affine', roughCmp = null;
+  if (res.Wp) {
+    /* B1: the perspective candidate is kept only when it clearly fits better: at least 3 points less unmatched ink (of the box) and at least
+       10 % less in relation. On flat scans the two are practically the same, and the simpler whole-page step stays. */
+    const rp = S.add(warp(cv, mov, res.Wp, ref.cols, ref.rows)); cut(rp);
+    const ua = unmatchedShare(cv, ref, rough, box).share, up = unmatchedShare(cv, ref, rp, box).share;
+    roughCmp = { affine: +ua.toFixed(4), perspective: +up.toFixed(4) };
+    if (up <= ua - 0.03 && up <= 0.9 * ua) { rough.delete(); rough = rp; res.W = res.Wp; model = 'perspective'; }
+    else rp.delete();
+  }
+  tm.warp_s = (now() - t) / 1000;
   const [x0, y0, x1, y1] = box, w = ref.cols, h = ref.rows;
   const envRing = (typeof process !== 'undefined' && process.env && process.env.BC_RING) ? +process.env.BC_RING : null;     // research only (A2): ring width as a fraction of the longer box side
   const envEdge = (typeof process !== 'undefined' && process.env && process.env.BC_EDGE) ? +process.env.BC_EDGE : null;     // research only (A2): strip along the scan edge that is never fine-aligned (px)
@@ -134,7 +146,7 @@ function alignCopyIn(cv, refState, red, opts, S) {
   tm.tiles_s = (now() - t) / 1000;
   tm.total_s = tm.ink_s + tm.rough_s + tm.warp_s + tm.tiles_s;
   mov.delete();
-  const out = { field, map, aligned, rough, W: res.W, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
+  const out = { field, map, aligned, rough, W: res.W, model, roughCmp, tbox, stats, times: tm, ecc: res.ecc, score: res.score, scale: res.scale, sparse, density, margin };
   if (opts.measure) out.unmatched = { rough: unmatchedShare(cv, ref, rough, box).share, tiles: unmatchedShare(cv, ref, aligned, box).share };
   if (!opts.keepRough) { rough.delete(); out.rough = null; }
   S.release(aligned); if (out.rough) S.release(rough);                          // handed to the caller, who deletes them

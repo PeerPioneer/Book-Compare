@@ -8,7 +8,7 @@
    The website has no results folder: there nothing is stored (decided 21 Nov 2026). */
 (function () {
   'use strict';
-  var ENGINE = 'tiles-2026-11';        // change this when the alignment itself changes: stored results of the old one are then made again
+  var ENGINE = 'tiles-2026-11b';       // (b: B1 perspective rough step, 0.11.0) change this when the alignment itself changes: stored results of the old one are then made again
   var INDEX = 'index.json';
   var cur = fresh();
   function fresh() { return { id: null, dir: null, idx: null, loading: null, timer: 0, writing: null, again: false, changed: false }; }

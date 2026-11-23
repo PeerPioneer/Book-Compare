@@ -293,16 +293,6 @@
         align-items: center;
       }
 
-      .samples {
-        grid-area: samples;
-        background-color: rgba(255, 255, 255, 1);
-        transition: transform 0.24s 0.16s;
-        z-index: 1;
-      }
-      .samples > div.mdc-top-app-bar--fixed-adjust {
-        height: 100%;
-        overflow-y: auto;
-      }
 
       #main > section.logo {
         grid-area: logo;
@@ -1051,7 +1041,7 @@
     <script defer src="js/action.js"></script>
     <script defer src="js/compare.js"></script>
     <script defer src="js/panes.js"></script>
-    <script defer src="js/samples.js"></script>
+    <script defer src="js/examples.js"></script>
     <script defer src="js/workspace.js"></script>
     <script defer src="js/compare-annot.js"></script>
     <script defer src="js/compare-box.js"></script>
@@ -1143,8 +1133,8 @@
             <div class="diff_row" id="diff_custom_row">
               <input type="radio" name="diff_pair" id="diff_pair_custom" />
               <label for="diff_pair_custom" class="diff_label">
-                <input type="color" id="diff_custom_1" value="#e60000" />
-                <input type="color" id="diff_custom_2" value="#00961e" />
+                <input type="color" id="diff_custom_1" value="#0046c8" />
+                <input type="color" id="diff_custom_2" value="#e60000" />
                 <span class="diff_name">Your own colors
                   <span class="diff_note">Pick any two colors: first for copy 1, second for copy 2.</span>
                 </span>
@@ -1279,8 +1269,8 @@
         class="gone"
       />
 
-      <!-- The start screen (items 13-16): continue the last project, open one, or start a new one. Comparing two single
-           pictures (the way Image Compare works) is a small link underneath. -->
+      <!-- The start screen (items 13-16): continue the last project, open one, or start a new one; the examples are a small
+           link underneath. -->
       <section class="buttons start hide fc f-center f-justify-center">
         <button id="start_continue" class="mdc-button mdc-button--raised start-big" hidden>
           <span class="mdc-button__ripple" data-mdc-auto-init="MDCRipple"></span>
@@ -1296,10 +1286,9 @@
             <span class="mdc-button__label">New project</span>
           </button>
         </div>
+        <!-- 0.11.0: the examples are a small project (js/examples.js); comparing two single pictures is gone -->
         <p class="start-small">
-          <button type="button" id="image_select_btn" class="start-link">Compare two single pictures</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" id="try_samples_btn" class="start-link">Try the samples</button>
+          <button type="button" id="start_examples" class="start-link">Try the examples</button>
         </p>
         <!-- website only: where to get the desktop program (hidden inside the desktop program itself, see the script below) -->
         <p id="desktop_dl" class="desktop-dl" hidden>
@@ -1321,125 +1310,6 @@
           &nbsp;|&nbsp; Modifications by Torge Schiefelbein</span
         >
       </footer>
-    </div>
-    <div class="samples w-100 h-100">
-      <header class="mdc-top-app-bar mdc-top-app-bar--fixed">
-        <div class="mdc-top-app-bar__row">
-          <section
-            class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start"
-          >
-            <button
-              id="samples_close_btn"
-              class="material-icons mdc-top-app-bar__navigation-icon mdc-icon-button"
-              aria-label="Close"
-            >
-              close
-            </button>
-            <span class="mdc-top-app-bar__title">Samples</span>
-          </section>
-        </div>
-      </header>
-
-      <div class="mdc-top-app-bar--fixed-adjust">
-        <ul class="mdc-list mdc-list--thumbnail-list">
-          <li class="mdc-list-item f-center" tabindex="0">
-            <span
-              class="mdc-list-item__ripple"
-              data-mdc-auto-init="MDCRipple"
-            ></span>
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/churchill/case3-churchill-1.jpg"
-            />
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/churchill/case3-churchill-2.jpg"
-            />
-            <span class="mdc-list-item__text">Photo Alteration</span>
-          </li>
-          <li role="separator" class="mdc-list-divider"></li>
-          <li class="mdc-list-item f-center" tabindex="-1">
-            <span
-              class="mdc-list-item__ripple"
-              data-mdc-auto-init="MDCRipple"
-            ></span>
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/painting/giovanni-1.jpg"
-            />
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/painting/giovanni-2.jpg"
-            />
-            <span class="mdc-list-item__text">Art restoration</span>
-          </li>
-          <li role="separator" class="mdc-list-divider"></li>
-          <li class="mdc-list-item f-center" tabindex="-1">
-            <span
-              class="mdc-list-item__ripple"
-              data-mdc-auto-init="MDCRipple"
-            ></span>
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/book/case2-traherne2-a-original.jpg"
-            />
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/book/case2-traherne2-b-original.jpg"
-            />
-            <span class="mdc-list-item__text">Book editions</span>
-          </li>
-          <li role="separator" class="mdc-list-divider"></li>
-          <li class="mdc-list-item f-center" tabindex="-1">
-            <span
-              class="mdc-list-item__ripple"
-              data-mdc-auto-init="MDCRipple"
-            ></span>
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/satellite/Original-Tokyo-2017.jpg"
-            />
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/satellite/Original-Tokyo-1986.jpg"
-            />
-            <span class="mdc-list-item__text">Satellite imagery</span>
-          </li>
-          <li role="separator" class="mdc-list-divider"></li>
-          <li class="mdc-list-item f-center" tabindex="-1">
-            <span
-              class="mdc-list-item__ripple"
-              data-mdc-auto-init="MDCRipple"
-            ></span>
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/music/case5-music-sheet-1.jpg"
-            />
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/music/case5-music-sheet-2.jpg"
-            />
-            <span class="mdc-list-item__text">Music sheet editions</span>
-          </li>
-          <li role="separator" class="mdc-list-divider"></li>
-          <li class="mdc-list-item f-center" tabindex="-1">
-            <span
-              class="mdc-list-item__ripple"
-              data-mdc-auto-init="MDCRipple"
-            ></span>
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/puzzle/case6-puzzle-1-a.jpg"
-            />
-            <img
-              class="mdc-list-item__graphic"
-              src="images/usecases/puzzle/case6-puzzle-1-b.jpg"
-            />
-            <span class="mdc-list-item__text">Puzzle</span>
-          </li>
-          <li role="separator" class="mdc-list-divider"></li>
-        </ul>
-      </div>
     </div>
     <div id="compare_screen" class="">
       <div id="compare_container" class="">
@@ -2039,7 +1909,6 @@
       const main_el = document.getElementById("main");
       const compare_el = document.getElementById("compare_screen");
       const action_el = document.getElementById("action");
-      const samples_el = document.querySelector("div.samples");
       const result_el = document.querySelector("#result");
       const more_menu_el = document.getElementById("more_menu");
 
@@ -2053,7 +1922,7 @@
 
     </script>
     <script>
-      let main, result, compare, samples;
+      let main, result, compare;
 
       window.addEventListener("load", () => {
         window.mdc.autoInit();
@@ -2073,7 +1942,6 @@
           result = new Visualization(result_el, Module);
           action_bar = new Action(action_el, result);
           compare = new Compare(compare_el, result, action_bar);
-          samples = new Samples(samples_el);
 
           main.c.addEventListener("select_image", (e) => {
             compare.set_image(e.detail.urls);
@@ -2081,9 +1949,7 @@
             compare.show_compare_screen();
           });
 
-          main.c.addEventListener("samples", () => {
-            samples.show();
-          });
+          document.getElementById("start_examples").onclick = () => BookWorkspace.startAction("examples");
 
           // Whole-book workspace (js/workspace.js): a layer on top of the app.
           // "Compare" there hands two scans to the usual two-image screen; "Back" on that screen returns to the layer.
@@ -2130,10 +1996,6 @@
             more_menu_el.MDCMenu.open = true;
           });
 
-          samples.c.addEventListener("select_sample", (e) => {
-            compare.set_image(e.detail.image_sources);
-            compare.show_compare_screen();
-          });
         });
       });
 

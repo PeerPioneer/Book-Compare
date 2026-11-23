@@ -27,8 +27,8 @@ open(PICKS, 'w').close()
 U = os.path.join(REPO, 'app', 'images', 'usecases')
 PAIRS = [('book/case2-traherne2-a-original.jpg', 'book/case2-traherne2-b-original.jpg'),
          ('music/case5-music-sheet-1.jpg', 'music/case5-music-sheet-2.jpg'),
-         ('churchill/case3-churchill-1.jpg', 'churchill/case3-churchill-2.jpg'),
-         ('painting/giovanni-1.jpg', 'painting/giovanni-2.jpg')]
+         ('../../../tests/workspace/fixtures/case3-churchill-1.jpg', '../../../tests/workspace/fixtures/case3-churchill-2.jpg'),     # (photos, kept for the tests only:
+         ('../../../tests/workspace/fixtures/giovanni-1.jpg', '../../../tests/workspace/fixtures/giovanni-2.jpg')]                 #  the examples leave them out, 0.11.0)
 for ci, name in ((0, 'Copy-A'), (1, 'Copy-B')):
     os.makedirs(os.path.join(BOOKS, name))
     for i, pr in enumerate(PAIRS): shutil.copy(os.path.join(U, pr[ci]), os.path.join(BOOKS, name, 'p%d.jpg' % (i + 1)))
@@ -122,21 +122,36 @@ def scenario(p, kind):
     pg.click('#ct_sidebtn'); pg.wait_for_timeout(300); assert pg.is_visible('.ct-side')
     assert pg.evaluate("document.querySelector('#result canvas').width") > 100, 'the superimposed picture should be drawn'
     # the tile alignment (V3) is the default: it runs in the background helper and sends copy 2 back bent onto copy 1, as big as copy 1
-    assert pg.evaluate("document.getElementById('ct_tf').value") == 'tiles', 'Tiles should be the default alignment'
+    assert pg.locator('#ct_tf').count() == 0 and pg.locator('#ct_rough').count() == 0 and pg.locator('#ct_swap').count() == 0, '0.11.0: no type menu, no "Without fine alignment", no Swap'
     t = pg.evaluate("CompareTab.lastTiles()"); assert t and t['w'] > 100 and t['unmatched_tiles'] is not None, t
     assert pg.evaluate("document.querySelector('#result canvas').width") == t['w'], 'the result is as big as copy 1'
     # next page by the button, then by the key, then back
     pg.click('#ct_next'); wait_aligned(pg, 'next page'); assert 'Page 2' in where(pg), where(pg)
     t = pg.evaluate("CompareTab.lastTiles()"); assert t['unmatched_tiles'] <= t['unmatched_rough'] + 0.01, ('music page: the tiles do not make it worse', t)
-    # an older type still works, and back to Tiles
-    pg.select_option('#ct_tf', 'perspective'); wait_aligned(pg, 'perspective')
-    assert pg.evaluate("document.querySelector('#result canvas').width") > 100
-    pg.select_option('#ct_tf', 'tiles'); wait_aligned(pg, 'tiles again')
+    # option C (0.11.0): the alignment of this page is one folded section; its head names the setting
+    assert pg.get_attribute('#ct_alhead', 'aria-expanded') == 'false' and not pg.is_visible('#ct_albody') and pg.inner_text('#ct_alval') == 'Standard'
+    lh0 = pg.locator('#ct_list').bounding_box()['height']
+    pg.click('#ct_alhead'); pg.wait_for_timeout(150)
+    assert pg.get_attribute('#ct_alhead', 'aria-expanded') == 'true' and pg.is_visible('#ct_albody') and pg.evaluate("localStorage.getItem('bookcompare_alsec')") == 'open'
+    assert pg.locator('#ct_list').bounding_box()['height'] < lh0 - 40, 'the page list gets the height the folded section leaves'
+    # the coloured edges of the two copy boxes are the colours of the Superimposed view (blue / red by default)
+    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c1')).borderLeftColor") == 'rgb(0, 70, 200)'
+    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c2')).borderLeftColor") == 'rgb(230, 0, 0)'
+    # "Paper …" next to the colour legend (0.11.0): a copy's paper whiter, display only, kept in the project
+    pg.click('#legend_paper'); pg.wait_for_timeout(300)
+    assert pg.locator('#ws-float .ct-prow').count() == 2 and 'B-Test' in pg.inner_text('#ws-float .ws-dlg')
+    c2id = pg.evaluate("BookWorkspace.tab.state().pair[1]")
+    pg.click('#ws-float .ct-seg[data-k="1"] button[data-v="1"]'); pg.wait_for_timeout(300)
+    assert pg.evaluate("BookWorkspace.tab.paper(%d)" % c2id) == 1 and pg.evaluate("window.BC_PAPER") == [0, 0.5]
+    pg.click('#ws-float .ct-seg[data-k="1"] button[data-v="0"]'); pg.wait_for_timeout(300)
+    assert pg.evaluate("BookWorkspace.tab.paper(%d)" % c2id) == 0 and pg.evaluate("window.BC_PAPER") == [0, 0]
+    pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200)
     # tile settings for copy 2 on this page (V15): presets, advanced numbers, saved per copy and page, back to standard
     def tset(): return pg.evaluate("(() => { const s = BookWorkspace.tab.state(); return BookWorkspace.tab.tileSetting(s.row, s.pair[1]); })()")
     assert pg.is_visible('#ct_tiles') and pg.get_attribute('#ct_tiles button[data-tp=std]', 'aria-pressed') == 'true' and tset() is None
     pg.click('#ct_tiles button[data-tp=flex]'); wait_aligned(pg, 'more flexible')
     assert tset() == {'main': 8, 'sub': 4} and 'real differences' in pg.inner_text('#ct_tnote'), (tset(), pg.inner_text('#ct_tnote'))
+    assert pg.inner_text('#ct_alval') == 'Flexible', pg.inner_text('#ct_alval')
     pg.click('#ct_tiles button[data-tp=stiff]'); wait_aligned(pg, 'stiffer')
     assert tset() == {'main': 8, 'sub': 2} and 'real differences' not in pg.inner_text('#ct_tnote')
     pg.click('#ct_tadvbtn'); pg.fill('#ct_tmain', '12'); pg.fill('#ct_tsub', '2'); pg.click('#ct_tapply'); wait_aligned(pg, 'advanced')
@@ -144,19 +159,12 @@ def scenario(p, kind):
     pg.click('#ct_next'); wait_aligned(pg, 'next page, own setting'); assert tset() is None, 'the setting belongs to one page only'
     pg.click('#ct_prev'); wait_aligned(pg, 'back'); assert tset() == {'main': 12, 'sub': 2}
     pg.click('#ct_tiles button[data-tp=std]'); wait_aligned(pg, 'standard again'); assert tset() is None and pg.inner_text('#ct_tnote') == ''
-    pg.select_option('#ct_tf', 'perspective'); pg.wait_for_timeout(150); assert not pg.is_visible('#ct_tiles'), 'the tile settings belong to the tile alignment only'
-    pg.select_option('#ct_tf', 'tiles'); wait_aligned(pg, 'tiles once more')
     # what the fine alignment did (V16): movement map over the picture, the rough alignment alone and back; the mismatch warning (V18)
     t = pg.evaluate("CompareTab.lastTiles()"); m = t['movement']
     assert m and m['w'] > 50 and m['h'] > 50 and m['max'] >= 0, m
     pg.check('#ct_mv'); pg.wait_for_timeout(200)
     assert pg.is_visible('#pane_main .ct-mv') and pg.is_visible('#ct_mvleg'), 'movement map and legend shown'
     pg.screenshot(path=SHOTS + '/movement.png') if SHOTS else None
-    w_fine = pg.evaluate("document.querySelector('#result canvas').width")
-    pg.check('#ct_rough'); pg.wait_for_timeout(400); pg.wait_for_function("!document.querySelector('.ct-busy:not([hidden])')", timeout=60000); pg.wait_for_timeout(300)
-    assert not pg.is_visible('#pane_main .ct-mv'), 'no movement map on the rough view'
-    assert pg.evaluate("document.querySelector('#result canvas').width") == w_fine
-    pg.uncheck('#ct_rough'); pg.wait_for_timeout(300); assert pg.is_visible('#pane_main .ct-mv'), 'back to the fine result, map shown again'
     pg.uncheck('#ct_mv'); pg.wait_for_timeout(100); assert not pg.is_visible('#pane_main .ct-mv')
     assert pg.is_visible('#ct_warn') == (t['unmatched_tiles'] > 0.30), ('mismatch warning only above 30 %', t['unmatched_tiles'])
     assert pg.is_visible('#ct_hint') == bool(m.get('hint')), 'the shift hint appears exactly when the engine reports one'
@@ -173,9 +181,12 @@ def scenario(p, kind):
     pg.fill('#ct_q', '4'); assert pg.locator('#ct_list li[data-i]').count() == 1, pg.inner_text('#ct_list')
     pg.click('#ct_list li[data-i="3"]'); wait_aligned(pg, 'list click'); assert 'Page 4' in where(pg), where(pg)
     pg.fill('#ct_q', ''); assert pg.locator('#ct_list li[data-i]').count() == 4
-    # swap, and copy 2 = C (has only two pages): rows 3 and 4 are marked, and "next" skips them
-    pg.click('#ct_swap'); wait_aligned(pg, 'swap'); assert pg.evaluate("document.getElementById('ct_c1').selectedOptions[0].text") == 'B-Test'
-    pg.click('#ct_swap'); wait_aligned(pg, 'swap back')
+    # item 6a: the small arrows beside copy 2 step through the copies (copy 1 is left out); then copy 2 = C (has only two pages): rows 3 and 4 are marked, and "next" skips them
+    pg.click('#ct_c2up'); pg.wait_for_timeout(300); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'C-Test', 'from B back over A (copy 1) to C'
+    pg.click('#ct_c2dn'); wait_aligned(pg, 'arrow: back to B'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
+    pg.evaluate("document.activeElement && document.activeElement.blur()")
+    pg.keyboard.press('.'); pg.wait_for_timeout(300); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'C-Test', 'key . = next copy'
+    pg.keyboard.press(','); wait_aligned(pg, 'key , back to B'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
     pg.select_option('#ct_c2', label='C-Test'); pg.wait_for_selector('.ct-busy.bad:visible', timeout=20000)
     assert 'C-Test has no page' in pg.inner_text('.ct-busy'), pg.inner_text('.ct-busy')      # page 4 does not exist in copy C
     assert pg.locator('#ct_list li.miss').count() == 2, pg.locator('#ct_list li.miss').count()
@@ -315,7 +326,13 @@ def scenario(p, kind):
     pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'back from the pages')
     # ---------------------------------------------------------------- annotations (on page 2 of the book, pair A + B)
     pg.click('#ct_list li[data-i="1"]'); wait_aligned(pg, 'annotations: page 2'); assert 'Page 2' in where(pg), where(pg)
-    assert pg.is_visible('.ct-atools') and pg.locator('.ct-atools button[data-t]').count() == 4
+    # 0.11.0: the tools are folded behind the pen button in the zoom column of the superimposed picture, right above the "Scroll up" arrow
+    assert pg.is_visible('#ct_pen') and not pg.is_visible('.ct-atools') and pg.get_attribute('#ct_pen', 'aria-expanded') == 'false'
+    assert pg.evaluate("document.getElementById('ct_pen').nextElementSibling.title") == 'Scroll up'
+    pg.click('#ct_pen'); pg.wait_for_timeout(150)
+    assert pg.is_visible('.ct-atools') and pg.locator('.ct-atools button[data-t]').count() == 4 and pg.get_attribute('#ct_pen', 'aria-expanded') == 'true'
+    pb = pg.locator('#ct_pen').bounding_box(); tb = pg.locator('.ct-atools').bounding_box()
+    assert tb['x'] + tb['width'] <= pb['x'] + 2 and abs(tb['y'] - pb['y']) < 4, ('the tools stand to the left of the pen', pb, tb)
     def anns(): return pg.evaluate("BookWorkspace.tab.annList(1)")
     def svgbox(sel='#pane_main .ct-ann svg'): return pg.locator(sel).bounding_box()
     def pt(fx, fy):
@@ -381,7 +398,7 @@ def scenario(p, kind):
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(500)
     for sel in ('.ct-top', '#ct_list', '#ct_prev', '#ct_flag', '#ct_map', '#ct_vpill', '.ct-side'):
         assert not pg.is_visible(sel), 'focus mode hides ' + sel
-    assert pg.is_visible('.ct-leave') and pg.is_visible('#pane_main') and pg.is_visible('#fold_strip') and pg.is_visible('.ct-atools') and not pg.is_visible('#ct_sidebtn'), 'the pictures and the annotation tools stay'
+    assert pg.is_visible('.ct-leave') and pg.is_visible('#pane_main') and pg.is_visible('#fold_strip') and pg.is_visible('#ct_pen') and not pg.is_visible('#ct_sidebtn'), 'the pictures and the annotation tools stay'
     h1 = pg.locator('#pane_main').bounding_box(); assert h1['height'] > h0['height'] + 60 and h1['x'] < 5 and h1['y'] < 5, (h0, h1)      # the pictures got the room
     assert pg.is_visible('.ct-toast') and 'Focus mode' in pg.inner_text('.ct-toast')
     pg.keyboard.press('PageDown'); wait_aligned(pg, 'focus: key page down'); assert row_now() == 2

@@ -17,14 +17,19 @@ function compose(A, B) {   // [A;0 0 1] * [B;0 0 1], top two rows
   return [A[0] * B[0] + A[1] * B[3], A[0] * B[1] + A[1] * B[4], A[0] * B[2] + A[1] * B[5] + A[2],
           A[3] * B[0] + A[4] * B[3], A[3] * B[1] + A[4] * B[4], A[3] * B[2] + A[4] * B[5] + A[5]];
 }
-function matOf(cv, W) { const m = new cv.Mat(2, 3, cv.CV_32F); m.data32F.set(W); return m; }
+function matOf(cv, W) { const m = W.length === 9 ? new cv.Mat(3, 3, cv.CV_32F) : new cv.Mat(2, 3, cv.CV_32F); m.data32F.set(W); return m; }
+/* W: 6 numbers (affine, reference -> other scan) or 9 numbers (perspective, a 3 x 3 matrix, B1: photographed pages) */
 function warp(cv, src, W, w, h) {
   const m = matOf(cv, W), d = new cv.Mat();
-  try { cv.warpAffine(src, d, m, new cv.Size(w, h), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0)); }
+  try {
+    if (W.length === 9) cv.warpPerspective(src, d, m, new cv.Size(w, h), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+    else cv.warpAffine(src, d, m, new cv.Size(w, h), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+  }
   catch (e) { d.delete(); throw e; }
   finally { m.delete(); }
   return d;
 }
+function mul3(A, B) { const C = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let v = 0; for (let k = 0; k < 3; k++) v += A[3 * i + k] * B[3 * k + j]; C.push(v); } return C; }
 
 /* local correlation of two pictures (window sigma s) */
 function localCorrelation(cv, a, b, s) {
@@ -127,7 +132,38 @@ function roughAlignIn(cv, ref, mov, box, opts, S) {
     if (cc2 > 0) { Ws = W2; cc = cc2; }
     for (const m of [warped, lc, bl, agreeM]) m.delete();
   }
-  return { W: bg(Ws), ecc: cc, score: mx, scale: s };
+  const out = { W: bg(Ws), ecc: cc, score: mx, scale: s };
+  if (opts.perspective) {                                                                // B1: a second candidate with perspective (the caller chooses)
+    const P = perspectiveIn(cv, refS, movS, Ws, maskS, sw, sh, S);
+    if (P) out.Wp = [P[0], P[1], P[2] * q, P[3], P[4], P[5] * q, P[6] / q, P[7] / q, P[8]];
+  }
+  return out;
 }
 
-module.exports = { roughAlign, warp, gauss, scaled };
+/* B1 (23 Nov 2026, Melopoiae p.6, D-W photographed at a slant): a photo taken at an angle makes the page narrower at one end, which a whole-page
+   move / turn / scale (affine) cannot undo; on that page the rough step left the copy off by up to one staff-line spacing near the bottom, and the
+   tile step then caught the neighbouring line in the empty staves. Here the affine result is refined once more allowing perspective (ECC with
+   MOTION_HOMOGRAPHY, inside the printed area). Returns the 3 x 3 matrix at the small scale, or null (failed, or implausibly strong). */
+function perspectiveIn(cv, refS, movS, Ws, maskS, sw, sh, S) {
+  let H = [Ws[0], Ws[1], Ws[2], Ws[3], Ws[4], Ws[5], 0, 0, 1], ok = false;
+  for (const [sigma, iterations] of [[4, 200], [2, 300], [1.5, 300]]) {
+    const L = scope();
+    try {
+      const Hm = L.add(new cv.Mat(3, 3, cv.CV_32F)); Hm.data32F.set(H);
+      const wv = L.add(new cv.Mat());
+      cv.warpPerspective(movS, wv, Hm, new cv.Size(sw, sh), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+      const br = L.add(gauss(cv, refS, sigma)), bm = L.add(gauss(cv, wv, sigma)), C = L.add(cv.Mat.eye(3, 3, cv.CV_32F));
+      const crit = new cv.TermCriteria(cv.TermCriteria_EPS | cv.TermCriteria_COUNT, iterations, ECC_EPS);
+      try { cv.findTransformECC(br, bm, C, cv.MOTION_HOMOGRAPHY, crit, maskS, 5); H = mul3(H, Array.from(C.data32F)); ok = true; }
+      catch (e) { return null; }
+    } finally { L.free(); }
+  }
+  if (!ok || !H.every(isFinite) || Math.abs(H[8]) < 1e-9) return null;
+  H = H.map(v => v / H[8]);
+  // plausible: the page keeps its orientation, and the two ends differ in scale by at most 30 %
+  const k = Math.abs(H[6]) * sw + Math.abs(H[7]) * sh, det = H[0] * H[4] - H[1] * H[3];
+  if (!(k < 0.3) || !(det > 0)) return null;
+  return H;
+}
+
+module.exports = { roughAlign, warp, gauss, scaled, mul3 };

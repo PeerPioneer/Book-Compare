@@ -1,7 +1,7 @@
 'use strict';
 /* Stored alignments (V10): how one copy's page was bent onto the reference page, kept small enough to keep for a whole book.
    Only the MOVEMENT is stored (decided 21 Nov 2026), never a picture of the result:
-     - W: the rough (whole-page) step, 6 numbers
+     - W: the rough (whole-page) step, 6 numbers (affine) or 9 (perspective, B1)
      - the fine movement of the tiles: for every 4th working pixel of the reference (working height 3000 px) how far the place in the
        other copy lies from where the rough step puts it, in 1/16 px (16-bit numbers), and "outside the scan" as a special value
      - the colour picture of the movement map (V16), cells of 4 x 4 working pixels, mostly transparent

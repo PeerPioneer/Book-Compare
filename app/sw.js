@@ -1,6 +1,6 @@
 // Book Compare's service worker: keeps the website's files so that it also opens without a connection.
 // Change CACHE_NAME whenever a file listed here changes, so that the browsers load the new files.
-const CACHE_NAME = "imcomp-mdc-pwa-v31";
+const CACHE_NAME = "imcomp-mdc-pwa-v32";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -17,7 +17,7 @@ const staticAssets = [
     './js/compare.js',
     './js/panes.js',
     './js/main.js',
-    './js/samples.js',
+    './js/examples.js',
     './js/workspace.js',
     './js/workspace.css',
     './js/compare-annot.js',
@@ -35,16 +35,12 @@ const staticAssets = [
     './deps/material-components-web.min.js',
     './deps/material-components-web.min.css',
     './fonts/material-icons.ttf',
+    './images/examples/welcome-1.jpg',
+    './images/examples/welcome-2.jpg',
     './images/usecases/book/case2-traherne2-a-original.jpg',
     './images/usecases/book/case2-traherne2-b-original.jpg',
-    './images/usecases/churchill/case3-churchill-1.jpg',
-    './images/usecases/churchill/case3-churchill-2.jpg',
-    './images/usecases/painting/giovanni-1.jpg',
-    './images/usecases/painting/giovanni-2.jpg',
     './images/usecases/music/case5-music-sheet-1.jpg',
     './images/usecases/music/case5-music-sheet-2.jpg',
-    './images/usecases/satellite/Original-Tokyo-2017.jpg',
-    './images/usecases/satellite/Original-Tokyo-1986.jpg',
     './images/usecases/puzzle/case6-puzzle-1-a.jpg',
     './images/usecases/puzzle/case6-puzzle-1-b.jpg',
 ]

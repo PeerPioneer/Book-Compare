@@ -48,7 +48,7 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
   ctx.drawImage(bmp, 0, 0); bmp.close();
   var src = cv.matFromImageData(ctx.getImageData(0, 0, mw, mh)); oc.width = oc.height = 1;
   var Wr = ref.cols, Hr = ref.rows, Wm = Math.round(mw * 3000 / mh), Hm = 3000;          // working sizes (reference and other copy)
-  var W = r.W, mxA = r.map ? r.map.mx.data32F.slice() : null, myA = r.map ? r.map.my.data32F.slice() : null;
+  var W = r.W, P = W.length === 9, mxA = r.map ? r.map.mx.data32F.slice() : null, myA = r.map ? r.map.my.data32F.slice() : null;
   var out = new Uint8ClampedArray(refW0 * refH0 * 4), STRIP = 256;
   // for every column / row of the result: the two neighbouring working pixels and the weight
   function axis(n0, n) { var i0 = new Int32Array(n0), wt = new Float32Array(n0), f = n / n0; for (var k = 0; k < n0; k++) { var v = Math.min(Math.max((k + 0.5) * f - 0.5, 0), n - 1.001); i0[k] = Math.floor(v); wt[k] = v - i0[k]; } return { i: i0, w: wt }; }
@@ -70,6 +70,7 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
               py = (myA[p00] * (1 - wx) + myA[p01] * wx) * (1 - wy) + (myA[p10] * (1 - wx) + myA[p11] * wx) * wy;
             } else { px = i + wx; py = j + wy; }
             var u = W[0] * px + W[1] * py + W[2], v = W[3] * px + W[4] * py + W[5];           // working place in the other copy
+            if (P) { var dn = W[6] * px + W[7] * py + W[8]; u /= dn; v /= dn; }                 // (B1: a perspective rough step)
             ax[o + x] = (u + 0.5) * sx - 0.5; ay[o + x] = (v + 0.5) * sy - 0.5;               // its full-size place
           }
         }
