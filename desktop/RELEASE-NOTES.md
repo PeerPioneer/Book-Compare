@@ -6,6 +6,6 @@
 
 Windows may say "Windows protected your PC" (unknown publisher), because the installer is not signed yet. Click "More info", then "Run anyway".
 
-An older version does not need to be removed first: installing the new one replaces it. Your projects stay where you saved them.
+An older version does not need to be removed first: installing the new one replaces it. From version 0.10.0 on, Book Compare can also update itself: when it says that a new version is available, choose "Update now". Your projects stay where you saved them.
 
 What is new: see [CHANGELOG.txt](https://github.com/PeerPioneer/Book-Compare/blob/main/CHANGELOG.txt). Book Compare in the browser, without installing: https://peerpioneer.github.io/Book-Compare/

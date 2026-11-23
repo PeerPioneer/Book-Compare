@@ -172,7 +172,7 @@ class Compare {
         this.visualisation_select.classList.remove('hide');
         this.link_option.classList.remove('hide');
         this.visualisation_select.MDCSelect.setValue('diff');
-        this.visualisation_select.querySelector('#selected-text').textContent = 'Difference';
+        this.visualisation_select.querySelector('#selected-text').textContent = 'Superimposed';
         this.footer.querySelector('.bar').classList.replace('step2', 'step3');
         window.requestAnimationFrame(() => {
             this.action_bar.reset();
@@ -218,7 +218,7 @@ class Compare {
 
         this.visualisation_select.classList.add('hide');
         this.visualisation_select.MDCSelect.setValue('diff');
-        this.visualisation_select.querySelector('#selected-text').textContent = 'Difference';
+        this.visualisation_select.querySelector('#selected-text').textContent = 'Superimposed';
 
         go_to_screen(this.cc, {inline: 'start'});
         this.footer.querySelector('.bar').classList.replace('step3', 'step2');

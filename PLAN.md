@@ -1052,6 +1052,29 @@ from memory. Status: **done** / **next** / **waiting** (needs something first) /
 |----|--------|------|
 | S10 | **done 20 Nov:** **Add single pictures with the ordinary Windows "Open" window**: a button "Add single pictures…" opens the same file window as in any Windows program; one or several pictures are chosen there (Ctrl- or Shift-click) and go into the copy. The tick boxes in "Add a folder" (S3) stay | **decided 19 Nov (owner)**, to be built in the next coding round (on Sonnet). With the helper the window is opened by the helper, like its folder window today (`launcher/pickfolder.ps1`); the desktop program (V5) has such a window built in, so the button carries over. On the website without the helper the tick boxes remain the way, because a browser can reopen pictures later only from a folder it was given. **As built 20 Nov:** button "Add single pictures …" next to "Choose another folder …" in *Add a copy* and *Add files* (only with the helper); the helper's window (`pickfolder.ps1`, `BC_PICK_MODE=files`) returns the folder and the names; the folder is registered like a scan folder and the chosen pictures arrive ticked; the window opens in the folder of the last single pictures. Tested: helper API and the page (`test_helper.py`), the real Windows window on CI (`windows-checks.ps1`: cancel, and two names typed into the file-name box) |
 
+### 11.1c The review of 22 November 2026 (items 1-38 of the review, N1-N7 the owner's new requests)
+
+Built 22-23 Nov 2026 as **version 0.10.0** (details in CHANGELOG.txt).
+
+| ID | Item | Status |
+|----|------|--------|
+| R2, R12-R16 | One top bar in both views (name, project name, save state, tabs Pages / Compare, "?", one menu "⋮" with Project / Grid / Export / Help); no ☰ (fold handle on the panel edge); no bottom bar in the Pages view; start screen Continue / Open project … / New project, single pictures and samples as small links; old tour removed | **done 0.10.0** |
+| R4, R5 | Keys in the help of the Compare tab; one-line notices with "Show" | **done 0.10.0** |
+| R7, R9 | Copy 1 and copy 2 folded away by default; "Difference" renamed "Superimposed" | **done 0.10.0** |
+| R11 | Colour choice next to the legend; orange / dark blue removed; teal / pink added | **done 0.10.0**; the default pair: **waiting for the owner** (red stays; red / blue proposed) |
+| R17, R18, R20, R21, R22 | Compact Pages toolbar + menu of the cell (right mouse button); "Insert gap above …" asks how many; double-click = compare with the reference; stored-status dots, aligned count, unfinished run offered again; shorter heading | **done 0.10.0** |
+| R23-R33, R35, R37, R38 | Background dialog layout fixed; shorter dialogs; one wording; messages above dialogs; save on close; stored alignments dialog (size, clean-up); content fingerprint; relative folder addresses; memory cap for helpers; index written on close; helper preloaded; one-click update (electron-updater); contrast and text size; long-run test | **done 0.10.0** |
+| R34 | Code signing | **decided: no certificate** (the warning stays) |
+| R36 | Stored results on the website (browser storage) | **waiting for the owner** |
+| R1 | Left panel of the Compare tab (tile settings explained, mock-ups A / B / C) | **waiting for the owner** (A recommended); the arrows of the movement map are done |
+| R3, R6, R8, R10, R19 | Mock-up / explanation sent: R6 annotation symbols, R8 where the annotation tools fold away, R10 "clean paper" switch, R19 small pictures in the grid (switchable) | **waiting for the owner** |
+| N1 | Copy 2 view: Aligned / Original scan; copy names in the labels | **done 0.10.0** |
+| N2 | Project name in the Pages view (example: De humani corporis fabrica · Oporinus, Basel 1543) | **done 0.10.0** |
+| N3 | New example pages from 15th/16th-century books with free licences | **researched 22 Nov** (BSB own scans PDM; pairs: Liber selectarum D-Mbs/D-Sl, Schedel 1493 BSB/Frankfurt, Ptolemy 1482 BSB/Zürich text and map; no title-page pair yet) – **waiting for the owner** (which pairs, which folio) |
+| N4 | New name, tagline, logo, file ending | **waiting for the owner** (nothing renamed until decided) |
+| N5, N6 | Gap goes above (said and asked); first column resizable | **done 0.10.0** |
+| N7 | Leftovers removed (prototypes/, dev-readme, .prettierignore, tour animations, two logos, experiment scripts, the Python prototype) | **done 0.10.0** |
+
 ### 11.2 After version 1
 
 | ID | Item | Status |

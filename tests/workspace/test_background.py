@@ -154,6 +154,26 @@ def scenario(p, kind):
     menu(pg, 'bg'); pg.click('#bg-go'); t = wait_strip(pg, ['finished'], 60)
     assert '0 pages aligned' in t and '4 already stored' in t, t
     pg.click('#ws-bg [data-bg=close]')
+    # item 21: a small dot in every stored cell, and how many pages of a copy are aligned, in its heading
+    for _ in range(20):
+        if pg.locator('#ws .ws-st').count() == 4: break
+        pg.wait_for_timeout(250)
+    assert pg.locator('#ws .ws-st').count() == 4, pg.locator('#ws .ws-st').count()
+    assert '2 aligned' in pg.inner_text('#ws .ws-hcell[data-c="1"] .ws-hmeta') and 'aligned' not in pg.inner_text('#ws .ws-hcell[data-c="0"] .ws-hmeta')
+    # item 29: a scan with another date but the same content (copied to another computer): the stored results still fit
+    fb = os.path.join(BOOKS, 'Copy-B', 'p1.jpg'); st0 = os.stat(fb); os.utime(fb, ns=(st0.st_atime_ns, st0.st_mtime_ns + 10 * 86400 * 10**9))
+    try:
+        menu(pg, 'bg'); pg.click('#bg-go'); t = wait_strip(pg, ['finished'], 60)
+        assert '0 pages aligned' in t and '4 already stored' in t, ('a new date alone does not make a stored result stale', t)
+    finally: os.utime(fb, ns=(st0.st_atime_ns, st0.st_mtime_ns))
+    pg.click('#ws-bg [data-bg=close]'); pg.wait_for_timeout(1300)
+    assert project().get('bgRun') is None, 'a finished run is not remembered'
+    # item 21: a run that did not finish is offered again (here: as if the program had been closed during the run)
+    pg.evaluate("BookWorkspace.tab.setBgRun({ ids: [%d], n: 1 })" % B); pg.wait_for_timeout(1300); assert project().get('bgRun') == {'ids': [B], 'n': 1}
+    pg.evaluate("BCBackground.offer({ ids: [%d], n: 1 })" % B); pg.wait_for_timeout(200)
+    assert 'not finished' in pg.inner_text('#ws-bg') and 'B-Test' in pg.inner_text('#ws-bg'), pg.inner_text('#ws-bg')
+    pg.click('#ws-bg [data-bg=resume]'); t = wait_strip(pg, ['finished'], 60); assert '2 already stored' in t, t
+    pg.click('#ws-bg [data-bg=close]'); pg.wait_for_timeout(1300); assert project().get('bgRun') is None
     # --- the Compare tab: reference pair from the stored movement; another pair directly, the next page prepared meanwhile ----------------
     pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300)
     t0 = time.time(); pg.click('#ws-compare'); wait_aligned(pg, 'reference pair'); took = time.time() - t0
@@ -224,6 +244,15 @@ def scenario(p, kind):
         time.sleep(0.25)
     assert not project().get('boxes'), project().get('boxes')
     pg.uncheck('#ct_box'); pg.wait_for_timeout(200); assert not pg.is_visible('#pane_main .ct-qbox')
+    # --- item 28: how much is stored, and removing what is no longer needed ------------------------------------------------------------
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
+    menu(pg, 'stored'); dlg = pg.inner_text('#ws-scrim')
+    assert '4 pages stored' in dlg and 'still needed' in dlg and 'MB' in dlg, dlg
+    pg.click('#ws-scrim [data-close]')
+    pg.locator('#ws .ws-cell[data-c="1"][data-r="1"]').click(); pg.click('#ws-toolbar [data-act=del]'); pg.wait_for_timeout(1500)    # p2 of B-Test leaves the grid
+    menu(pg, 'stored'); dlg = pg.inner_text('#ws-scrim'); assert '1 of them is no longer needed' in dlg, dlg
+    pg.click('#st-prune'); pg.wait_for_timeout(800)
+    assert len(index()['entries']) == 3 and len([f for f in os.listdir(RES) if f.endswith('.bin')]) == 3, os.listdir(RES)
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

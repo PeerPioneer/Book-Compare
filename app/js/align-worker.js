@@ -810,11 +810,28 @@ function movementMap(r, W, H, box) {
     }
     if (n >= MV_MIN) hint = { px: Math.round(best), cells: n, x: X0 / mw, y: Y0 / mh, w: (X1 + 1 - X0) / mw, h: (Y1 + 1 - Y0) / mh };
   }
-  return { w: mw, h: mh, pixels: px.buffer, max: Math.round(max * 10) / 10, hint: hint };
+  var arrows = mx ? movementArrows(mx, my, W, H, function (x, y) { return D[Math.floor(y / F) * mw + Math.floor(x / F)] >= 2; }) : [];
+  return { w: mw, h: mh, pixels: px.buffer, max: Math.round(max * 10) / 10, hint: hint, arrows: arrows, W: W, H: H };
+}
+// The arrows of the movement map (owner 21 Nov 2026): on a coarse grid (18 rows of arrows on the page), the direction in which the fine
+// alignment moved that part of copy 2, as [x, y, dx, dy] in working pixels; only where it moved by 2 px or more (keep(x, y)).
+// The map gives, for every place of the result, where in the (roughly placed) copy its ink came from: the ink moved by (x - mx, y - my).
+var MV_ROWS = 18;
+function movementArrows(mx, my, W, H, keep) {
+  var S = Math.max(16, Math.round(H / MV_ROWS)), out = [];
+  for (var y = S >> 1; y < H; y += S) for (var x = S >> 1; x < W; x += S) {
+    var p = y * W + x, sx = mx[p], sy = my[p];
+    if (!(sx > -50 && sx < W + 50 && sy > -50 && sy < H + 50)) continue;
+    if (keep && !keep(x, y)) continue;
+    var dx = x - sx, dy = y - sy;
+    if (Math.hypot(dx, dy) < 2) continue;
+    out.push([x, y, Math.round(dx * 10) / 10, Math.round(dy * 10) / 10]);
+  }
+  return out;
 }
 
 
-module.exports = { movementMap, MV_BIG, MV_EDGE };
+module.exports = { movementMap, movementArrows, MV_BIG, MV_EDGE };
 
 };
 __defs["stored_movement"] = function (module, exports, require) {
@@ -1056,7 +1073,8 @@ var handlers = {
   warpStored: async function (m) {
     var cv = (await loadOpenCv()).cv, Sm = require('./stored_movement'), t0 = performance.now();
     var st = Sm.unpack(await Sm.decompress(new Uint8Array(m.bin))), meta = st.meta, map = null;
-    if (st.map) { var up = Sm.upsample(st.map, meta.Wr, meta.Hr); map = { mx: { data32F: up.mx }, my: { data32F: up.my } }; }
+    var up = null;
+    if (st.map) { up = Sm.upsample(st.map, meta.Wr, meta.Hr); map = { mx: { data32F: up.mx }, my: { data32F: up.my } }; }
     var bmp;
     try { bmp = await createImageBitmap(m.file); }
     catch (e) { throw new Error('The browser could not open the scan "' + (m.file.name || 'picture') + '" (' + (m.file.size / 1e6).toFixed(1) + ' MB).'); }
@@ -1066,7 +1084,12 @@ var handlers = {
       unmatched_tiles: meta.unmatched_tiles, unmatched_rough: meta.unmatched_rough, sparse: meta.sparse, ink_density: meta.ink_density, margin_moved: 0, movement: null,
       box: meta.box || null, quad: meta.quad || null };
     res.transfer = [px.buffer];
-    if (st.mv) { var mvpx = new Uint8ClampedArray(st.mv); res.movement = { w: meta.mvw, h: meta.mvh, pixels: mvpx.buffer, max: meta.max, hint: meta.hint }; res.transfer.push(mvpx.buffer); }
+    if (st.mv) {
+      var mvpx = new Uint8ClampedArray(st.mv), mw = meta.mvw, Mv = require('./movement');
+      // the arrows again from the stored map: only where the movement picture is coloured (moved by 2 px or more, inside the tile area)
+      var arrows = up ? Mv.movementArrows(up.mx, up.my, meta.Wr, meta.Hr, function (x, y) { return mvpx[(Math.floor(y / 4) * mw + Math.floor(x / 4)) * 4 + 3] > 0; }) : [];
+      res.movement = { w: mw, h: meta.mvh, pixels: mvpx.buffer, max: meta.max, hint: meta.hint, arrows: arrows, W: meta.Wr, H: meta.Hr }; res.transfer.push(mvpx.buffer);
+    }
     return res;
   },
   align: async function (m) {
@@ -1105,7 +1128,7 @@ var handlers = {
       var res = { w: refState.w0, h: refState.h0, pixels: px.buffer, decode_s: d.decode_s, rough_s: t.rough_s, tiles_s: t.tiles_s + t.warp_s, colour_s: (performance.now() - t0) / 1000,
         unmatched_rough: r.unmatched.rough, unmatched_tiles: r.unmatched.tiles, sparse: r.sparse, ink_density: r.density, margin_moved: r.margin ? r.margin.moved.length : 0,
         box: refState.autoBoxF, quad: refState.quad || null,
-        movement: { w: mv.w, h: mv.h, pixels: mv.pixels, max: mv.max, hint: mv.hint } };
+        movement: { w: mv.w, h: mv.h, pixels: mv.pixels, max: mv.max, hint: mv.hint, arrows: mv.arrows, W: mv.W, H: mv.H } };
       res.transfer = [px.buffer, mv.pixels];
       if (bin) { res.bin = bin; res.transfer.push(bin); }
       return res;

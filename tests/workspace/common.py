@@ -87,6 +87,19 @@ def add_copy(pg, key, name, start=None, ticks=()):
     if start: pg.fill('#ac-start', str(start))
     for i in ticks: pg.check('#ac-groups input[data-g="%d"]'%i)
     pg.click('#ac-ok'); pg.wait_for_timeout(600)
+def cellmenu(pg, act, right_click=None):
+    # the less frequent cell actions are in the menu "More for this cell" (or the right mouse button on a cell, right_click = locator)
+    if right_click is not None: right_click.click(button='right')
+    else: pg.click('#ws-cellmore')
+    pg.wait_for_timeout(120); pg.click('#ws-ctx [data-act=%s]' % act)
+def cellmenu_enabled(pg, act):
+    pg.click('#ws-cellmore'); pg.wait_for_timeout(100)
+    on = pg.locator('#ws-ctx [data-act=%s]' % act).is_enabled()
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(80)
+    return on
+def insert_gap(pg, n):
+    # "Insert gap above …" asks how many empty cells
+    pg.click('#ws-toolbar [data-act=gap]'); pg.wait_for_timeout(120); pg.fill('#gapN', str(n)); pg.click('#gap-ok')
 def leave_compare(pg):
     # from the Compare screen back to the pages: the Compare tab has the PAGES tab (it has no Back button any more); the old two-image screen has Back
     pg.click('#ct_tab_pages' if pg.is_visible('#ct_tab_pages') else '#back')

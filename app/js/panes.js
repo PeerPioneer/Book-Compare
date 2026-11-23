@@ -462,20 +462,77 @@
         return 'ws-three';
     };
 
-    // The two side panels show copy 1 as it is and copy 2 moved onto it.
+    // The two side panels show copy 1 as it is and copy 2 moved onto it. In the "Copy 2" view the switch
+    // "Aligned | Original scan" shows copy 2 as it was scanned instead: the whole scan, unchanged, scaled to fit
+    // the same frame (copy 1 is the reference: the alignment never changes it, so it has no such switch).
+    let o2_original = false;
+    const original_copy2 = () => {
+        const list = document.querySelector('ul.mdc-image-list.vertical-image-list');
+        const img = list && list.querySelectorAll('img')[1];
+        return img && img.complete && img.naturalWidth ? img : null;
+    };
+    const showing_original = () => o2_original && current_mode === 'onlyimage2' && !!original_copy2();
+    const draw_copy2 = () => {
+        const r = result;
+        if (!r || !r.ocanvas.width) return;
+        const c = copy2.canvas, w = r.tcanvas.width, h = r.tcanvas.height;
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        const img = showing_original() ? original_copy2() : null;
+        if (img) {
+            const k = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+            const dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+            g.fillStyle = '#e4e4e4'; g.fillRect(0, 0, w, h);
+            g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        } else {
+            g.drawImage(r.tcanvas, 0, 0);
+        }
+        workspace_el.classList.toggle('ws-o2orig', !!img);
+        update_copy_labels();
+    };
     const draw_pane_sources = () => {
         const r = result;
         if (!r || !r.ocanvas.width) return;
-        [[copy1, r.ocanvas], [copy2, r.tcanvas]].forEach(([p, src]) => {
-            p.canvas.width = src.width;
-            p.canvas.height = src.height;
-            p.canvas.getContext('2d').drawImage(src, 0, 0);
+        copy1.canvas.width = r.ocanvas.width;
+        copy1.canvas.height = r.ocanvas.height;
+        copy1.canvas.getContext('2d').drawImage(r.ocanvas, 0, 0);
+        draw_copy2();
+    };
+    // Labels: in the Compare tab the copies are named as in the grid, with the file name below; the two-image
+    // screens show the file names.
+    const update_copy_labels = () => {
+        const r = result;
+        const files = (r && r.selected_filename_list) || [];
+        const copies = window.BC_PANE_NAMES || [];          // Compare tab: "name of the copy · page" (js/compare-tab.js)
+        const label = (i, head) => {
+            if (copies[i]) return head + ' · ' + copies[i];
+            return head + (files[i] ? ': ' + files[i] : '');
+        };
+        copy1.set_label(label(0, 'Copy 1'));
+        copy2.set_label(label(1, showing_original() ? 'Copy 2, original scan' : 'Copy 2, aligned'));
+    };
+    const o2_switch = el('o2_switch');
+    const render_o2_switch = () => {
+        o2_switch.querySelectorAll('button').forEach((b) => {
+            const on = (b.dataset.o2 === 'original') === o2_original;
+            b.classList.toggle('on', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
     };
+    o2_switch.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-o2]');
+        if (!b) return;
+        o2_original = b.dataset.o2 === 'original';
+        render_o2_switch();
+        draw_copy2();
+        copy2.update_bars && copy2.update_bars();
+    });
+    render_o2_switch();
+    window.BCCopy2View = { original: () => showing_original(), set: (orig) => { o2_original = !!orig; render_o2_switch(); draw_copy2(); }, relabel: () => update_copy_labels() };
 
     // The main panel's label is always "Superimposed", plus two extra lines
-    // explaining the colors while in Difference mode specifically.
-    let current_mode = 'diff'; // the app starts in Difference mode
+    // explaining the colors while in the Superimposed view (mode 'diff').
+    let current_mode = 'diff'; // the app starts in the Superimposed view
     const update_main_label = () => {
         let note = '';
         if (current_mode === 'diff') {
@@ -490,7 +547,15 @@
             note = `\n[[${DIFF_COLOR_1}]]${nm(preset && preset.n1)} = ${copy(0)}` +
                    `\n[[${DIFF_COLOR_2}]]${nm(preset && preset.n2)} = ${copy(1)}`;
         }
-        main.set_label('Superimposed' + note);
+        main.set_label((current_mode === 'toggle' ? 'Toggle (copy 1 and copy 2 in turn)' : 'Superimposed') + note);
+        if (current_mode === 'diff') {                    // the colour choice sits right next to the legend (item 11)
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'pane__lblbtn'; b.id = 'legend_colors';
+            b.textContent = 'Change colors …'; b.title = 'Choose the two colors of the Superimposed view';
+            b.addEventListener('click', () => document.dispatchEvent(new CustomEvent('opendiffcolors')));
+            main.label.appendChild(document.createElement('br'));
+            main.label.appendChild(b);
+        }
     };
 
     document.addEventListener('diffcolorschange', update_main_label);
@@ -502,11 +567,27 @@
 
         current_mode = mode;
         update_main_label();
+        draw_copy2();                       // the original scan of copy 2 only in the "Copy 2" view
 
         // Panels just changed visibility/size (main hidden, or o1/o2 now
         // full-width/full-height) - give them a nudge to measure again.
         remeasure();
     });
+
+    // Copy 1 and copy 2 beside the superimposed picture: folded away by default (the strip at the right
+    // edge opens them, "Fold away" closes them again); the choice is remembered on this computer.
+    const FOLD_KEY = 'bookcompare_side_panels';
+    const set_folded = (folded, keep) => {
+        workspace_el.classList.toggle('ws-folded', folded);
+        if (keep) { try { localStorage.setItem(FOLD_KEY, folded ? 'folded' : 'open'); } catch (err) { /* private mode */ } }
+        remeasure();
+    };
+    let start_open = false;
+    try { start_open = localStorage.getItem(FOLD_KEY) === 'open'; } catch (err) { /* private mode */ }
+    set_folded(!start_open, false);
+    el('fold_strip').addEventListener('click', () => set_folded(false, true));
+    el('fold_btn').addEventListener('click', () => set_folded(true, true));
+    window.BCPanels = { folded: () => workspace_el.classList.contains('ws-folded'), fold: (f) => set_folded(!!f, true) };
 
     // A new comparison arrived: load the three pictures and start from the whole page
     document.addEventListener('transform', () => {
@@ -516,10 +597,8 @@
 
         draw_pane_sources();
 
-        const names = r.selected_filename_list || [];
         update_main_label();
-        copy1.set_label('Copy 1' + (names[0] ? ': ' + names[0] : ''));
-        copy2.set_label('Copy 2, aligned' + (names[1] ? ': ' + names[1] : ''));
+        update_copy_labels();
         panes.forEach((p) => {
             p.set_natural(w, h);
         });

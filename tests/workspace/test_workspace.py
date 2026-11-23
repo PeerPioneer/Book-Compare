@@ -38,13 +38,13 @@ with sync_playwright() as p:
     assert col(pg, 2)[:6] == ['x_1.jpg', 'x_3.jpg', 'x_5.jpg', 'x_2.jpg', 'x_4.jpg', 'x_6.jpg']
     assert thumbs(pg, 2), 'thumbnails should load'
     # editing and undo/redo (also by keyboard)
-    cell(1, 4).click(); pg.fill('#gapN', '2'); pg.click('[data-act=gap]'); pg.wait_for_timeout(150)
+    cell(1, 4).click(); insert_gap(pg, 2); pg.wait_for_timeout(150)
     assert col(pg, 1)[4:6] == ['-', '-']
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(150); assert col(pg, 1)[4] == 'img_10.JPG'
     pg.keyboard.press('Control+y'); pg.wait_for_timeout(150); assert col(pg, 1)[4] == '-'
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
     # "Start numbering" asks for pagination or foliation
-    cell(0, 1).click(); pg.click('[data-act=startnum]'); pg.wait_for_timeout(150)
+    cell(0, 1).click(); cellmenu(pg, 'startnum'); pg.wait_for_timeout(150)
     assert pg.locator('#ws-scrim input[name=nm-style]').count() == 2 and pg.locator('#ws-scrim input[value=page]').is_checked()
     pg.check('#ws-scrim input[value=folio]'); pg.click('#nm-ok'); pg.wait_for_timeout(150)
     lbl = lambda r: pg.locator('#ws .ws-lbl[data-r="%d"] b' % r).inner_text()
@@ -69,6 +69,30 @@ with sync_playwright() as p:
     assert d['version'] == 2 and len(d['roots']) == 3 and all(len(c['locs']) == 1 for c in d['copies']) and 'tray' not in d
     # column width, moving a copy, deleting a range of files with Shift (the grid is left as it was)
     import gridchecks; gridchecks.run(pg, col, lambda: read_project(pg))
+    # N2: the project's name, in the top bar; kept in the project file
+    assert 'De humani corporis fabrica' in pg.get_attribute('#ws-title', 'placeholder')
+    pg.fill('#ws-title', 'Liber selectarum cantionum · Grimm & Wirsung, Augsburg 1520'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1300)
+    assert read_project(pg)['title'] == 'Liber selectarum cantionum · Grimm & Wirsung, Augsburg 1520'
+    pg.keyboard.press('Control+z'); pg.wait_for_timeout(200); assert pg.input_value('#ws-title').startswith('Liber'), 'the grid undo leaves the name alone'
+    pg.keyboard.press('Control+y'); pg.wait_for_timeout(200)
+    # N6: the first column (row names) can be made wider and narrower, like the others; a double-click fits the names
+    lw = lambda: pg.evaluate("document.querySelector('#ws .ws-corner').getBoundingClientRect().width")
+    w0 = lw(); bb = pg.locator('#ws .ws-rz[data-c=lbl]').bounding_box(); x = bb['x'] + bb['width'] / 2; y = bb['y'] + bb['height'] / 2
+    pg.mouse.move(x, y); pg.mouse.down(); pg.mouse.move(x + 30, y, steps=4); pg.mouse.move(x + 60, y, steps=4); pg.mouse.up(); pg.wait_for_timeout(1300)
+    assert abs(lw() - (w0 + 60)) < 2 and abs(pg.evaluate("document.querySelector('#ws .ws-lbl').getBoundingClientRect().width") - (w0 + 60)) < 2, (w0, lw())
+    assert read_project(pg)['lblw'] == round(w0 + 60), read_project(pg).get('lblw')
+    pg.dblclick('#ws .ws-rz[data-c=lbl]'); pg.wait_for_timeout(200); assert 64 <= lw() < w0 + 60, lw()
+    # N5 / item 18: the gap goes ABOVE the selected cell, and the number is asked for
+    cell(1, 2).click(); pg.click('#ws-toolbar [data-act=gap]'); pg.wait_for_timeout(150)
+    assert 'above' in pg.inner_text('#ws-scrim') and pg.input_value('#gapN') == '1'; pg.click('#ws-scrim [data-close]')
+    # item 17: the right mouse button on a cell opens the menu of the cell, its copy and its row
+    cell(1, 2).click(button='right'); pg.wait_for_timeout(150)
+    assert pg.is_visible('#ws-ctx') and [t.strip().split(' (')[0].upper() for t in pg.locator('#ws-ctx .ws-mhead').all_inner_texts()] == ['THIS CELL', 'THIS COPY', 'THIS ROW']
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(100); assert pg.locator('#ws-ctx').count() == 0
+    # the one menu: Project, Grid, Export (only in the Compare tab) and Help
+    pg.click('#ws-more'); heads = [t.strip().upper() for t in pg.locator('#ws-menu .ws-mhead').all_inner_texts()]
+    assert heads == ['PROJECT', 'GRID', 'EXPORT', 'HELP'] and not pg.locator('#ws-menu [data-m=x-view]').is_enabled(), heads
+    pg.keyboard.press('Escape')
     # deleting a file: gone from the workspace, no "set aside" tray, the scan itself is untouched
     assert pg.locator('#ws-tray').count() == 0 and 'Set aside' not in pg.inner_text('#ws')
     cell(2, 0).click(); assert pg.inner_text('[data-act=del]') == 'Delete file'; pg.click('[data-act=del]'); pg.wait_for_timeout(1500)     # automatic saving
@@ -77,13 +101,13 @@ with sync_playwright() as p:
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(150); assert col(pg, 2)[0] == 'x_1.jpg'          # undo
     pg.keyboard.press('Delete'); pg.wait_for_timeout(150); assert col(pg, 2)[0] == 'x_3.jpg'              # Delete key
     # add the deleted file to the copy again, at the end
-    cell(2, 0).click(); pg.click('[data-act=addfiles]'); pg.wait_for_timeout(700)
+    cell(2, 0).click(); cellmenu(pg, 'addfiles'); pg.wait_for_timeout(700)
     assert 'x_1.jpg' in pg.inner_text('#af-list') and 'x_3.jpg' not in pg.inner_text('#af-list')
     pg.check('#af-list input[data-gall]'); pg.click('#af-ok'); pg.wait_for_timeout(300)
     c2 = col(pg, 2)
     assert c2[:5] == ['x_3.jpg', 'x_5.jpg', 'x_2.jpg', 'x_4.jpg', 'x_6.jpg'] and c2[5] == 'x_1.jpg', c2
     # add pages from another folder (Copy-B, picked once) to the end of copy A
-    cell(0, 7).click(); pg.click('[data-act=addfiles]'); pg.wait_for_timeout(500)
+    cell(0, 7).click(); cellmenu(pg, 'addfiles'); pg.wait_for_timeout(500)
     assert pg.is_checked('input[name=af-where][value=end]')
     pg.evaluate("window.__picks.push(window.__h.B)"); pg.click('#af-folder'); pg.wait_for_timeout(600)
     assert 'img_1.JPG' in pg.inner_text('#af-list')
@@ -94,13 +118,13 @@ with sync_playwright() as p:
     assert len(dd['roots']) == 3, 'Copy-B is already a known folder: no new root'
     cell(0, 9).click(); pg.wait_for_timeout(900); assert thumbs(pg, 1)       # previews of the files from the second folder
     # an empty cell is filled first ...
-    cell(1, 0).click(); pg.click('[data-act=addfiles]'); pg.wait_for_timeout(500)
+    cell(1, 0).click(); cellmenu(pg, 'addfiles'); pg.wait_for_timeout(500)
     assert pg.is_checked('input[name=af-where][value=row]') and pg.input_value('#af-row') == '1'
     pg.select_option('#af-known', label='Copy-A'); pg.wait_for_timeout(600)
     pg.locator('#af-list input[data-j="0"]').first.check(); pg.click('#af-ok'); pg.wait_for_timeout(500)
     assert col(pg, 1)[:3] == ['scan_001.jpg', 'img_1.JPG', 'img_2.JPG'], col(pg, 1)
     # ... and where a cell is taken, the pages below move down
-    cell(1, 1).click(); pg.click('[data-act=addfiles]'); pg.wait_for_timeout(500)
+    cell(1, 1).click(); cellmenu(pg, 'addfiles'); pg.wait_for_timeout(500)
     pg.select_option('#af-known', label='Copy-A'); pg.wait_for_timeout(600)
     pg.locator('#af-list details').first.evaluate("d => d.open = true"); pg.wait_for_timeout(200)
     pg.locator('#af-list input[data-j="0"]').first.check()

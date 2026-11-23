@@ -1,7 +1,7 @@
 {
   "name": "book-compare",
   "productName": "Book Compare",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Compare scans of copies of early printed books, page by page.",
   "author": "Torge Schiefelbein",
   "license": "BSD-2-Clause",
@@ -38,8 +38,16 @@
         ]
       }
     ],
+    "publish": [
+      { "provider": "github", "owner": "PeerPioneer", "repo": "Book-Compare", "releaseType": "release" }
+    ],
     "fileAssociations": [
-      { "ext": "bookcompare", "name": "Book Compare project", "description": "Book Compare project", "role": "Editor" }
+      {
+        "ext": "bookcompare",
+        "name": "Book Compare project",
+        "description": "Book Compare project",
+        "role": "Editor"
+      }
     ],
     "win": {
       "target": [
@@ -64,5 +72,8 @@
       "deleteAppDataOnUninstall": false,
       "include": "build/installer.nsh"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

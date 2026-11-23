@@ -65,6 +65,13 @@ jobs:
           $setup = Get-ChildItem desktop\dist -Filter 'Book-Compare-Setup-*.exe' | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File tests\windows\installer-checks.ps1 -Setup $setup.FullName
           if ($LASTEXITCODE -ne 0) { throw 'installer checks failed' }
+      - name: The update description for the one-click update is there
+        shell: bash
+        run: |
+          v=$(node -p "require('./desktop/package.json').version")
+          cat desktop/dist/latest.yml
+          test -f desktop/dist/latest.yml && grep -q "version: $v" desktop/dist/latest.yml && grep -q "sha512:" desktop/dist/latest.yml
+          test -f desktop/dist/win-unpacked/resources/app-update.yml && cat desktop/dist/win-unpacked/resources/app-update.yml
       - uses: actions/upload-artifact@v5
         with:
           name: Book-Compare-Setup
@@ -80,4 +87,7 @@ jobs:
           v=$(node -p "require('./desktop/package.json').version")
           if gh release view "v$v" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "v$v is already on the Releases page"; exit 0; fi
           sed "s/VERSION/$v/g" desktop/RELEASE-NOTES.md > notes.md
-          gh release create "v$v" "desktop/dist/Book-Compare-Setup-$v.exe" -R "$GITHUB_REPOSITORY" --title "Book Compare $v" --notes-file notes.md --target "$GITHUB_SHA" --latest
+          # latest.yml and the blockmap are what the program's one-click update (item 35, electron-updater) reads
+          test -f desktop/dist/latest.yml && test -f "desktop/dist/Book-Compare-Setup-$v.exe.blockmap"
+          grep -q "Book-Compare-Setup-$v.exe" desktop/dist/latest.yml
+          gh release create "v$v" "desktop/dist/Book-Compare-Setup-$v.exe" "desktop/dist/Book-Compare-Setup-$v.exe.blockmap" desktop/dist/latest.yml -R "$GITHUB_REPOSITORY" --title "Book Compare $v" --notes-file notes.md --target "$GITHUB_SHA" --latest

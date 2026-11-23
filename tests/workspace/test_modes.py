@@ -1,7 +1,7 @@
 """Visualization modes of the two-image screen (Chromium, no helper needed).
 
 Loads one of the sample pairs, presses Compare, then walks through every entry of the Visualization menu and checks that
- * the menu offers exactly: Difference, Toggle, Top and bottom, Left and right, Only image 1, Only image 2 (the Slide mode is gone),
+ * the menu offers exactly: Superimposed, Toggle, Top and bottom, Left and right, Only image 1, Only image 2 (the Slide mode is gone),
  * every mode can be chosen without a script error and without breaking the picture panels,
  * nothing of the old Slide mode is left on the page (its bar, its slider line, its Horizontal/Vertical switch).
 Run:  python3 -m http.server 8765 -d app   (in the repository folder), then   python3 tests/workspace/test_modes.py"""

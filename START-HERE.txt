@@ -25,17 +25,20 @@ Windows" leads there) and run it.
 2. Every day
 ------------
 Start Book Compare from the Start menu or the Desktop icon. It opens in its own window.
-On the start screen choose "Compare copies of a book". Add each copy as a folder of scans
-(the ordinary Windows folder window; or "Add single pictures ..." for a few files), then save
-the project in a folder of its own ("More" > "Save project in a folder ..."). Book Compare
-remembers your scan folders and your last project.
+On the start screen choose "New project" (or "Continue" / "Open project ..."). Type the name
+of the project at the top left, add each copy as a folder of scans (the ordinary Windows
+folder window; or "Add single pictures ..." for a few files), then save the project (menu
+"⋮" at the top right > "Save project ..."), not in a scan folder. Book Compare remembers your
+scan folders and your last project, and saves every change by itself.
 
 
 3. Updating
 -----------
-When a newer version is on the download page, Book Compare says so once a day ("Go to the
-download page" / "Later"). Download the new installer and run it: it replaces the old
-version; there is no need to remove the old one first. Your projects are not touched.
+When a newer version is on the download page, Book Compare says so once a day ("Update now"
+/ "What is new" / "Later"). "Update now" downloads it; "Install and restart" saves your
+project, closes Book Compare, installs the new version and starts it again. (You can also
+download the new installer yourself and run it: it replaces the old version.) Your projects
+are not touched.
 
 
 4. Removing it
@@ -52,9 +55,9 @@ If something does not work
  * Still there from before November 2026: the old "helper" (a small icon near the clock and
    the files "Start Book Compare.bat"). It is no longer needed. Right-click its icon near the
    clock, untick "Start with Windows", choose "Quit Book Compare", and delete the old
-   unzipped Book Compare folder. Projects made with it open in the program: "More" >
+   unzipped Book Compare folder. Projects made with it open in the program: menu "⋮" >
    "Open project ...", and choose the file "book-compare-project.json" in the old project
-   folder. Then "More" > "Save project as ..." saves it as a project file; the old project
+   folder. Then menu "⋮" > "Save project as ..." saves it as a project file; the old project
    folder is left as it is.
 
 

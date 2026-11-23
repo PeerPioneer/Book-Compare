@@ -52,12 +52,13 @@
     var footer = E.compare.footer;
 
     ui = {};
-    ui.top = el('div', 'ct-top');
+    ui.top = el('div', 'ct-top ws-vars');
     ui.top.innerHTML =
-      '<button class="ct-iconbtn" id="ct_sidebtn" title="Show or hide the left panel" aria-label="Show or hide the left panel">&#9776;</button>' +
-      '<div class="ct-brand">Book Compare</div><div class="ct-proj" id="ct_proj"></div><div class="ct-sp"></div>' +
-      '<div class="ct-tabs" role="tablist"><button class="ct-tab" role="tab" aria-selected="true" id="ct_tab_compare">Compare</button>' +
-      '<button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages">Pages</button></div>' +
+      '<div class="ct-brand">Book Compare</div><div class="ct-proj" id="ct_proj"></div><button class="ws-save" id="ct_save"></button><div class="ct-sp"></div>' +
+      '<div class="ct-tabs" role="tablist"><button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages">Pages</button>' +
+      '<button class="ct-tab" role="tab" aria-selected="true" id="ct_tab_compare" tabindex="-1">Compare</button></div>' +
+      '<button class="ct-iconbtn ct-helpbtn" id="ct_helpbtn" title="How the Compare tab works, and its keys" aria-label="Help: how the Compare tab works, and its keys">?</button>' +
+      '<button class="ct-iconbtn ct-dots" id="ct_more" title="Menu: project, export, help" aria-label="Menu" aria-haspopup="true">&#8942;</button>' +
       '<button class="ct-iconbtn" id="ct_focusbtn" title="Focus mode: hide everything except the pictures (Esc leaves it)" aria-label="Focus mode: hide everything except the pictures">' +
       '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"/></svg></button>';
 
@@ -91,7 +92,7 @@
       // V16: what the fine alignment did - movement map, the rough alignment alone, and the hint for sharp shifts
       '<div class="ct-check"><label title="Colours over the picture: how far the fine alignment moved each part of copy 2"><input type="checkbox" id="ct_mv"> Movement map</label>' +
       '<label title="Show copy 2 placed by the whole-page step only, without the fine alignment in tiles"><input type="checkbox" id="ct_rough"> Without fine alignment</label></div>' +
-      '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span></p>' +
+      '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span><br><b class="ct-mvarr">&#8599;</b> arrows: the direction in which that part of copy 2 was moved (longer = moved further; drawn longer than the real shift)</p>' +
       '<p class="ct-hint" id="ct_hint" hidden></p>' +
       '<div class="ct-warn" id="ct_warn" hidden></div>' +
       // B5: what the comparison cannot show (owner 18 Nov / 21 Nov)
@@ -107,8 +108,7 @@
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
       '<ul class="ct-list" id="ct_list" role="listbox" aria-label="Pages"></ul>' +
-      '<label class="ct-foot"><input type="checkbox" id="ct_skip" checked><span>Skip pages that one of the two copies lacks</span></label>' +
-      '<div class="ct-keys"><kbd>Page Up</kbd> <kbd>Page Down</kbd> page<br><kbd>1</kbd>–<kbd>6</kbd> view · <kbd>F</kbd> flag<br>Arrow keys move the picture (click it first)</div>';
+      '<label class="ct-foot"><input type="checkbox" id="ct_skip" checked><span>Skip pages that one of the two copies lacks</span></label>';
 
     ui.busy = el('div', 'ct-busy');
     ui.busy.hidden = true;
@@ -127,7 +127,7 @@
     // the six names unfold when the pointer rests on it (or when it is clicked or tapped), a click on a name switches.
     ui.view = el('div', 'ct-view');
     ui.view.innerHTML =
-      '<button class="ct-vpill" id="ct_vpill" aria-haspopup="true" aria-expanded="false" title="Change the view (keys 1 to 6)"><span id="ct_vlab">Difference</span><span class="ct-vdots" id="ct_vdots" aria-hidden="true"></span></button>' +
+      '<button class="ct-vpill" id="ct_vpill" aria-haspopup="true" aria-expanded="false" title="Change the view (keys 1 to 6)"><span id="ct_vlab">Superimposed</span><span class="ct-vdots" id="ct_vdots" aria-hidden="true"></span></button>' +
       '<div class="ct-vpop" id="ct_vpop" role="menu" aria-label="Views" hidden></div>';
 
     ui.map = el('div', 'ct-map'); ui.map.id = 'ct_map';
@@ -141,7 +141,8 @@
 
     ui.leave = el('button', 'ct-leave', 'Leave focus mode'); ui.leave.hidden = true; ui.leave.title = 'Bring back the panel, tabs and bars (Esc)';
     ui.toast = el('div', 'ct-toast'); ui.toast.hidden = true; ui.toast.setAttribute('role', 'status');
-    rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.busy); rc.appendChild(ui.leave); rc.appendChild(ui.toast);
+    ui.sideh = el('button', 'ct-sideh'); ui.sideh.id = 'ct_sidebtn'; ui.sideh.type = 'button';      // the fold handle on the right edge of the left panel
+    rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.sideh); rc.appendChild(ui.busy); rc.appendChild(ui.leave); rc.appendChild(ui.toast);
     var tealbar = footer.querySelector('.bar');                                             // the dark teal bar: the only bar below the pictures
     tealbar.insertBefore(ui.bar, tealbar.firstChild);
     tealbar.insertBefore(ui.view, tealbar.querySelector('.bar_right'));
@@ -173,6 +174,21 @@
 
     $('ct_sidebtn').onclick = function () { st.side = !st.side; layout(); };
     $('ct_focusbtn').onclick = function () { setFocus(true); };
+    $('ct_helpbtn').onclick = helpDialog;
+    $('ct_more').onclick = function () { window.BookWorkspace.menu(this); };
+    $('ct_save').onclick = function () { window.BookWorkspace.chipClick(); };
+    window.BookWorkspace.compareMenu({                                                       // what only this tab can do, for the one menu (js/workspace.js)
+      'x-aligned': function () { E.action_bar.export_aligned_images(); },
+      'x-toggle': function () { E.action_bar.export_gif(); },
+      'x-view': function () { E.action_bar.export_current_view(); },
+      help: helpDialog,
+      leave: function () {                                                                    // "Back to the start screen"
+        st.token++; clearTimeout(st.timer); setBusy(null); closePalette(); hideTip();
+        st.focus = false; st.on = false; layout(); closeView();
+        window.BC_COPY_NAMES = null; window.BC_PANE_NAMES = null;
+        if (E.toStart) E.toStart();
+      }
+    });
     ui.leave.onclick = function () { setFocus(false); };
     $('ct_tab_pages').onclick = toPages;
     $('ct_swap').onclick = function () { W().swap(); afterCopies(); };
@@ -253,6 +269,10 @@
     ui.rc.classList.toggle('ct-noside', st.on && !st.side);
     var f = st.on && st.focus;                                                               // focus mode: only the pictures
     ui.rc.classList.toggle('ct-focus', f); document.body.classList.toggle('ct-focus', f);
+    ui.sideh.hidden = !st.on || f;
+    ui.sideh.innerHTML = st.side ? '&#8249;' : '&#8250;';
+    ui.sideh.title = st.side ? 'Fold the left panel away' : 'Show the left panel (copies and pages)';
+    ui.sideh.setAttribute('aria-label', ui.sideh.title); ui.sideh.setAttribute('aria-expanded', st.side ? 'true' : 'false');
     ui.top.hidden = !st.on || f; ui.side.hidden = !st.on || !st.side || f; ui.bar.hidden = !st.on; ui.view.hidden = !st.on; ui.map.hidden = !st.on; ui.leave.hidden = !f;
     if (!st.on) ui.toast.hidden = true;
     ui.map.style.setProperty('--ct-map-left', (st.on && st.side ? 300 : 0) + 'px');           // the opened map does not cover the left panel
@@ -306,8 +326,18 @@
     s = s || W().state();
     var r = W().rowInfo(s.row);
     ui.where.innerHTML = '<b>' + esc(r.label) + '</b><span>position ' + (s.row + 1) + ' of ' + s.rows + '</span>';
-    document.getElementById('ct_proj').textContent = s.name ? s.name : '';
+    renderTitle();
     renderFlagBtn(r); moveMarker(s); renderTiles(s);
+  }
+  // the project's name (set in the Pages view) and the save state, as in the top bar there
+  function renderTitle() {
+    var i = window.BookWorkspace ? BookWorkspace.projectInfo() : {}, p = document.getElementById('ct_proj');
+    if (p) { p.textContent = i.title || i.name || ''; p.title = i.title ? 'Name of the project (change it in the Pages view)' : ''; }
+    renderSaveChip();
+  }
+  function renderSaveChip() {
+    var b = document.getElementById('ct_save'); if (!b || !window.BookWorkspace) return;
+    var c = BookWorkspace.saveChip(); b.className = c.cls; b.textContent = c.text; b.title = c.title; b.hidden = !c.text;
   }
   // V15: the tile settings of copy 2 on this page (null = standard); a change aligns the pair again at once
   var PRESETS = { stiff: { main: 8, sub: 2 }, std: null, flex: { main: 8, sub: 4 } };
@@ -343,8 +373,29 @@
       var c = ui.mvc; c.width = m.w; c.height = m.h;
       var x = c.getContext('2d'); x.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), 0, 0);
       if (m.hint) { x.strokeStyle = '#c800c8'; x.lineWidth = 2; x.setLineDash([6, 4]); x.strokeRect(m.hint.x * m.w - 3, m.hint.y * m.h - 3, m.hint.w * m.w + 6, m.hint.h * m.h + 6); }
+      drawArrows(m);
       cvs.dataset.k = String(st.mvStamp);
     }
+  }
+  // the arrows: in which direction each part of copy 2 was moved (drawn as lines in the page's own pixels, so they stay sharp when zoomed;
+  // the length is exaggerated - a shift of a few pixels would not be visible otherwise)
+  function drawArrows(m) {
+    if (ui.mva) { ui.mva.remove(); ui.mva = null; }
+    var A = m.arrows || []; if (!A.length || !m.W) return;
+    var S = m.H / 18, path = '';
+    A.forEach(function (a) {
+      var d = Math.hypot(a[2], a[3]); if (!(d > 0)) return;
+      var L = Math.min(S * 0.85, S * 0.25 + d * S * 0.04), ux = a[2] / d, uy = a[3] / d;
+      var x0 = a[0] - ux * L / 2, y0 = a[1] - uy * L / 2, x1 = a[0] + ux * L / 2, y1 = a[1] + uy * L / 2, hd = Math.min(L * 0.4, S * 0.22);
+      var hx = x1 - ux * hd, hy = y1 - uy * hd, px = -uy * hd * 0.55, py = ux * hd * 0.55;
+      path += 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + 'L' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+        'M' + (hx + px).toFixed(1) + ' ' + (hy + py).toFixed(1) + 'L' + x1.toFixed(1) + ' ' + y1.toFixed(1) + 'L' + (hx - px).toFixed(1) + ' ' + (hy - py).toFixed(1);
+    });
+    var ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + m.W + ' ' + m.H); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'ct-mvarrows');
+    svg.innerHTML = '<path d="' + path + '" stroke="#fff" stroke-width="3.6" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" opacity=".85"/>' +
+      '<path d="' + path + '" stroke="#1a1a1a" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+    ui.mv.appendChild(svg); ui.mva = svg;
   }
   // V18 (owner 21 Nov: no search among neighbouring pages): when much of the ink has no partner, the two scans may not show the same page
   var MISMATCH = 0.30;
@@ -352,7 +403,8 @@
     var w = $('ct_warn'), t = st.lastTiles;
     if (!t || t.sparse || st.transform !== 'tiles' || !(t.unmatched_tiles > MISMATCH)) { w.hidden = true; return; }
     w.hidden = false;
-    w.innerHTML = '<b>' + Math.round(t.unmatched_tiles * 100) + ' % of the ink has no partner.</b> The two scans may not show the same page: perhaps a page is missing or extra in one copy, and the rows of the grid are out of step here. ' +
+    w.title = 'The two scans may not show the same page: perhaps a page is missing or extra in one copy, and the rows of the grid are out of step here.';
+    w.innerHTML = '<b>' + Math.round(t.unmatched_tiles * 100) + ' % of the ink has no partner</b>: not the same page? ' +
       '<span class="ct-warnacts"><button class="ct-tapply" id="ct_warnpages">Go to the pages</button><button class="ct-tadvbtn" id="ct_warnok">Continue</button></span>';
     $('ct_warnpages').onclick = toPages;
     $('ct_warnok').onclick = function () { w.hidden = true; };
@@ -361,8 +413,8 @@
     var h = $('ct_hint'), m = st.lastTiles && st.lastTiles.movement;
     if (!m || !m.hint || st.transform !== 'tiles') { h.hidden = true; return; }
     h.hidden = false;
-    h.innerHTML = 'Part of this page was moved by about <b>' + m.hint.px + ' px</b> by the fine alignment, with a sharp edge: a line or block may have been re-set or shifted here. ' +
-      '<button class="ct-hintbtn" id="ct_hintshow">Show the movement map</button>';
+    h.title = 'Part of this page was moved by about ' + m.hint.px + ' px by the fine alignment, with a sharp edge: a line or block may have been re-set or shifted here.';
+    h.innerHTML = '<b>Shifted block, about ' + m.hint.px + ' px</b> <button class="ct-hintbtn" id="ct_hintshow">Show</button>';
     $('ct_hintshow').onclick = function () { $('ct_mv').checked = true; st.mvOn = true; if (st.roughOn) { $('ct_rough').checked = false; showRough(false); } drawMovement(); };
   }
   // the rough view: copy 2 placed by the whole-page step only; switching back shows the fine result again (kept, not computed again)
@@ -509,7 +561,7 @@
 
 
   /* ---------------------------------------------------------------- the view switcher (middle of the bar) */
-  var VIEWS = [['diff', 'Difference'], ['toggle', 'Toggle'], ['topbottom', 'Top and bottom'], ['leftright', 'Left and right'], ['onlyimage1', 'Copy 1'], ['onlyimage2', 'Copy 2']];
+  var VIEWS = [['diff', 'Superimposed'], ['toggle', 'Toggle'], ['topbottom', 'Top and bottom'], ['leftright', 'Left and right'], ['onlyimage1', 'Copy 1'], ['onlyimage2', 'Copy 2']];
   var vt = { open: 0, close: 0 };
   function viewIndex() { var m = E && E.action_bar ? E.action_bar.MODE : 'diff'; for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i][0] === m) return i; return 0; }
   function copyName(slot) {
@@ -635,6 +687,28 @@
     e.preventDefault();
   }
 
+  // "?" in the top bar (item 4): how the tab works, with all its keys (they used to stand at the bottom of the left panel)
+  function helpDialog() {
+    var k = function (t) { return '<kbd>' + t + '</kbd>'; };
+    W().modal('<h3>The Compare tab</h3>' +
+      '<p>Copy 2 is moved and bent onto copy 1, page by page. Ink that is in both copies turns dark; ink that is only in one copy keeps that copy’s colour.</p>' +
+      '<table class="ct-keytbl"><tbody>' +
+      '<tr><td>' + k('Page Down') + ' ' + k('Page Up') + '</td><td>next / previous page</td></tr>' +
+      '<tr><td>' + k('1') + ' … ' + k('6') + '</td><td>view: 1 Superimposed, 2 Toggle, 3 Top and bottom, 4 Left and right, 5 Copy 1, 6 Copy 2</td></tr>' +
+      '<tr><td>' + k('F') + '</td><td>flag this page (or take the flag away)</td></tr>' +
+      '<tr><td>arrow keys</td><td>move the picture (click the picture first)</td></tr>' +
+      '<tr><td>mouse wheel</td><td>zoom in and out</td></tr>' +
+      '<tr><td>' + k('Delete') + '</td><td>delete the selected annotation</td></tr>' +
+      '<tr><td>' + k('Esc') + '</td><td>let go of an annotation; leave focus mode</td></tr>' +
+      '</tbody></table>' +
+      '<ul><li><b>Left panel:</b> the two copies, how they are aligned, and the pages. The small tab on its right edge folds it away.</li>' +
+      '<li><b>Copy 1 and copy 2</b> can be shown in two small panels beside the superimposed picture: the strip at the right edge opens them.</li>' +
+      '<li><b>Copy 2 view</b> (key 6): <b>Aligned</b> shows copy 2 as the alignment moved it, <b>Original scan</b> as it was scanned. Copy 1 is never changed.</li>' +
+      '<li><b>Movement map</b> (left panel) colours the parts of copy 2 that the fine alignment moved, with arrows for the direction.</li>' +
+      '<li>The arrows button at the top right is <b>focus mode</b>: only the pictures. Esc brings everything back.</li></ul>' +
+      '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
+  }
+
   /* ---------------------------------------------------------------- aligning */
   function schedule(ms) { clearTimeout(st.timer); st.timer = setTimeout(align, ms); }
   // The background helper for the tile alignment. One job at a time (a job that is no longer wanted when its turn comes is skipped);
@@ -643,19 +717,25 @@
   var eng = null, chain = Promise.resolve(), MAX_JOBS = 40;
   function serial(fn) { var p = chain.then(fn, fn); chain = p.catch(function () { }); return p; }
   function dropEngine() { if (eng) { try { eng.e.terminate(); } catch (x) { /* ignore */ } } eng = null; }
+  // item 33: the helper is started while the Pages view is still open, so that the first comparison does not wait for it
+  function preload() {
+    if (eng || !window.AlignEngine || !AlignEngine.supported()) return;
+    var g = eng = { e: AlignEngine.create(), ref: null, jobs: 0, ready: false };
+    g.loading = g.e.init().then(function () { g.ready = true; g.loading = null; }, function () { g.loading = null; if (eng === g) dropEngine(); });
+  }
   // Stored alignments (V10, desktop program): a pair whose copy 1 is the reference copy (or stands in for it on this page) is kept in the
   // results folder; when it is there and still fits, the page is shown from it at once. Other pairs are aligned directly, and the next page
   // in the direction of travel is prepared meanwhile (D2, kept in memory only, prepared by a second helper).
-  function storeKey(d) {
+  async function storeKey(d) {
     if (!d.ids || !window.BCResults || !BCResults.available() || !W().refFor || W().refFor(d.row) !== d.ids[0]) return null;
-    return { c0: d.ids[0], k0: d.keys[0], c1: d.ids[1], k1: d.keys[1], i0: BCResults.fileInfo(d.files[0]), i1: BCResults.fileInfo(d.files[1]), tiles: d.tiles || null, quad: d.quad || null };
+    return { c0: d.ids[0], k0: d.keys[0], c1: d.ids[1], k1: d.keys[1], i0: await BCResults.fileInfo(d.files[0]), i1: await BCResults.fileInfo(d.files[1]), tiles: d.tiles || null, quad: d.quad || null };
   }
   function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null), JSON.stringify(d.quad || null)].join('|') : null; }
   var pre = { e: null, ready: false, jobs: 0, cache: new Map(), busy: null };          // the helper that prepares the next page, and what it prepared
   function preTake(d) { var k = preKey(d), v = k && pre.cache.get(k); if (v) pre.cache.delete(k); return v || null; }
   async function stored(d) {
     var hit = preTake(d); if (hit) return hit;
-    var p = storeKey(d); return p ? BCResults.read(p) : null;
+    var p = await storeKey(d); return p ? BCResults.read(p) : null;
   }
   function prepareNext(s) {
     if (st.transform !== 'tiles' || !st.on) return;
@@ -669,7 +749,7 @@
         var d = await W().loadRow(i); if (!d || my !== st.token) return;
         d.tiles = W().tileSetting(i, d.ids[1]); d.quad = W().boxSetting(i, d.ids[0]);
         var k = preKey(d); if (pre.cache.has(k)) return;
-        var p = storeKey(d); if (p && await BCResults.has(p)) return;                       // stored already: nothing to prepare
+        var p = await storeKey(d); if (p && await BCResults.has(p)) return;                       // stored already: nothing to prepare
         if (pre.e && pre.jobs >= MAX_JOBS) { try { pre.e.terminate(); } catch (x) { /* ignore */ } pre.e = null; }
         if (!pre.e) { pre.e = AlignEngine.create(); pre.ready = false; pre.jobs = 0; }
         if (!pre.ready) { await pre.e.init(); pre.ready = true; }
@@ -688,7 +768,7 @@
     var g = eng, loading = E.compare.load_images(d.urls, d.names);
     loading.catch(function () { });
     try {
-      if (!g.ready) { setBusy('Starting the alignment helper … (the first time, the browser loads about 13 MB)'); await g.e.init(); g.ready = true; }
+      if (!g.ready) { setBusy('Starting the alignment helper … (the first time, the browser loads about 13 MB)'); await (g.loading || g.e.init()); g.ready = true; }
       if (my !== st.token) return null;
       var bin = null; try { bin = await stored(d); } catch (x) { bin = null; }
       if (bin && my === st.token) {
@@ -712,7 +792,7 @@
       if (my !== st.token) return null;
       setBusy('Aligning copy 2 onto copy 1 … (rough position, then the fine alignment in tiles; a few seconds)');
       g.jobs++;
-      var sk = storeKey(d), r = await g.e.alignColor(d.files[1], d.tiles, !!sk);
+      var sk = await storeKey(d), r = await g.e.alignColor(d.files[1], d.tiles, !!sk);
       if (sk && r.bin) BCResults.save(sk, r.bin, { u: r.unmatched_tiles, max: r.movement && r.movement.max, sparse: !!r.sparse }).catch(function () { });
       r.bin = null;
       await loading;
@@ -767,13 +847,8 @@
   // the panels say which copy and page they show (the file names stay the names of the exported files)
   function labelPanels(s) {
     var r = W().rowInfo(s.row), byId = {}; s.copies.forEach(function (c) { byId[c.id] = c; });
-    var labs = document.querySelectorAll('#workspace .pane__label');
-    labs.forEach(function (l) {
-      var t = l.textContent || '';
-      var i = t.indexOf('Copy 1') === 0 ? 0 : t.indexOf('Copy 2') === 0 ? 1 : -1;
-      if (i < 0 || !byId[s.pair[i]]) return;
-      l.textContent = (i ? 'Copy 2, aligned' : 'Copy 1') + ' · ' + byId[s.pair[i]].name + ' · ' + r.label;
-    });
+    window.BC_PANE_NAMES = [0, 1].map(function (i) { return byId[s.pair[i]] ? byId[s.pair[i]].name + ' · ' + r.label : ''; });   // (js/panes.js writes the labels)
+    if (window.BCCopy2View) BCCopy2View.relabel();
   }
 
   /* ---------------------------------------------------------------- entering and leaving */
@@ -797,7 +872,7 @@
   function toPages() {
     st.token++; clearTimeout(st.timer); setBusy(null); closePalette(); hideTip();
     st.focus = false; st.on = false; layout(); closeView();
-    window.BC_COPY_NAMES = null;
+    window.BC_COPY_NAMES = null; window.BC_PANE_NAMES = null;
     W().showPages();
   }
 
@@ -809,6 +884,10 @@
     inFocus: function () { return st.on && st.focus; },
     transform: function () { return st.transform === 'tiles' ? 'perspective' : st.transform; },   // the OLDER alignment type to time in the speed test (it measures the tiles separately)
     lastTiles: function () { return st.lastTiles || null; },                                 // what the tile alignment of the picture on screen reported (tests)
-    prepared: function () { return { busy: pre.busy, cached: pre.cache.size }; }             // the next page being prepared (tests)
+    prepared: function () { return { busy: pre.busy, cached: pre.cache.size }; },            // the next page being prepared (tests)
+    toast: function (t) { if (ui) toast(t); },
+    preload: function () { try { preload(); } catch (e) { /* not important */ } },
+    titleChanged: function () { if (ui) renderTitle(); },
+    saveChanged: function () { if (ui) renderSaveChip(); }
   };
 })();

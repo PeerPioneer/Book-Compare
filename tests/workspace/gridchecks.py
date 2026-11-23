@@ -3,6 +3,8 @@ deleting a whole range of files (Shift + click / Shift + arrow). Shared by test_
 test_desktop_server.py (Chromium AND Firefox, real folders). It expects the three test copies and leaves the grid exactly as it found it.
 """
 
+from common import cellmenu, cellmenu_enabled, insert_gap
+
 def run(pg, col, read_proj=None):
     cell = lambda ci, r: pg.locator('#ws .ws-cell[data-c="%d"][data-r="%d"]' % (ci, r))
     names = lambda: pg.evaluate("[...document.querySelectorAll('#ws .ws-hname')].map(e=>e.textContent)")
@@ -39,13 +41,13 @@ def run(pg, col, read_proj=None):
     # ---- moving a copy ------------------------------------------------------------------------------------------------------
     drag_edge(0, 60)                                                            # copy 1 is wider now: the width goes with the column
     cell(1, 2).click(); pg.wait_for_timeout(100)
-    assert pg.locator('#ws [data-act=mvr]').is_enabled() and pg.locator('#ws [data-act=mvl]').is_enabled()
-    pg.click('#ws [data-act=mvl]'); pg.wait_for_timeout(250)
+    assert cellmenu_enabled(pg, 'mvr') and cellmenu_enabled(pg, 'mvl')
+    cellmenu(pg, 'mvl'); pg.wait_for_timeout(250)
     assert names() == [start_names[1], start_names[0], start_names[2]], names()
     assert col(pg, 0) == start_cols[1] and col(pg, 1) == start_cols[0] and abs(hw(1) - 232) < 2, 'the files and the width move with the column'
-    assert pg.evaluate("document.querySelector('#ws .ws-cell.sel').dataset.c") == '0' and not pg.locator('#ws [data-act=mvl]').is_enabled(), 'the selection follows the copy'
-    pg.click('#ws [data-act=mvr]'); pg.click('#ws [data-act=mvr]'); pg.wait_for_timeout(250)
-    assert names() == [start_names[0], start_names[2], start_names[1]] and not pg.locator('#ws [data-act=mvr]').is_enabled(), names()
+    assert pg.evaluate("document.querySelector('#ws .ws-cell.sel').dataset.c") == '0' and not cellmenu_enabled(pg, 'mvl'), 'the selection follows the copy'
+    cellmenu(pg, 'mvr'); pg.wait_for_timeout(150); cellmenu(pg, 'mvr', right_click=pg.locator('#ws .ws-cell.sel')); pg.wait_for_timeout(250)     # (also with the right mouse button)
+    assert names() == [start_names[0], start_names[2], start_names[1]] and not cellmenu_enabled(pg, 'mvr'), names()
     for _ in range(3): pg.keyboard.press('Control+z'); pg.wait_for_timeout(120)
     assert names() == start_names and allcols() == start_cols, 'Undo puts the copies back'
     # by dragging the heading: onto the right half of another heading = behind it, onto the left half = in front of it, onto "+" = to the end
@@ -80,7 +82,7 @@ def run(pg, col, read_proj=None):
     for _ in range(2): pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
     assert allcols() == start_cols, 'Undo puts the files back'
     # onto an empty cell ("no page"): the file moves there and an empty cell stays behind (rows are page positions)
-    cell(0, 3).click(); pg.fill('#gapN', '1'); pg.click('[data-act=gap]'); pg.wait_for_timeout(200)
+    cell(0, 3).click(); insert_gap(pg, 1); pg.wait_for_timeout(200)
     g = col(pg, 0); assert g[3] == '-' and g[4] == c0[3], g
     cell(0, 0).drag_to(cell(0, 3)); pg.wait_for_timeout(250)
     g2 = col(pg, 0); assert g2[0] == '-' and g2[3] == g[0] and g2[1:3] == g[1:3] and g2[4:] == g[4:], g2

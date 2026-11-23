@@ -1,17 +1,9 @@
-# research/: alignment and printed-area detection (Python prototype and its JavaScript rewrite)
+# research/: how the alignment was worked out
 
-These scripts are the code behind the tests described in `FINDINGS.md`. They run on a normal computer with Python 3
-and `pip install numpy opencv-python scipy`. The Book Compare app does not use the Python files; they were rewritten in
-JavaScript in `js/` (see its README), and that rewrite already runs in the app's speed test. Building it into the Compare tab
-is items V2 and V3 of the plan, [`PLAN.md`](../PLAN.md) §11.
+`FINDINGS.md` describes the tests behind the alignment (printed area, ink map, rough and tile alignment). They were first
+done with a Python prototype; that prototype was rewritten in JavaScript in `js/` (see its README), which is what Book Compare
+uses. The Python files were removed on 22 Nov 2026 because nothing uses them any more (they are still in the history of this
+repository, before that date). `known_differences/` holds checked differences between copies that the check scripts in `js/` use.
 
-| file | what it does |
-|---|---|
-| `ink_map.py` | turns a scan into an "ink map" (printed ink = 1, paper = 0) |
-| `printed_area.py` | proposes the printed area (a rectangle) of a scan; `python3 printed_area.py out.jpg a.jpg b.jpg ...` draws the proposals |
-| `rough_align.py` | whole-page alignment (scale, shift, small rotation/shear) |
-| `tile_align.py` | local alignment with four rounds of ever smaller tiles |
-| `align_pair.py` | everything together for two scans: `python3 align_pair.py reference.jpg other.jpg out_prefix` |
-
-Run the scripts from inside this folder. Scans are only ever read, never changed. **No scan images are part of this repository**
+Run the scripts in `js/` from inside that folder. Scans are only ever read, never changed. **No scan images are part of this repository**
 (they belong to the libraries and to the thesis work); use your own.

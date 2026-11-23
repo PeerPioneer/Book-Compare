@@ -1,9 +1,6 @@
-// Tutorial:
-// https://dev.to/zippytyro/how-to-convert-any-website-webpage-into-an-installable-progressive-web-app-pwa-59ai
-// https://vaadin.com/learn/tutorials/learn-pwa/turn-website-into-a-pwa
-// https://github.com/jakearchibald/wittr/blob/cache-avatars/public/js/sw/index.js
-// Cache
-const CACHE_NAME = "imcomp-mdc-pwa-v30";
+// Book Compare's service worker: keeps the website's files so that it also opens without a connection.
+// Change CACHE_NAME whenever a file listed here changes, so that the browsers load the new files.
+const CACHE_NAME = "imcomp-mdc-pwa-v31";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -15,11 +12,7 @@ const staticAssets = [
     './images/icons/imcomp-192x192.png',
     './images/icons/imcomp-128x128.png',
     './images/logo/imcomp-logo-large-path.svg',
-    './images/logo/image-compare-1.svg',
-    './images/logo/image-compare-2.svg',
     './images/empty.svg',
-    './images/churchill.gif',
-    './images/output.gif',
     './js/action.js',
     './js/compare.js',
     './js/panes.js',

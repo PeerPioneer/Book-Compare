@@ -132,10 +132,38 @@
     if (now - (+lsGet('bc_update_shown') || 0) < DAY) return;                     // "Later": not again today
     var b = $('#ws-update'); if (!b) return;
     b.innerHTML = '<span>A new version of Book Compare is available: <b>' + esc(latest) + '</b> (you have ' + esc(DESKTOP) + ').</span>' +
-      '<button class="ws-tb primary" data-act="upd-dl">Go to the download page</button><button class="ws-tb" data-act="upd-later">Later</button>';
+      '<button class="ws-tb primary" data-act="upd-now">Update now</button><button class="ws-tb" data-act="upd-dl">What is new</button><button class="ws-tb" data-act="upd-later">Later</button>';
     b.hidden = false;
   }
   function hideUpdate() { var b = $('#ws-update'); if (b) b.hidden = true; lsSet('bc_update_shown', String(Date.now())); }
+  // One-click update (item 35, desktop program): download the new version, then close, install it and start again (desktop/main.js)
+  async function updateNow() {
+    var b = $('#ws-update'), call = function (cmd) { return hjson('/api/update', { cmd: cmd }); }, st;
+    var show = function (html) { b.innerHTML = html; b.hidden = false; };
+    var fallback = function (why) {
+      show('<span>The new version could not be downloaded here' + (why ? ' (' + esc(why) + ')' : '') + '. Please download it from the Releases page.</span><button class="ws-tb primary" data-act="upd-dl">Go to the download page</button><button class="ws-tb" data-act="upd-later">Later</button>');
+    };
+    show('<span>Looking for the new version …</span>');
+    try { st = await call('check'); } catch (e) { return fallback(niceError(e)); }
+    if (st.state !== 'available' && st.state !== 'downloading' && st.state !== 'ready') return fallback(st.error || '');
+    if (st.state === 'available') { try { st = await call('download'); } catch (e) { return fallback(niceError(e)); } }
+    while (st.state === 'downloading') {
+      show('<span>Downloading Book Compare ' + esc(st.version || '') + ' … ' + (st.percent || 0) + ' %</span><span class="ws-bgbar"><i style="width:' + (st.percent || 0) + '%"></i></span>');
+      await new Promise(function (r) { setTimeout(r, 700); });
+      try { st = await call('state'); } catch (e) { return fallback(niceError(e)); }
+    }
+    if (st.state !== 'ready') return fallback(st.error || '');
+    show('<span><b>Book Compare ' + esc(st.version || '') + ' is ready.</b> Book Compare closes, installs it and starts again (Windows may ask once whether it may run).</span>' +
+      '<button class="ws-tb primary" data-act="upd-install">Install and restart</button><button class="ws-tb" data-act="upd-later">Later</button>');
+  }
+  async function installUpdate() {
+    var r = await beforeClose();                                                           // the project is saved first
+    if (!r.ok) {
+      var go = await confirmDialog('The project is not saved', 'The project has changes that are not saved in a project file. Install the new version anyway? The changes are lost.', 'Install anyway');
+      if (!go) return;
+    }
+    try { await hjson('/api/update', { cmd: 'install' }); } catch (e) { toast(niceError(e)); }
+  }
 
   /* ---------------------------------------------------------------- desktop mode (folders read by the desktop program itself, see desktop/server.js) */
   // (Called "helper" in the code for historical reasons: until 21 Nov 2026 a separate helper program, launcher/serve.ps1, did this
@@ -195,6 +223,7 @@
   function hsame(a, b) { return HELPER && HELPER.os === 'windows' ? a.toLowerCase() === b.toLowerCase() : a === b; }
   function HDir(ref, rel, name) { this.kind = 'directory'; this.isHelper = true; this.ref = ref; this.rel = rel; this.name = name; }
   Object.defineProperty(HDir.prototype, 'rootPath', { get: function () { return this.ref.path; } });
+  HDir.prototype.removeEntry = function (name) { return hcall(this.ref, 'POST', '/api/remove', joinPath(this.rel, name)).then(function () { }); };   // (stored alignments only, item 28)
   HDir.prototype._stat = function (rel) { return hcall(this.ref, 'GET', '/api/stat', joinPath(this.rel, rel)).then(function (r) { return r.json(); }); };
   HDir.prototype.getDirectoryHandle = async function (name) {
     var st = await this._stat(name);
@@ -251,7 +280,9 @@
         var resp = await hcall(this.dir.ref, 'GET', '/api/file', joinPath(this.dir.rel, this.name));
         var blob = await resp.blob();                                    // rejects with a TypeError when the connection broke in the middle
         var m = parseInt(resp.headers.get('X-Mtime-Ms'), 10) || (this._info && this._info.mtime) || Date.now();
-        return new File([blob], this.name, { type: blob.type, lastModified: m });
+        var file = new File([blob], this.name, { type: blob.type, lastModified: m });
+        if (this._info && this._info.fp && this._info.size === file.size) file.fp = this._info.fp;      // (computed by the helper already, item 29)
+        return file;
       } catch (e) {
         if (e && e.name === 'TypeError') { var broken = new Error('The connection was interrupted while the picture was being read.'); broken.net = true; e = broken; }
         last = e;
@@ -286,8 +317,26 @@
   }
 
   /* ---------------------------------------------------------------- state */
+  // the example in the empty name field (N2): a famous book of the 16th century, with printer, place and year of one edition
+  var TITLE_EXAMPLE = 'De humani corporis fabrica · Oporinus, Basel 1543';
+  // Folder addresses relative to the project file's folder (item 30). Windows addresses (C:\\…) are compared without regard to case;
+  // two different drives have no relative address (null).
+  function pathSegs(p) { var x = String(p).replace(/\\/g, '/').replace(/\/+$/, ''); return x.split('/'); }
+  function relPath(from, to) {
+    var a = pathSegs(from), b = pathSegs(to), win = /^[a-z]:$/i.test(a[0]) || /^[a-z]:$/i.test(b[0]);
+    var same = function (x, y) { return win ? x.toLowerCase() === y.toLowerCase() : x === y; };
+    if (!a.length || !b.length || !same(a[0], b[0])) return null;
+    var k = 0; while (k < a.length && k < b.length && same(a[k], b[k])) k++;
+    var up = []; for (var i = k; i < a.length; i++) up.push('..');
+    return up.concat(b.slice(k)).join('/');
+  }
+  function joinRelPath(base, rel) {
+    var win = /^[a-z]:/i.test(base) || /\\/.test(base), out = pathSegs(base);
+    String(rel).split('/').forEach(function (s) { if (!s || s === '.') return; if (s === '..') { if (out.length > 1) out.pop(); } else out.push(s); });
+    return out.join(win ? '\\' : '/') || null;
+  }
   function blank() {
-    return { projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
+    return { title: '', lblw: 0, projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -297,8 +346,9 @@
   function limitW(w) { return Math.min(MAX_W, Math.max(MIN_W, Math.round(+w) || MIN_W)); }
   function clampW(w) { w = Math.round(+w); return isFinite(w) && w > 0 ? limitW(w) : 0; }                    // from a project file: 0 = standard width
   function cw(c) { return c.w || COL_W; }
-  function gridW() { var w = LBL_W + COL_W; S.copies.forEach(function (c) { w += cw(c); }); return w; }
-  function colLeft(ci) { var x = LBL_W; for (var i = 0; i < ci; i++) x += cw(S.copies[i]); return x; }
+  function lblW() { return S && S.lblw ? S.lblw : LBL_W; }          // the first column (row names): its width can be changed too (N6)
+  function gridW() { var w = lblW() + COL_W; S.copies.forEach(function (c) { w += cw(c); }); return w; }
+  function colLeft(ci) { var x = lblW(); for (var i = 0; i < ci; i++) x += cw(S.copies[i]); return x; }
   // A range of rows marked with Shift in ONE column (not saved with the project): from the row where Shift began to the active row S.sel.row.
   var anchor = null;
   function range() {
@@ -638,7 +688,7 @@
     var parts = joinPath(loc.path, sk.rel).split('/'), d = r.handle;
     for (var i = 0; i < parts.length - 1; i++) d = await d.getDirectoryHandle(parts[i]);
     var fh = await d.getFileHandle(parts[parts.length - 1]);
-    return fh._info ? { size: fh._info.size, mtime: fh._info.mtime } : null;
+    return fh._info ? { size: fh._info.size, mtime: fh._info.mtime, fp: fh._info.fp || null } : null;
   }
 
   /* ---------------------------------------------------------------- thumbnails (small copies made in the browser; the scans are not changed) */
@@ -702,11 +752,14 @@
     var used = {};
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
-      format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(),
+      format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(), title: S.title || '', lblw: S.lblw || 0, bgRun: S.bgRun || null,
       nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, boxes: S.boxes, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
-        return path ? { id: r.id, name: r.name, path: path } : { id: r.id, name: r.name };
+        if (!path) return { id: r.id, name: r.name };
+        var o = { id: r.id, name: r.name, path: path }, pd = proj.target && proj.target.dir && proj.target.dir.rootPath;
+        var rel = pd ? relPath(pd, path) : null; if (rel != null) o.rel = rel;                // item 30: also where it lies seen from the project file
+        return o;
       }),
       copies: S.copies.map(function (c) { var o = { id: c.id, name: c.name, folder: c.folder, locs: c.locs, keys: c.keys, cells: c.cells }; if (c.w) o.w = c.w; return o; })
     };
@@ -739,6 +792,18 @@
     if (proj.again) { proj.again = false; proj.timer = setTimeout(saveNow, 50); }
     renderSave();
   }
+  // Closing the program (item 27, desktop: js in desktop/main.js asks this): a project with a file is saved and the stored results'
+  // index written (item 32) without asking; only a project that has never been saved needs a question.
+  async function beforeClose() {
+    try { if (window.BCBackground) BCBackground.stop(); if (window.BCResults) await BCResults.flush(); } catch (e) { /* closing anyway */ }
+    if (!S || !S.copies.length || !dirty) return { ok: true };
+    if (proj.target && proj.state !== 'error') { await flushSave(); return { ok: !dirty }; }
+    return { ok: false, err: proj.state === 'error' ? proj.err : '' };
+  }
+  async function saveForClose() {
+    if (!proj.target) await saveProjectAs(); else await flushSave();
+    return !!proj.target && !dirty;
+  }
   // before another project is opened: a change that is still waiting to be saved is saved now
   async function flushSave() { if (proj.target && (proj.state === 'dirty' || proj.saving)) { await saveNow(); for (var i = 0; i < 50 && proj.saving; i++) await new Promise(function (r) { setTimeout(r, 100); }); } }
   // true if the work so far may be replaced by another project (asks when there are changes that are saved nowhere)
@@ -749,7 +814,14 @@
   }
   function renderSave() {
     if (!root) return;
-    var b = $('#ws-save'), t = '', cls = 'ws-save';
+    var b = $('#ws-save'), c = saveChip();
+    b.className = c.cls; b.textContent = c.text; b.title = c.title;
+    if (window.CompareTab && CompareTab.saveChanged) CompareTab.saveChanged();
+  }
+  // the save state as the chip in the top bar shows it (both views)
+  function saveChip() {
+    var t = '', cls = 'ws-save';
+    if (!S) return { text: '', cls: cls, title: '' };
     if (!HAS_FSA) { t = dirty ? 'Not saved · save project file' : 'Project file saved'; cls += dirty ? ' warn' : ' ok'; }
     else if (!proj.target) {
       t = !S.copies.length ? 'No project yet' : proj.legacy ? 'Older project · save it as a project file' : 'Not saved yet · save the project';
@@ -758,13 +830,29 @@
     else if (proj.state === 'saving' || proj.state === 'dirty') { t = 'Saving …'; }
     else if (proj.state === 'error') { t = 'Could not save · ' + proj.err; cls += ' bad'; }
     else { t = '✓ Saved · “' + proj.name + '”'; cls += ' ok'; }
-    b.className = cls; b.textContent = t;
-    b.title = proj.target ? 'Project file: ' + targetFile(proj.target) + '. Changes are saved automatically.'
+    return { text: t, cls: cls,
+      title: proj.target ? 'Project file: ' + targetFile(proj.target) + '. Changes are saved automatically.'
       : proj.legacy ? 'This project was saved by an older version of Book Compare. Save it as a project file to keep your changes; the old project folder stays as it is.'
-      : 'Save the project as a file (not in one of your scan folders).';
+      : 'Save the project as a file (not in one of your scan folders).' };
+  }
+  function chipClick() { return proj.target ? (proj.state === 'error' ? saveNow() : toast('Project file: “' + targetFile(proj.target) + '”. Changes are saved automatically.')) : saveProjectAs(); }
+  // the start screen (index.html): Continue / Open project … / New project
+  async function startInfo() {
+    if (S && S.copies.length) return { open: true, name: S.title || proj.name || 'this project' };
+    await helperReady;
+    if (!lastProject) { try { lastProject = await loadLastProject(); } catch (e) { lastProject = null; } }
+    return lastProject ? { open: false, name: lastProject.name || '' } : null;
+  }
+  async function startAction(kind) {
+    var had = !!(S && S.copies.length);
+    show();
+    if (kind === 'continue') { if (!had && lastProject) await continueLast(); }
+    else if (kind === 'open') await openProject();
+    else if (kind === 'new') { if (had) await newProject(); }
   }
   function suggestedName() {
     var n = proj.legacy ? (proj.legacy.dir ? proj.legacy.dir.name : '') : proj.name;
+    if (!proj.target && S.title) n = S.title.replace(/[<>:"\/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);   // a new project file is named after the project
     return (n && !/[<>:"\/\\|?*\x00-\x1f]/.test(n) ? n : 'Book project') + PROJECT_EXT;
   }
   // the Windows "Save as" or "Open" window for a project file
@@ -877,11 +965,14 @@
     projectChanging();
     S = blank(); REG = {}; anchor = null;
     S.projectId = json.projectId || uid();
+    S.title = typeof json.title === 'string' ? json.title.slice(0, 160) : '';
+    S.lblw = +json.lblw > 0 ? Math.max(64, Math.min(420, Math.round(+json.lblw))) : 0;
+    S.bgRun = json.bgRun && Array.isArray(json.bgRun.ids) ? { ids: json.bgRun.ids.filter(function (x) { return typeof x === 'number'; }), n: +json.bgRun.n || 0 } : null;
     S.ns = json.ns || 0; S.folio = !!json.folio; S.labels = json.labels || {}; S.skip = json.skip || {}; S.flags = cleanFlags(json.flags);
     S.annots = cleanAnnots(json.annotations); S.nextAnn = Math.max(+json.nextAnn || 1, maxAnnId() + 1); S.tiles = cleanTiles(json.tiles); S.boxes = cleanBoxes(json.boxes);
     S.pair = json.pair || [null, null]; S.sel = json.sel || { ci: null, row: 0 };
     // (a "set aside" tray from older versions is dropped: those files can be added again with "Add files to this copy")
-    (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', handle: null, files: null, ok: false }); });
+    (json.roots || []).forEach(function (r) { S.roots.push({ id: r.id, name: r.name, path: r.path || '', rel: typeof r.rel === 'string' ? r.rel : null, handle: null, files: null, ok: false }); });
     var maxId = 0, legacy = [];
     for (var i = 0; i < json.copies.length; i++) {
       var r = json.copies[i], c = { id: r.id, name: r.name, folder: r.folder, w: clampW(r.w) || 0, keys: r.keys || [], cells: r.cells || [], locs: (r.locs || []).map(function (l) { return { root: l.root, path: l.path || '' }; }) };
@@ -901,6 +992,13 @@
       var rt = S.roots[k];
       if (HELPER) {                                              // helper mode: the project file holds the folder's address
         if (rt.path) { try { rt.handle = await helperRegister(rt.path, 'scans'); rt.ok = true; } catch (e) { rt.handle = null; } }
+        // item 30: the folder is not where it was, but the project and the scans were moved together (another drive, another computer):
+        // the folder's place relative to the project file is tried
+        var pd = t && t.dir && t.dir.rootPath;
+        if (!rt.handle && rt.rel != null && pd) {
+          var alt = joinRelPath(pd, rt.rel);
+          if (alt) { try { rt.handle = await helperRegister(alt, 'scans'); rt.ok = true; rt.path = rt.handle.rootPath || alt; } catch (e) { rt.handle = null; } }
+        }
         continue;
       }
       var hh = await idbGet('handles', S.projectId + '/root/' + rt.id);
@@ -923,9 +1021,11 @@
     if (proj.target) await rememberProject();
     renderAll(); renderSave();
     var copies = S.copies.length + ' cop' + (S.copies.length === 1 ? 'y' : 'ies');
-    if (unsafe) toast('This project file lies in a folder that holds scans, so automatic saving is switched off. Save the project in another folder (More → Save project as …).');
-    else if (oldFormat) toast('Project opened (' + copies + '). It was saved by an older version of Book Compare: to keep your changes, save it as a project file (More → Save project as …). The old project folder stays as it is.');
+    if (unsafe) toast('This project file lies in a folder that holds scans, so automatic saving is switched off. Save the project in another folder (menu ⋮ → Save project as …).');
+    else if (oldFormat) toast('Project opened (' + copies + '). It was saved by an older version of Book Compare: to keep your changes, save it as a project file (menu ⋮ → Save project as …). The old project folder stays as it is.');
     else toast('Project opened: ' + copies + '.');
+    if (HELPER && proj.target && S.bgRun && window.BCBackground && BCBackground.offer) BCBackground.offer(S.bgRun);   // a run that did not finish (item 21)
+    if (S.copies.length >= 2 && window.CompareTab && CompareTab.preload) setTimeout(CompareTab.preload, 1500);         // item 33
     return true;
   }
 
@@ -1009,27 +1109,87 @@
   }
 
   /* ---------------------------------------------------------------- rendering */
+  // The toolbar (items 17, 18): only what is used all the time; everything else is in "More for this cell" and in the menu of the
+  // right mouse button (on a cell, on a row name, on a copy's heading).
   function renderToolbar() {
-    var s = selected(), tb = $('#ws-toolbar'), n = tb.querySelector('#gapN') ? tb.querySelector('#gapN').value : '1';
+    var s = selected(), tb = $('#ws-toolbar');
     var rg = range(), nrg = 0;
     if (rg) for (var q = rg.lo; q <= rg.hi; q++) if (s.c.cells[q]) nrg++;
     var where = s ? '<b>' + esc(s.c.name) + '</b> · ' + (rg ? esc(rowLabel(rg.lo)) + ' to ' + esc(rowLabel(rg.hi)) + ' (' + (rg.hi - rg.lo + 1) + ' rows)' : esc(rowLabel(s.row))) : 'Select a cell';
     tb.innerHTML = '<div class="sel">' + where + '</div>' +
-      '<button class="ws-tb" data-act="addfiles"' + (s ? '' : ' disabled') + ' title="Add pictures to this copy: ones you deleted, or pages that are stored in another folder">Add files to this copy …</button>' +
-      '<button class="ws-tb" data-act="mvl"' + (s && s.ci > 0 ? '' : ' disabled') + ' title="Moves the whole column of this copy one place to the left (you can also drag the heading of a column)">&#9664; Move copy</button>' +
-      '<button class="ws-tb" data-act="mvr"' + (s && s.ci < S.copies.length - 1 ? '' : ' disabled') + ' title="Moves the whole column of this copy one place to the right">Move copy &#9654;</button>' +
-      '<span class="ws-vsep"></span>' +
-      '<span class="ws-numwrap">Pages <input type="number" id="gapN" min="1" max="999" value="' + esc(n) + '" aria-label="Number of pages"></span>' +
-      '<button class="ws-tb" data-act="gap"' + (s ? '' : ' disabled') + ' title="Pushes this cell and everything below it down">Insert gap here</button>' +
-      '<button class="ws-tb" data-act="closegap"' + (s && !s.key ? '' : ' disabled') + ' title="Pulls everything below up again">Close gap</button>' +
+      '<button class="ws-tb" data-act="gap"' + (s ? '' : ' disabled') + ' title="Inserts empty cells ABOVE the selected cell: this cell and everything below it in this copy move down. Book Compare asks how many.">Insert gap above …</button>' +
+      '<button class="ws-tb" data-act="closegap"' + (s && !s.key ? '' : ' disabled') + ' title="Select an empty cell: it is removed and everything below it moves up">Close gap</button>' +
       '<button class="ws-tb" data-act="del"' + ((rg ? nrg : s && s.key) ? '' : ' disabled') + ' title="' + (rg ? 'Removes all the marked rows of this column from the workspace; the pages below move up.' : 'Removes this file from the workspace (for covers, flyleaves, duplicates). Hold Shift and click another cell (or press Shift + arrow) to mark several in one go.') + ' The scan files on your disk are not touched. Undo brings them back.">' + (rg ? 'Delete ' + nrg + ' file' + (nrg === 1 ? '' : 's') : 'Delete file') + '</button>' +
       '<span class="ws-vsep"></span>' +
-      '<button class="ws-tb" data-act="startnum"' + (s ? '' : ' disabled') + ' title="Rows above become front matter (Front 1, Front 2 …). This row becomes the first numbered page. You choose pagination or foliation.">Start numbering at this row</button>' +
-      '<button class="ws-tb" data-act="skiprow"' + (s ? '' : ' disabled') + ' title="Keeps the row in the grid but leaves it out of the comparison">' + (s && S.skip[s.row] ? 'Compare this row again' : 'Don’t compare this row') + '</button>' +
+      '<button class="ws-tb" data-act="undo"' + (hist.undo.length ? '' : ' disabled') + ' title="Undo (Ctrl+Z)">Undo</button>' +
+      '<button class="ws-tb" data-act="redo"' + (hist.redo.length ? '' : ' disabled') + ' title="Redo (Ctrl+Y)">Redo</button>' +
       '<span class="ws-vsep"></span>' +
-      '<button class="ws-tb" data-act="undo"' + (hist.undo.length ? '' : ' disabled') + '>Undo</button>' +
-      '<button class="ws-tb" data-act="redo"' + (hist.redo.length ? '' : ' disabled') + '>Redo</button>';
+      '<button class="ws-tb" id="ws-cellmore" data-act="cellmenu"' + (s ? '' : ' disabled') + ' aria-haspopup="true" title="More for this cell, its row and its copy (also with the right mouse button)">More for this cell &#9662;</button>';
   }
+  // the menu for a cell (right mouse button, or "More for this cell"): its copy, its row
+  function cellMenuHtml() {
+    var s = selected(); if (!s) return '';
+    var it = function (a, label, off, tip) { return '<button role="menuitem" data-act="' + a + '"' + (off ? ' disabled' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + label + '</button>'; };
+    var other = S.ref != null && S.ref !== s.c.id && copyById(S.ref) && copyById(S.ref).cells[s.row];
+    return '<div class="ws-mhead">This cell</div>' +
+      it('gap', 'Insert gap above …') + it('closegap', 'Close gap', !!s.key) + it('del', 'Delete file', !s.key) +
+      it('cmpref', 'Compare with the reference copy', !s.key || !other, 'The same as a double-click on the cell' + (other ? '' : ': needs a reference copy (menu ⋮) with a page in this row')) +
+      '<hr><div class="ws-mhead">This copy (' + esc(s.c.name) + ')</div>' +
+      it('addfiles', 'Add files to this copy …') +
+      it('mvl', '&#9664; Move copy to the left', s.ci <= 0) + it('mvr', 'Move copy to the right &#9654;', s.ci >= S.copies.length - 1) +
+      it('renamecopy', 'Rename copy …') + it('setref', S.ref === s.c.id ? '★ Is the reference copy' : 'Make it the reference copy', S.ref === s.c.id) +
+      '<hr><div class="ws-mhead">This row (' + esc(rowLabel(s.row)) + ')</div>' +
+      it('startnum', 'Start numbering at this row …') + it('renamerow', 'Rename this row …') +
+      it('skiprow', S.skip[s.row] ? 'Compare this row again' : 'Don’t compare this row');
+  }
+  function openCellMenu(x, y) {
+    closeCellMenu();
+    var h = cellMenuHtml(); if (!h) return;
+    var m = document.createElement('div'); m.className = 'ws-menu ws-ctx'; m.id = 'ws-ctx'; m.setAttribute('role', 'menu'); m.innerHTML = h;
+    root.appendChild(m);
+    var w = m.offsetWidth, hh = m.offsetHeight;
+    m.style.left = Math.max(6, Math.min(x, window.innerWidth - w - 6)) + 'px'; m.style.top = Math.max(6, Math.min(y, window.innerHeight - hh - 6)) + 'px';
+    var f = m.querySelector('button:not(:disabled)'); if (f) f.focus();
+  }
+  function closeCellMenu() { var m = root && root.querySelector('#ws-ctx'); if (m) m.remove(); }
+  // Insert gap above … / Close gap: how many (N5: the gap goes ABOVE the selected cell)
+  function gapDialog(s) {
+    var sc = modal('<h3>Insert gap above</h3><p>Empty cells are put <b>above</b> ' + (s.key ? '“' + esc(baseName(s.key)) + '”' : 'the selected cell') + ' in <b>' + esc(s.c.name) + '</b> (' + esc(rowLabel(s.row)) + '). This cell and everything below it in this copy move down. The other copies stay as they are.</p>' +
+      '<label class="inl">How many empty cells <input type="number" id="gapN" min="1" max="999" value="1"></label>' +
+      '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="gap-ok">Insert</button></div>');
+    var inp = sc.querySelector('#gapN'), go = function () {
+      var n = Math.max(1, Math.min(999, parseInt(inp.value, 10) || 1)); closeModal();
+      commit(); insertGap(s.c, s.row, n); changed(); toast('Inserted ' + n + ' empty cell' + (n > 1 ? 's' : '') + ' above ' + rowLabel(s.row + n) + '.', true);
+    };
+    sc.querySelector('#gap-ok').onclick = go;
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    inp.focus(); inp.select();
+  }
+  function closeGapAction(s) {
+    var run = 0; while (s.row + run < s.c.cells.length && s.c.cells[s.row + run] == null) run++;
+    var doIt = function (n) { commit(); var k = closeGap(s.c, s.row, n); trim(s.c); changed(); toast(k ? 'Closed ' + k + ' empty cell' + (k > 1 ? 's' : '') + '.' : 'Nothing to close.', true); };
+    if (run <= 1) return doIt(1);
+    var sc = modal('<h3>Close gap</h3><p>' + run + ' empty cells follow each other here in <b>' + esc(s.c.name) + '</b>. How many should be removed? The pages below move up.</p>' +
+      '<label class="inl">Empty cells to remove <input type="number" id="cgN" min="1" max="' + run + '" value="' + run + '"></label>' +
+      '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="cg-ok">Close gap</button></div>');
+    var inp = sc.querySelector('#cgN'), go = function () { var n = Math.max(1, Math.min(run, parseInt(inp.value, 10) || 1)); closeModal(); doIt(n); };
+    sc.querySelector('#cg-ok').onclick = go;
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    inp.focus(); inp.select();
+  }
+  // a double-click on a cell (item 20): this page of this copy against the same row of the reference copy
+  function compareWithRef(ci, row) {
+    var c = S.copies[ci]; if (!c || !c.cells[row]) return;
+    var ref = S.ref != null ? copyById(S.ref) : null;
+    S.sel.ci = ci; S.sel.row = row; anchor = null;
+    if (ref && ref !== c && ref.cells[row]) S.pair = [ref.id, c.id];
+    else if (S.pair[0] === c.id || S.pair[1] === c.id) { /* keep the marked pair */ }
+    else if (S.pair[0] != null) S.pair = [S.pair[0], c.id];
+    touch(); renderAll();
+    if (canCompare()) compareNow();
+    else toast(ref ? 'The reference copy has no page in this row.' : 'Choose a reference copy first (menu ⋮ → Reference copy …), or mark two pages with “1” and “2”.');
+  }
+
   function nameList(list) {
     var names = list.map(function (c) { return c.name; });
     return esc(names.length > 4 ? names.slice(0, 4).join(', ') + ' and ' + (names.length - 4) + ' more' : names.join(', '));
@@ -1042,7 +1202,7 @@
     bn.hidden = !lost.length || (!allow.length && !find.length);
     if (bn.hidden) return;
     var h = '';
-    if (allow.length) h += '<span>The browser locks your scans after a restart (<b>' + nameList(lost) + '</b>). Pictures you have seen before are still shown. When you press COMPARE the browser asks for permission by itself; to see every page now, allow access here.</span><button class="ws-tb primary" data-act="allow">Allow access now</button>';
+    if (allow.length) h += '<span>The browser locks your scans after a restart (<b>' + nameList(lost) + '</b>). Pictures you have seen before are still shown. When you compare two pages the browser asks for permission by itself; to see every page now, allow access here.</span><button class="ws-tb primary" data-act="allow">Allow access now</button>';
     if (find.length) h += '<span>' + (allow.length ? 'For some copies the folder is not known on this computer. ' : 'Book Compare cannot find the scans of <b>' + nameList(lost) + '</b> on this computer. ') + 'Choose the folder that holds them (one choice is enough for all copies inside it).</span><button class="ws-tb' + (allow.length ? '' : ' primary') + '" data-act="reconnect">Choose scan folder …</button>';
     else if (allow.length > 1) h += '<button class="ws-tb" data-act="reconnect" title="Pick the folder that holds all your copies once. After that a single permission is enough.">Choose one folder for all …</button>';
     bn.innerHTML = h;
@@ -1050,17 +1210,18 @@
   function renderGridShell() {
     var gb = $('#ws-gridbox');
     if (!S.copies.length) {
-      gb.innerHTML = '<div class="ws-empty"><h2>No copies yet</h2><p>Add the first copy to start. Each copy is one folder of scans on your disk. You can add the others one by one afterwards.</p><div class="acts"><button class="ws-tb primary" data-act="add" style="padding:10px 18px;font-size:15px">Add first copy</button><button class="ws-tb" data-act="openproj" style="padding:10px 18px;font-size:15px">Open saved project …</button>' +
+      gb.innerHTML = '<div class="ws-empty"><h2>No copies yet</h2><p>Add the first copy to start. Each copy is one folder of scans on your disk. You can add the others one by one afterwards.</p><div class="acts"><button class="ws-tb primary" data-act="add" style="padding:10px 18px;font-size:15px">Add first copy</button><button class="ws-tb" data-act="openproj" style="padding:10px 18px;font-size:15px">Open project …</button>' +
         (lastProject ? '<button class="ws-tb" data-act="continue" style="padding:10px 18px;font-size:15px">Continue “' + esc(lastProject.name) + '”</button>' : '') + '</div></div>';
       return;
     }
-    var w = gridW();
+    var w = gridW(), stH = storedEntries();
     var h = '<div class="ws-vp" id="ws-vp" tabindex="0" aria-label="Page grid. Arrow keys move the selection."><div class="ws-inner" id="ws-inner" style="width:' + w + 'px;height:' + (HEAD_H + rows() * ROW_H) + 'px">';
-    h += '<div class="ws-hrow" style="width:' + w + 'px"><div class="ws-corner">Page</div>';
+    root.style.setProperty('--ws-lblw', lblW() + 'px');
+    h += '<div class="ws-hrow" style="width:' + w + 'px"><div class="ws-corner">Page<div class="ws-rz" data-c="lbl" title="Drag to change the width of this column. Double-click: fit the names of the rows."></div></div>';
     S.copies.forEach(function (c, i) {
       var cnt = 0; c.cells.forEach(function (x) { if (x) cnt++; });
       var k = c.id === S.pair[0] ? ' k1' : c.id === S.pair[1] ? ' k2' : '', lost = copyLost(c);
-      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (c.id === S.ref ? '<span class="ws-star" title="Reference copy: the other copies are aligned onto it (More → Reference copy …)">★</span> ' : '') + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid') + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
+      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (c.id === S.ref ? '<span class="ws-star" title="Reference copy: the other copies are aligned onto it (More → Reference copy …)">★</span> ' : '') + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + storedCount(stH, c)) + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
     });
     h += '<div class="ws-addcell"><button class="ws-addbtn" data-act="add"><span class="plus">+</span><small>Add new copy</small></button></div></div><div id="ws-rowshost"></div></div></div>';
     gb.innerHTML = h;
@@ -1070,9 +1231,33 @@
     var f = S.flags[i]; if (f == null) return '';
     return '<svg class="ws-flag" viewBox="0 0 24 24" width="15" height="15" role="img" style="color:' + FLAG_COLORS[f] + '"><title>Flagged (' + FLAG_NAMES[f] + ')</title><path fill="currentColor" d="' + FLAG_PATH + '"/></svg>';
   }
+  // Stored alignments (item 21, desktop program): a small dot in a cell whose page is aligned onto the reference copy and stored
+  var stLoad = null;
+  function storedEntries() {
+    if (!HELPER || !proj.target || !window.BCResults || !BCResults.available()) return null;
+    var e = BCResults.storedSync();
+    if (!e && stLoad !== tabApi.resultsId()) { stLoad = tabApi.resultsId(); BCResults.load().then(function (ok) { if (ok) renderAllSoon(); }); }
+    return e;
+  }
+  function isStored(st, c, row, key) {
+    if (!st || !key) return false;
+    var b = refFor(row); if (b == null || b === c.id) return false;
+    var rc = copyById(b), rk = rc && rc.cells[row]; if (!rk) return false;
+    var e = st[BCResults.nameFor({ c0: b, k0: rk, c1: c.id, k1: key })];
+    return !!(e && typeof e.valid === 'string' && e.valid.indexOf(BCResults.ENGINE + '|') === 0);
+  }
+  function storedCount(st, c) {
+    if (!st) return ' in grid';
+    var b = 0, n = 0;
+    for (var r = 0; r < c.cells.length; r++) { if (!c.cells[r]) continue; var f = refFor(r); if (f == null || f === c.id) continue; n++; if (isStored(st, c, r, c.cells[r])) b++; }
+    return n ? ' · ' + b + ' aligned' : ' in grid';
+  }
+  var soonT = 0;
+  function renderAllSoon() { if (soonT) return; soonT = setTimeout(function () { soonT = 0; if (root && !root.hidden) renderAll(); }, 1200); }   // (at most about once a second while helpers store pages)
+  document.addEventListener('bcresultschange', renderAllSoon);
   function renderRows() {
     var vp = $('#ws-vp'), host = $('#ws-rowshost'); if (!vp || !host) return;
-    var N = rows(), top = vp.scrollTop, vh = vp.clientHeight;
+    var N = rows(), top = vp.scrollTop, vh = vp.clientHeight, stE = storedEntries();
     var a = Math.max(0, Math.floor((top - HEAD_H) / ROW_H) - OVERSCAN), b = Math.min(N - 1, Math.ceil((top + vh) / ROW_H) + OVERSCAN), h = '';
     var lostC = S.copies.map(copyLost), rg = range();
     for (var i = a; i <= b; i++) {
@@ -1080,7 +1265,8 @@
       S.copies.forEach(function (c, ci) {
         var key = c.cells[i] || null, sel = (S.sel.ci === ci && S.sel.row === i) ? ' sel' : (rg && rg.ci === ci && i >= rg.lo && i <= rg.hi ? ' rng' : ''), wst = ' style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px"';
         var pm = c.id === S.pair[0] ? '<b class="pm m1">1</b>' : c.id === S.pair[1] ? '<b class="pm m2">2</b>' : '';
-        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '><i class="ico"></i><span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + pm + '</div>'; }
+        var dot = isStored(stE, c, i, key) ? '<i class="ws-st" title="Aligned onto the reference copy and stored: comparing it with the reference opens at once"></i>' : '';
+        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '><i class="ico"></i><span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + dot + pm + '</div>'; }
         else cells += '<div class="ws-cell empty' + sel + '" data-c="' + ci + '" data-r="' + i + '"' + wst + '><span class="gap">no page</span></div>';
       });
       var sk = !!S.skip[i], small = sk ? 'not compared' : (i === S.ns && S.ns > 0 ? 'starts here' : n + ' of ' + S.copies.length + ' copies');
@@ -1092,7 +1278,7 @@
   function renderPreview() {
     var tok = ++pvTok, row = S.sel.row, h = '';
     $('#ws-pvtitle').textContent = S.copies.length ? rowLabel(row) : 'Row';
-    var sub = !S.copies.length ? 'Previews appear here.' : S.skip[row] ? 'This row will not be compared.' : 'The same page in every copy. Mark two with “1” and “2”, then press COMPARE.';
+    var sub = !S.copies.length ? 'Previews appear here.' : S.skip[row] ? 'This row will not be compared.' : 'The same page in every copy. Mark two with “1” and “2”, then compare them.';
     $('#ws-pvsub').innerHTML = '<span class="txt">' + esc(sub) + '</span>' + (S.copies.length > 1 ? '<button class="ws-tb" data-act="swap" title="Swap copy 1 and copy 2">⇄ Swap 1 and 2</button>' : '');
     S.copies.forEach(function (c, ci) {
       var key = c.cells[row] || null;
@@ -1116,8 +1302,9 @@
     }
   }
   function renderBar() {
-    var b = $('#ws-compare');
-    b.classList.toggle('notready', !canCompare());
+    var ok = canCompare();
+    $('#ws-compare').classList.toggle('notready', !ok); $('#ws-cmpbtn').classList.toggle('notready', !ok);
+    var t = $('#ws-title'); if (t && document.activeElement !== t && t.value !== (S.title || '')) t.value = S.title || '';
   }
   function renderAll() {
     if (!root) return;
@@ -1145,7 +1332,7 @@
   function ensureColVisible(ci) {
     var vp = $('#ws-vp'), c = S.copies[ci]; if (!vp || !c) return;
     var l = colLeft(ci), r = l + cw(c);
-    if (l < vp.scrollLeft + LBL_W) vp.scrollLeft = Math.max(0, l - LBL_W);
+    if (l < vp.scrollLeft + lblW()) vp.scrollLeft = Math.max(0, l - lblW());
     else if (r > vp.scrollLeft + vp.clientWidth) vp.scrollLeft = r - vp.clientWidth;
   }
   function ensureVisible(row) {
@@ -1159,8 +1346,9 @@
   /* ---------------------------------------------------------------- messages and dialogs */
   var toastT = null;
   function toast(msg, withUndo) {
+    if (root.hidden && window.CompareTab && CompareTab.isOpen && CompareTab.isOpen()) return CompareTab.toast(msg);   // the Compare tab is on screen
     var old = $('#ws-toast'); if (old) old.remove();
-    var d = document.createElement('div'); d.id = 'ws-toast'; d.className = 'ws-toast'; d.setAttribute('role', 'status');
+    var d = document.createElement('div'); d.id = 'ws-toast'; d.className = 'ws-toast' + ($('#ws-scrim') ? ' top' : ''); d.setAttribute('role', 'status');
     d.innerHTML = '<span>' + esc(msg) + '</span>' + (withUndo ? '<button data-act="undo">Undo</button>' : '');
     root.appendChild(d); clearTimeout(toastT); toastT = setTimeout(function () { d.remove(); }, withUndo ? 7000 : 4500);
   }
@@ -1168,11 +1356,18 @@
     closeModal();
     var sc = document.createElement('div'); sc.className = 'ws-scrim'; sc.id = 'ws-scrim';
     sc.innerHTML = '<div class="ws-dlg" role="dialog" aria-modal="true">' + html + '</div>';
-    $('#ws-layer').appendChild(sc);
+    if (root.hidden) {                                                                      // asked from the Compare tab: the Pages layer is hidden
+      var fl = document.createElement('div'); fl.className = 'ws ws-float'; fl.id = 'ws-float';
+      fl.addEventListener('click', onClick);                                                // (data-close and the other buttons work as in the layer)
+      fl.appendChild(sc); document.body.appendChild(fl);
+    } else $('#ws-layer').appendChild(sc);
     sc.addEventListener('mousedown', function (e) { if (e.target === sc) closeModal(); });
     return sc;
   }
-  function closeModal() { var s = root && $('#ws-scrim'); if (s) s.remove(); }
+  function closeModal() {
+    var s = root && ($('#ws-scrim') || document.getElementById('ws-scrim')); if (s) s.remove();
+    var fl = document.getElementById('ws-float'); if (fl) fl.remove();
+  }
   function confirmDialog(title, text, okLabel) {
     return new Promise(function (resolve) {
       var sc = modal('<h3>' + esc(title) + '</h3><p>' + text + '</p><div class="acts"><button class="ws-tb" id="cf-no">Cancel</button><button class="ws-tb primary" id="cf-yes">' + esc(okLabel) + '</button></div>');
@@ -1182,22 +1377,23 @@
   }
   function helpDialog() {
     modal('<h3>How this screen works</h3><ul>' +
+      '<li>The <b>name of the project</b> goes into the field at the top left. It is shown in both tabs and proposed as the name of the project file.</li>' +
       '<li>Each <b>column</b> is one copy: a folder of scans on your disk. Each <b>row</b> is one page position. The pages in a row will be compared with each other.</li>' +
       '<li>Book Compare only <b>reads</b> your scan folders. Everything you do here (gaps, renaming, deleting files) changes only the project, never a scan file.</li>' +
       '<li>A copy with missing pages has <b>empty cells</b>. Select a cell and use <b>Insert gap here</b> to push the following files down, or <b>Close gap</b> to pull them up.</li>' +
       '<li>Covers, flyleaves and duplicates can be removed from the grid with <b>Delete file</b>. The scan itself stays on your disk, and <b>Add files to this copy</b> brings it back.</li>' +
       '<li><b>Add files to this copy</b> also adds pictures from another folder, for example pages that were scanned later.</li>' +
-      '<li><b>More → Reference copy …</b> chooses the copy the others are compared with (★ in its heading). ' + (HELPER ? '<b>More → Align copies in the background …</b> aligns the other copies onto it page by page and keeps the results next to the project file, so that comparisons with the reference open at once.' : 'In the desktop program the other copies can be aligned onto it in the background.') + '</li>' +
+      '<li><b>⋮ → Reference copy …</b> chooses the copy the others are compared with (★ in its heading). ' + (HELPER ? '<b>⋮ → Align copies in the background …</b> aligns the other copies onto it page by page and keeps the results next to the project file, so that comparisons with the reference open at once.' : 'In the desktop program the other copies can be aligned onto it in the background.') + '</li>' +
       '<li>What the comparison cannot show (light inks such as red, small shifts, ...) is explained in the Compare tab, left panel, under “What the comparison cannot show”.</li>' +
-      '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later under <b>More</b>. Double-click a row name to rename it.</li>' +
+      '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later in the menu <b>⋮</b>. Double-click a row name to rename it.</li>' +
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
-      '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>COMPARE</b>: they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The <b>Pages</b> tab or <b>Back</b> there brings you here again.</li>' +
+      '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>Compare 1 and 2</b> (or the tab <b>Compare</b> at the top): they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The tab <b>Pages</b> brings you here again.</li>' +
       '<li>When you reopen a saved project the browser asks once for permission to read your scans again. Click <b>Allow access to scans</b>; you do not have to pick the folders again.</li>' +
       '<li><b>Delete several files at once:</b> click the first cell, hold <b>Shift</b> and click the last one (or press Shift + the up/down arrow). The whole range is marked; <b>Delete</b> removes it and the pages below move up.</li>' +
-      '<li><b>Column width:</b> drag the right edge of a column heading; a double-click fits the longest file name. <b>More › Standard width for all columns</b> resets them.</li>' +
+      '<li><b>Column width:</b> drag the right edge of a column heading; a double-click fits the longest file name. <b>⋮ → Standard width for all columns</b> resets them.</li>' +
       '<li><b>Moving a copy:</b> drag its heading to another place, or use <b>Move copy</b> in the toolbar. Undo works for this too.</li>' +
       '<li>If a preview says it could not be loaded, press <b>Reload</b> under it. Ctrl+Z undoes the last change. Arrow keys move the selection.</li>' +
-      '<li><b>More › Measure speed on this computer</b> aligns a few real pages one after the other and shows how long each step takes here. It only reads your scans.</li></ul>' +
+      '<li><b>⋮ → Measure speed on this computer</b> aligns a few real pages one after the other and shows how long each step takes here. It only reads your scans.</li></ul>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
   }
 
@@ -1272,7 +1468,7 @@
       srcBlock('ac') +
       '<div id="ac-groups"></div>' +
       '<label>Place the first file at row<input type="number" id="ac-start" min="1" value="1"></label>' +
-      '<p class="note">Files are placed in name order, one per row. You fix the placement afterwards in the grid. Book Compare only reads the scan folder; it never changes anything in it. If one folder holds the scans of several copies, choose it once: for the next copy it is in the list of folders used so far.</p>' +
+      '<p class="note">One file per row, in name order; you fix the order in the grid. Book Compare only reads the folder.</p>' +
       '<div class="err" id="ac-err"></div>' +
       '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="ac-ok">Add copy</button></div>');
     // Whole folders are the usual way (a folder with one tick takes all its pictures); a folder can also be opened to take single pictures.
@@ -1350,13 +1546,13 @@
     var c = s.c, extra = (c.locs || []).map(function (l) { return { root: l.root, path: l.path }; }), pk = null, n = -1, groups = [], checked = {};
     var startRow = s.key ? 0 : s.row + 1;                                     // 0 = at the end
     var sc = modal('<h3>Add files to ' + esc(c.name) + '</h3>' +
-      '<p class="note">Add pictures that are not in the grid yet: pages you deleted, or pages that are stored in another folder.</p>' +
+      '<p class="note">Pages you deleted, or pages stored in another folder.</p>' +
       srcBlock('af') +
       '<div id="af-list"></div>' +
       '<fieldset class="place"><legend>Where should they go?</legend>' +
       '<label class="inl"><input type="radio" name="af-where" value="end"' + (startRow ? '' : ' checked') + '> At the end of the copy</label>' +
       '<label class="inl"><input type="radio" name="af-where" value="row"' + (startRow ? ' checked' : '') + '> Starting at row <input type="number" id="af-row" min="1" value="' + (startRow || s.row + 1) + '"> <span class="note" id="af-rowlbl"></span></label>' +
-      '</fieldset><p class="note">Empty cells are filled first. If a cell is already taken, the pages below move down.</p>' +
+      '</fieldset><p class="note">Empty cells are filled first; where a cell is taken, the pages below move down.</p>' +
       '<div class="err" id="af-err"></div>' +
       '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="af-ok">Add files</button></div>');
     var listEl = sc.querySelector('#af-list'), rowIn = sc.querySelector('#af-row');
@@ -1439,7 +1635,7 @@
       '<p>' + (row ? 'The rows above become front matter (Front 1, Front 2 …). ' : '') + 'This row becomes the first numbered page. How should the pages be numbered?</p>' +
       '<label class="inl opt"><input type="radio" name="nm-style" value="page"' + (folio ? '' : ' checked') + '><span><b>Pagination</b><br>Every page gets a number: Page 1, Page 2, Page 3 …</span></label>' +
       '<label class="inl opt"><input type="radio" name="nm-style" value="folio"' + (folio ? ' checked' : '') + '><span><b>Foliation</b><br>Every leaf gets a number, front and back: 1r, 1v, 2r, 2v …</span></label>' +
-      '<p class="note">You can switch between the two later under More. Row names you typed yourself are kept.</p>' +
+      '<p class="note">You can switch later (menu ⋮). Row names you typed yourself are kept.</p>' +
       '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="nm-ok">Start numbering</button></div>');
     sc.querySelector('#nm-ok').onclick = function () {
       var f = sc.querySelector('input[name=nm-style]:checked').value === 'folio';
@@ -1449,20 +1645,94 @@
     sc.querySelector('#nm-ok').focus();
   }
 
-  function renderMenu() {
-    var m = $('#ws-menu'), lost = usedRoots().some(function (r) { return !rootReady(r); });
-    m.innerHTML =
-      '<button data-m="save"><span class="tick"></span>' + (HAS_FSA ? (proj.target ? 'Save project as …' : 'Save project …') : 'Download project file') + '</button>' +
-      '<button data-m="open"><span class="tick"></span>Open project …</button>' +
-      '<button data-m="reconnect"' + (lost ? '' : ' disabled') + '><span class="tick"></span>Choose scan folder again …</button><hr>' +
-      '<button data-m="folio"><span class="tick"></span>' + (S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') + '</button>' +
-      '<button data-m="colw"><span class="tick"></span>Standard width for all columns</button>' +
-      '<button data-m="help"><span class="tick"></span>How this screen works</button>' +
-      '<button data-m="ref"' + (S.copies.length < 2 ? ' disabled' : '') + '><span class="tick"></span>Reference copy …</button>' +
-      (HELPER ? '<button data-m="bg"' + (S.copies.length < 2 ? ' disabled' : '') + '><span class="tick"></span>' + (window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …') + '</button>' : '') +
-      '<button data-m="speed"><span class="tick"></span>Measure speed on this computer …</button><hr>' +
-      '<button data-m="new"><span class="tick"></span>Start a new empty project</button>' +
-      (DESKTOP ? '' : '<hr><button data-m="download"><span class="tick"></span>Desktop program for Windows …</button>');
+  // The one menu (⋮ in the top bar), the same in both views (items 12-16): Project, Grid (Pages view only), Export and Help.
+  // The Compare tab hands over what only it can do (export, colours, its help) with BookWorkspace.compareMenu(handlers).
+  var cmpMenu = null;
+  function menuHtml(where) {
+    var cmp = where === 'compare', two = S.copies.length >= 2, lost = usedRoots().some(function (r) { return !rootReady(r); });
+    var item = function (m, label, off, tip) { return '<button role="menuitem" data-m="' + m + '"' + (off ? ' disabled' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '><span class="tick"></span>' + label + '</button>'; };
+    var notHere = 'In the Compare tab: these export the two pages shown there.';
+    var h = '<div class="ws-mhead">Project</div>' +
+      item('save', HAS_FSA ? (proj.target ? 'Save project as …' : 'Save project …') : 'Download project file') +
+      item('open', 'Open project …') + item('new', 'New project') +
+      (lost ? item('reconnect', 'Choose scan folder again …') : '') +
+      item('ref', 'Reference copy …', !two) +
+      (HELPER ? item('bg', window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …', !two) : '') +
+      (HELPER ? item('stored', 'Stored alignments …', !proj.target) : '') +
+      item('start', 'Back to the start screen');
+    if (!cmp) h += '<hr><div class="ws-mhead">Grid</div>' +
+      item('folio', S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') +
+      item('colw', 'Standard width for all columns');
+    h += '<hr><div class="ws-mhead">Export</div>' +
+      item('x-aligned', 'Aligned pages (two pictures)', !cmp, cmp ? 'Copy 1 and copy 2 as aligned, as two picture files' : notHere) +
+      item('x-toggle', 'Toggle view (moving picture, GIF)', !cmp, cmp ? '' : notHere) +
+      item('x-view', 'Current view (picture)', !cmp, cmp ? 'The picture as it is shown now, e.g. Superimposed' : notHere);
+    h += '<hr><div class="ws-mhead">Help</div>' +
+      item('help', cmp ? 'How the Compare tab works (keys) …' : 'How this screen works …') +
+      item('speed', 'Measure speed on this computer …') +
+      (DESKTOP ? '' : item('download', 'Desktop program for Windows …')) +
+      item('licenses', 'Licenses') + item('about', 'About Book Compare …');
+    return h;
+  }
+  function renderMenu() { $('#ws-menu').innerHTML = menuHtml('pages'); }
+  // the same menu over the Compare tab (the Pages layer is hidden there): a floating copy under the ⋮ button
+  function floatMenu(anchor) {
+    var old = document.getElementById('ws-fmenu'); if (old) { old.remove(); return; }
+    var w = document.createElement('div'); w.className = 'ws-vars ws-fmenuwrap'; w.id = 'ws-fmenu';
+    w.innerHTML = '<div class="ws-menu" role="menu">' + menuHtml('compare') + '</div>';
+    document.body.appendChild(w);
+    var r = anchor.getBoundingClientRect(), m = w.firstChild;
+    m.style.top = Math.round(r.bottom + 4) + 'px'; m.style.right = Math.max(6, Math.round(window.innerWidth - r.right)) + 'px';
+    var close = function () { w.remove(); document.removeEventListener('pointerdown', away, true); document.removeEventListener('keydown', esc1, true); };
+    var away = function (e) { if (!w.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) close(); };
+    var esc1 = function (e) { if (e.key === 'Escape') { close(); e.stopPropagation(); anchor.focus(); } };
+    document.addEventListener('pointerdown', away, true); document.addEventListener('keydown', esc1, true);
+    w.addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (!b || b.disabled) return; close(); menuAction(b.dataset.m, 'compare'); });
+    var first = m.querySelector('button:not(:disabled)'); if (first) first.focus();
+  }
+  function menuAction(m, where) {
+    var cmp = where === 'compare';
+    if (m === 'save') saveProjectAs();
+    else if (m === 'open') openProject();
+    else if (m === 'new') newProject();
+    else if (m === 'reconnect') reconnectScans();
+    else if (m === 'ref') refDialog();
+    else if (m === 'bg') { if (window.BCBackground) window.BCBackground.open(); }
+    else if (m === 'stored') storedDialog();
+    else if (m === 'start') { if (cmp && cmpMenu && cmpMenu.leave) cmpMenu.leave(); else leave(); }
+    else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
+    else if (m === 'colw') resetWidths();
+    else if (/^x-/.test(m)) { if (cmpMenu && cmpMenu[m]) cmpMenu[m](); }
+    else if (m === 'help') { if (cmp && cmpMenu && cmpMenu.help) cmpMenu.help(); else helpDialog(); }
+    else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
+    else if (m === 'download') openDownloadPage();
+    else if (m === 'licenses') { var a = document.createElement('a'); a.href = 'licenses.txt'; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+    else if (m === 'about') aboutDialog();
+  }
+  // item 28: how much room the stored alignments take, and removing those that are no longer needed (pages that left the grid, an older
+  // alignment). A pair that is still in the grid stays, even when its scans changed: it is replaced the next time it is aligned.
+  async function storedDialog() {
+    if (!window.BCResults || !BCResults.available()) return toast('Save the project as a file first: the stored alignments lie next to it.');
+    var st = await BCResults.stats(); if (!st) return toast('The stored alignments could not be read.');
+    var inGrid = {};
+    S.copies.forEach(function (c) { c.cells.forEach(function (k) { if (k) inGrid[c.id + '|' + k] = true; }); });
+    var keep = function (e) { return BCResults.current(e) && inGrid[e.c0 + '|' + e.k0] && inGrid[e.c1 + '|' + e.k1]; };
+    var idx = BCResults.storedSync() || {}, old = 0, oldB = 0;
+    Object.keys(idx).forEach(function (k) { if (!keep(idx[k])) { old++; oldB += idx[k].bytes || 200000; } });
+    var mb = function (b) { return (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace('.0', '') + ' MB'; };
+    var sc = modal('<h3>Stored alignments</h3><p><b>' + st.count + '</b> page' + (st.count === 1 ? '' : 's') + ' stored, about <b>' + mb(st.bytes) + '</b>, in the folder “' + esc(st.folder) + '” next to the project file.</p>' +
+      (old ? '<p>' + old + ' of them ' + (old === 1 ? 'is' : 'are') + ' no longer needed (' + mb(oldB) + '): their pages left the grid, or they were made by an older version.</p>' : '<p>All of them are still needed.</p>') +
+      '<div class="acts"><button class="ws-tb" data-close>Close</button>' + (old ? '<button class="ws-tb primary" id="st-prune">Remove those ' + old + '</button>' : '') + '</div>');
+    var b = sc.querySelector('#st-prune');
+    if (b) b.onclick = async function () { b.disabled = true; var r = await BCResults.prune(keep); closeModal(); toast('Removed ' + r.removed + ' stored alignment' + (r.removed === 1 ? '' : 's') + ' (' + mb(r.bytes) + ').'); renderAll(); };
+  }
+  function aboutDialog() {
+    modal('<h3>About Book Compare</h3>' +
+      '<p>Book Compare finds the differences between copies of the same early printed book: it aligns the scans of two copies page by page and shows them on top of each other.</p>' +
+      '<p><b>Version:</b> ' + (DESKTOP ? esc(DESKTOP) + ' (desktop program for Windows)' : 'website (always the newest version)') + '</p>' +
+      '<p>Made by Torge Schiefelbein. Book Compare grew out of <a href="https://www.robots.ox.ac.uk/~vgg/software/image-compare/" target="_blank" rel="noopener">Image Compare</a> by the Visual Geometry Group (VGG), University of Oxford.</p>' +
+      '<p>Source code and downloads: <a href="https://github.com/PeerPioneer/Book-Compare" target="_blank" rel="noopener">github.com/PeerPioneer/Book-Compare</a>. The licences of the parts it uses are listed under Help › Licenses.</p>' +
+      '<div class="acts"><button class="ws-tb primary" data-close>Close</button></div>');
   }
 
   /* ---------------------------------------------------------------- hand a pair of pages to the Compare tab */
@@ -1528,7 +1798,7 @@
     var sizes = {};
     for (var i = 0; i < S.copies.length; i++) sizes[S.copies[i].id] = await firstScanSize(S.copies[i]);
     var prop = proposeRef(sizes), cur = S.ref != null ? S.ref : prop;
-    var h = '<h3>Reference copy</h3><p>The other copies are compared with the reference copy. ' + (HELPER ? 'Book Compare can align them onto it in the background (More → Align copies in the background …) and keeps the results next to the project file, so that a comparison with the reference opens at once.' : 'In the desktop program, Book Compare can align the other copies onto it in the background, so that a comparison with the reference opens at once.') +
+    var h = '<h3>Reference copy</h3><p>The other copies are compared with the reference copy. ' + (HELPER ? 'Book Compare can align them onto it in the background (⋮ → Align copies in the background …) and keeps the results next to the project file, so that a comparison with the reference opens at once.' : 'In the desktop program, Book Compare can align the other copies onto it in the background, so that a comparison with the reference opens at once.') +
       ' Where the reference copy has no page, the first copy from the left that has the page stands in for it.</p><div class="ws-reflist">';
     S.copies.forEach(function (c) {
       var p = c.cells.filter(Boolean).length, z = sizes[c.id];
@@ -1542,7 +1812,7 @@
       var v = sc.querySelector('input[name=ws-ref]:checked'), id = v ? +v.value : null;
       closeModal(); if (id == null || id === S.ref) return;
       commit(); S.ref = id; touch(); renderAll();
-      toast('“' + copyById(id).name + '” is the reference copy now.' + (HELPER ? ' More → Align copies in the background … aligns the others onto it.' : ''));
+      toast('“' + copyById(id).name + '” is the reference copy now.' + (HELPER ? ' ⋮ → Align copies in the background … aligns the others onto it.' : ''));
     };
     var none = sc.querySelector('#rf-none');
     if (none) none.onclick = function () { closeModal(); commit(); S.ref = null; touch(); renderAll(); toast('No reference copy.'); };
@@ -1666,6 +1936,8 @@
     bgSlot: function () { return root ? $('#ws-bg') : null; },
     rowLabel: function (i) { return rowLabel(i); },
     toast: function (t) { toast(t); },
+    memoryGB: function () { return HELPER && HELPER.mem ? HELPER.mem / 1073741824 : (navigator.deviceMemory || null); },
+    setBgRun: function (r) { var was = JSON.stringify(S.bgRun || null), now = JSON.stringify(r || null); if (was !== now) { S.bgRun = r || null; touch(); } },
     // ---- for the speed test (js/speedtest.js): it reads scans and changes nothing in the project
     modal: modal, closeModal: closeModal,
     // Which page to time: the selected row if copy 1 and another copy have a page there, otherwise the row that most copies share with copy 1.
@@ -1751,7 +2023,7 @@
   var rz = null;
   function applyWidths() {
     var inner = $('#ws-inner'), hr = root.querySelector('.ws-hrow'); if (!inner || !hr) return;
-    var w = gridW() + 'px'; inner.style.width = w; hr.style.width = w;
+    var w = gridW() + 'px'; inner.style.width = w; hr.style.width = w; root.style.setProperty('--ws-lblw', lblW() + 'px');
     Array.prototype.forEach.call(hr.querySelectorAll('.ws-hcell'), function (h) { var c = S.copies[+h.dataset.c]; if (c) { h.style.width = cw(c) + 'px'; h.style.flexBasis = cw(c) + 'px'; } });
     renderRows();
   }
@@ -1764,6 +2036,12 @@
   }
   function onPointerDown(e) {
     var h = e.target.closest && e.target.closest('.ws-rz'); if (!h || e.button) return;
+    if (h.dataset.c === 'lbl') {
+      e.preventDefault(); e.stopPropagation();
+      rz = { lbl: true, x: e.clientX, w: lblW(), moved: false };
+      try { h.setPointerCapture(e.pointerId); } catch (_) {}
+      root.classList.add('rzing'); return;
+    }
     var c = S.copies[+h.dataset.c]; if (!c) return;
     e.preventDefault(); e.stopPropagation();
     rz = { ci: +h.dataset.c, x: e.clientX, w: cw(c), moved: false };
@@ -1772,6 +2050,7 @@
   }
   function onPointerMove(e) {
     if (!rz) return;
+    if (rz.lbl) { rz.moved = true; S.lblw = Math.max(64, Math.min(420, Math.round(rz.w + e.clientX - rz.x))); applyWidths(); return; }
     var c = S.copies[rz.ci]; if (!c) return;
     rz.moved = true; c.w = limitW(rz.w + e.clientX - rz.x); applyWidths();
   }
@@ -1780,43 +2059,48 @@
     var was = rz; rz = null; root.classList.remove('rzing');
     if (was.moved) touch();
   }
-  function resetWidths() { S.copies.forEach(function (c) { c.w = 0; }); applyWidths(); touch(); toast('All columns have the standard width again.'); }
+  function fitLabels() {
+    var ctx = document.createElement('canvas').getContext('2d'), best = 0, N = rows();
+    ctx.font = '500 13px Roboto, Arial, sans-serif';
+    for (var i = 0; i < N; i++) best = Math.max(best, ctx.measureText(rowLabel(i)).width);
+    S.lblw = Math.max(64, Math.min(420, Math.ceil(best) + 26)); applyWidths(); touch();
+  }
+  function resetWidths() { S.lblw = 0; S.copies.forEach(function (c) { c.w = 0; }); applyWidths(); touch(); toast('All columns have the standard width again.'); }
   function onClick(e) {
     var t = e.target, el;
     if (t.closest('[data-close]')) return closeModal();
     if (!t.closest('#ws-menu') && !t.closest('#ws-more')) $('#ws-menu').hidden = true;
+    if (!t.closest('#ws-ctx') && !t.closest('#ws-cellmore')) closeCellMenu();
     if ((el = t.closest('[data-m]'))) {
-      var m = el.dataset.m; $('#ws-menu').hidden = true;
-      if (m === 'save') saveProjectAs();
-      else if (m === 'open') openProject();
-      else if (m === 'reconnect') reconnectScans();
-      else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
-      else if (m === 'help') helpDialog();
-      else if (m === 'colw') resetWidths();
-      else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
-      else if (m === 'ref') refDialog();
-      else if (m === 'bg') { if (window.BCBackground) window.BCBackground.open(); }
-      else if (m === 'new') newProject();
-      else if (m === 'download') openDownloadPage();
+      $('#ws-menu').hidden = true;
+      if (!el.disabled) menuAction(el.dataset.m, 'pages');
       return;
     }
     var cell = t.closest('.ws-cell');
-    if (cell && !t.closest('[data-act]')) { if (e.shiftKey) extendTo(+cell.dataset.c, +cell.dataset.r); else selectCell(+cell.dataset.c, +cell.dataset.r); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); return; }
+    if (cell && !t.closest('[data-act]')) {
+      var cc = +cell.dataset.c, cr = +cell.dataset.r, now = Date.now();
+      // a double-click (item 20; counted here, because the first click draws the grid anew and the browser then sees two different cells)
+      if (!e.shiftKey && lastCellClick && lastCellClick.c === cc && lastCellClick.r === cr && now - lastCellClick.t < 450 && cell.classList.contains('filled')) { lastCellClick = null; compareWithRef(cc, cr); return; }
+      lastCellClick = { c: cc, r: cr, t: now };
+      if (e.shiftKey) extendTo(cc, cr); else selectCell(cc, cr); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); return;
+    }
     var a = t.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, s = selected();
     switch (act) {
       case 'add': return addDialog();
-      case 'addfiles': return addFilesDialog();
+      case 'addfiles': closeCellMenu(); return addFilesDialog();
       case 'undo': return undo();
       case 'redo': return redo();
       case 'help': return helpDialog();
       case 'back': return leave();
       case 'more': renderMenu(); $('#ws-menu').hidden = !$('#ws-menu').hidden; return;
       case 'compare': return compareNow();
-      case 'savechip': return proj.target ? (proj.state === 'error' ? saveNow() : toast('Project file: “' + targetFile(proj.target) + '”. Changes are saved automatically.')) : saveProjectAs();
+      case 'savechip': return chipClick();
       case 'openproj': return openProject();
       case 'continue': return continueLast();
       case 'upd-dl': hideUpdate(); return openDownloadPage();
+      case 'upd-now': return updateNow();
+      case 'upd-install': return installUpdate();
       case 'upd-later': return hideUpdate();
       case 'allow': return allowAccess(false);
       case 'reconnect': return reconnectScans();
@@ -1824,13 +2108,18 @@
       case 'pick': var cp = S.copies[+a.dataset.ci], slot = +a.dataset.slot; if (cp) { var o = 1 - slot; if (S.pair[o] === cp.id) S.pair[o] = S.pair[slot]; S.pair[slot] = cp.id; touch(); renderAll(); } return;
       case 'selcell': selectCell(+a.dataset.ci, S.sel.row); return;
       case 'reload': reloadThumb(+a.dataset.ci); return;
-      case 'mvl': if (s && s.ci > 0) moveCopy(s.ci, s.ci - 1); return;
-      case 'mvr': if (s && s.ci < S.copies.length - 1) moveCopy(s.ci, s.ci + 1); return;
-      case 'startnum': if (s) numberingDialog(s); return;
-      case 'skiprow': if (s) { commit(); if (S.skip[s.row]) delete S.skip[s.row]; else S.skip[s.row] = true; changed(); toast(S.skip[s.row] ? 'This row will not be compared.' : 'This row will be compared again.', true); } return;
-      case 'gap': if (s) { var n = Math.max(1, parseInt($('#gapN').value, 10) || 1); commit(); insertGap(s.c, s.row, n); changed(); toast('Inserted ' + n + ' empty page' + (n > 1 ? 's' : '') + '.', true); } return;
-      case 'closegap': if (s) { var n2 = Math.max(1, parseInt($('#gapN').value, 10) || 1); commit(); var k = closeGap(s.c, s.row, n2); trim(s.c); changed(); toast(k ? 'Closed ' + k + ' gap' + (k > 1 ? 's' : '') + '.' : 'Nothing to close.', true); } return;
-      case 'del': return deleteSelected();
+      case 'mvl': closeCellMenu(); if (s && s.ci > 0) moveCopy(s.ci, s.ci - 1); return;
+      case 'mvr': closeCellMenu(); if (s && s.ci < S.copies.length - 1) moveCopy(s.ci, s.ci + 1); return;
+      case 'startnum': closeCellMenu(); if (s) numberingDialog(s); return;
+      case 'skiprow': closeCellMenu(); if (s) { commit(); if (S.skip[s.row]) delete S.skip[s.row]; else S.skip[s.row] = true; changed(); toast(S.skip[s.row] ? 'This row will not be compared.' : 'This row will be compared again.', true); } return;
+      case 'gap': closeCellMenu(); if (s) gapDialog(s); return;
+      case 'closegap': closeCellMenu(); if (s && !s.key) closeGapAction(s); return;
+      case 'cellmenu': { var bb = a.getBoundingClientRect(); if (root.querySelector('#ws-ctx')) closeCellMenu(); else openCellMenu(bb.left, bb.bottom + 4); return; }
+      case 'cmpref': closeCellMenu(); if (s) compareWithRef(s.ci, s.row); return;
+      case 'renamecopy': { closeCellMenu(); if (!s) return; var hn = root.querySelector('.ws-hname[data-c="' + s.ci + '"]'); if (hn) hn.click(); return; }
+      case 'renamerow': { closeCellMenu(); if (!s) return; var lb = root.querySelector('.ws-lbl[data-r="' + s.row + '"] b'); if (lb) startRename(lb, function () { return rowLabel(s.row); }, function (v) { S.labels[s.row] = v; }); return; }
+      case 'setref': closeCellMenu(); if (s && S.ref !== s.c.id) { commit(); S.ref = s.c.id; changed(); toast('“' + s.c.name + '” is the reference copy now.', true); } return;
+      case 'del': closeCellMenu(); return deleteSelected();
       case 'remove':
         var ci = +a.dataset.c, nm = S.copies[ci].name; commit(); if (S.copies[ci].id === S.ref) S.ref = null; S.copies.splice(ci, 1);
         S.sel.ci = S.copies.length ? Math.min(S.sel.ci == null ? 0 : S.sel.ci, S.copies.length - 1) : null; ensurePair();
@@ -1840,16 +2129,33 @@
       case 'lbl': var r = +a.dataset.r; if (S.sel.row === r) return; anchor = null; S.sel.row = r; if (S.sel.ci == null && S.copies.length) S.sel.ci = 0; renderToolbar(); renderRows(); renderPreview(); renderBar(); return;
     }
   }
+  // the right mouse button on a cell, a row name or a copy's heading: the menu for that cell (item 17)
+  function onContextMenu(e) {
+    if ($('#ws-scrim') || e.target.closest('input, textarea')) return;
+    var cell = e.target.closest('.ws-cell'), lbl = e.target.closest('.ws-lbl'), hc = e.target.closest('.ws-hcell');
+    if (!cell && !lbl && !hc) return;
+    e.preventDefault();
+    if (cell) {
+      var ci = +cell.dataset.c, r = +cell.dataset.r, rg = range();
+      if (!(rg && S.sel.ci === ci && r >= rg.lo && r <= rg.hi)) selectCell(ci, r);
+    } else if (lbl) { var r2 = +lbl.dataset.r; selectCell(S.sel.ci == null ? 0 : S.sel.ci, r2); }
+    else { selectCell(+hc.dataset.c, S.sel.row || 0); }
+    openCellMenu(e.clientX, e.clientY);
+  }
+  var lastCellClick = null;
   function onDblClick(e) {
-    var z = e.target.closest && e.target.closest('.ws-rz'); if (z) { fitWidth(+z.dataset.c); return; }
+    var z = e.target.closest && e.target.closest('.ws-rz'); if (z) { if (z.dataset.c === 'lbl') fitLabels(); else fitWidth(+z.dataset.c); return; }
+    if (e.target.closest && e.target.closest('.ws-cell')) return;                        // (a double-click on a cell is counted in onClick)
     var l0 = e.target.closest('.ws-lbl'); if (!l0) return;
     var r = +l0.dataset.r, l = root.querySelector('.ws-lbl[data-r="' + r + '"]'), b = l && l.querySelector('b');
     if (!b) return;
     startRename(b, function () { return rowLabel(r); }, function (v) { S.labels[r] = v; });
   }
   function onKey(e) {
-    if (e.key === 'Escape') { if ($('#ws-scrim')) closeModal(); else if (!$('#ws-menu').hidden) $('#ws-menu').hidden = true; e.stopPropagation(); return; }
+    if (e.key === 'Escape') { if ($('#ws-scrim')) closeModal(); else if (root.querySelector('#ws-ctx')) { closeCellMenu(); var cm = $('#ws-vp'); if (cm) cm.focus({ preventScroll: true }); } else if (!$('#ws-menu').hidden) $('#ws-menu').hidden = true; e.stopPropagation(); return; }
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) { var sc0 = root.querySelector('.ws-cell.sel'); if (sc0 && !$('#ws-scrim')) { e.preventDefault(); var rb = sc0.getBoundingClientRect(); openCellMenu(rb.left + 20, rb.bottom); } return; }
     if ($('#ws-scrim')) return;
+    if (e.target.id === 'ws-title') return;                                       // typing the project's name (its own undo)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); }
     if (!$('#ws-vp') || e.target.tagName === 'INPUT') return;
@@ -1939,17 +2245,24 @@
     root = document.createElement('div'); root.className = 'ws'; root.id = 'ws'; root.hidden = true;
     root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Copies and pages'); root.tabIndex = -1;
     root.innerHTML =
-      '<div class="ws-head"><div class="ws-headtext"><h1>Copies and pages</h1><p>Each column is one copy, each row one page position. Check that every row shows the same page in all copies, then mark two pages and compare them.</p></div>' +
-      '<button class="ws-save" id="ws-save" data-act="savechip"></button><button class="ws-icon" data-act="help" aria-label="Help">?</button></div>' +
+      // one top bar for both views (items 13-16): name, project name, save state, the two tabs, help and the one menu
+      '<div class="ws-top"><div class="ws-brand">Book Compare</div>' +
+      '<input class="ws-title" id="ws-title" type="text" maxlength="160" spellcheck="false" autocomplete="off" aria-label="Name of the project" title="Name of the project (shown here and in the Compare tab; it is also proposed as the name of the project file)" placeholder="Name of the project, e.g. ' + TITLE_EXAMPLE + '">' +
+      '<button class="ws-save" id="ws-save" data-act="savechip"></button><div class="ws-sp"></div>' +
+      '<div class="ws-tabs" role="tablist"><button class="ws-tab" role="tab" aria-selected="true" tabindex="-1">Pages</button><button class="ws-tab" role="tab" aria-selected="false" id="ws-compare" data-act="compare" title="Compare the two pages marked “1” and “2”">Compare</button></div>' +
+      '<button class="ws-icon" data-act="help" aria-label="Help: how this screen works" title="How this screen works">?</button>' +
+      '<button class="ws-icon ws-dots" id="ws-more" data-act="more" aria-label="Menu" aria-haspopup="true" title="Menu: project, export, help">&#8942;</button>' +
+      '<div class="ws-menu" id="ws-menu" role="menu" hidden></div></div>' +
       '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-update" id="ws-update" hidden></div><div class="ws-banner ws-bg" id="ws-bg" hidden></div>' +
       '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-summary" id="ws-summary"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
-      '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div></aside></div>' +
-      '<div class="ws-bar"><button class="ws-side" id="ws-back" data-act="back"><span class="g">&#8249;</span>Back</button><button class="ws-compare" id="ws-compare" data-act="compare">COMPARE</button><button class="ws-side" id="ws-more" data-act="more"><span class="g">&#8942;</span>More</button><div class="ws-menu" id="ws-menu" hidden></div></div>' +
+      '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div>' +
+      '<div class="ws-pvacts"><button class="ws-cmpbtn" id="ws-cmpbtn" data-act="compare">Compare 1 and 2</button></div></aside></div>' +
       '<div id="ws-layer"></div>' +
       '<input type="file" id="ws-dirinput" class="ws-hidden" webkitdirectory multiple><input type="file" id="ws-jsoninput" class="ws-hidden" accept=".bookcompare,.json,application/json">';
     document.body.appendChild(root);
     root.addEventListener('click', onClick);
     root.addEventListener('dblclick', onDblClick);
+    root.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('keydown', function (e) { if (root && !root.hidden) onKey(e); });
     root.addEventListener('dragstart', onDragStart);
     root.addEventListener('dragover', onDragOver);
@@ -1959,12 +2272,18 @@
     root.addEventListener('pointermove', onPointerMove);
     root.addEventListener('pointerup', onPointerUp);
     root.addEventListener('pointercancel', onPointerUp);
+    var ti = $('#ws-title');
+    ti.addEventListener('input', function () { S.title = ti.value.slice(0, 160); touch(); if (window.CompareTab && CompareTab.titleChanged) CompareTab.titleChanged(); });
+    ti.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ti.blur(); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); } });
     $('#ws-jsoninput').onchange = function () {
       var f = this.files && this.files[0]; if (!f) return;
       mayReplace().then(function (ok) { if (ok) return f.text().then(function (t) { adopt(JSON.parse(t), null); }); }).catch(function () { toast('That file could not be read as a project.'); });
     };
     window.addEventListener('resize', function () { if (root && !root.hidden) renderRows(); });
-    window.addEventListener('beforeunload', function (e) { if (S && S.copies.length && dirty) { e.preventDefault(); e.returnValue = ''; } });
+    window.addEventListener('beforeunload', function (e) {
+      if (window.BCResults) BCResults.flush();                                              // (item 32: what is stored is listed in the index)
+      if (S && S.copies.length && dirty) { if (proj.target) saveNow(); e.preventDefault(); e.returnValue = ''; }
+    });
     setTimeout(function () { checkForUpdate().catch(function () { }); }, 2500);
   }
   function show() {
@@ -1972,6 +2291,7 @@
     if (!root) build();
     root.hidden = false;
     renderAll();
+    setTimeout(function () { if (S && S.copies.length >= 2 && window.CompareTab && CompareTab.preload) CompareTab.preload(); }, 1500);   // item 33
     helperReady.then(async function () {                        // the helper (if there is one) is known now
       var lp = await loadLastProject();
       if (lp && !S.copies.length) lastProject = lp;
@@ -1989,7 +2309,16 @@
     onCompare: function (fn) { cb.compare = fn; },
     onLeave: function (fn) { cb.leave = fn; },
     openPending: openPending,
-    projectInfo: function () { return { name: proj.name, file: proj.target ? targetFile(proj.target) : '', state: proj.state, legacy: !!proj.legacy, copies: S ? S.copies.length : 0 }; },
+    projectInfo: function () { return { name: proj.name, title: S ? S.title || '' : '', file: proj.target ? targetFile(proj.target) : '', state: proj.state, legacy: !!proj.legacy, copies: S ? S.copies.length : 0 }; },
+    menu: function (anchor) { if (!S) S = blank(); floatMenu(anchor); },
+    compareMenu: function (h) { cmpMenu = h; },
+    saveChip: function () { return saveChip(); },
+    chipClick: function () { return chipClick(); },
+    startInfo: startInfo,
+    about: function () { if (!S) S = blank(); if (!root) build(); aboutDialog(); },
+    beforeClose: beforeClose,
+    saveForClose: saveForClose,
+    startAction: startAction,
     tab: tabApi
   };
   // desktop program: a project file that was double-clicked opens at once

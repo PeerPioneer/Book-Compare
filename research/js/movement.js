@@ -34,8 +34,25 @@ function movementMap(r, W, H, box) {
     }
     if (n >= MV_MIN) hint = { px: Math.round(best), cells: n, x: X0 / mw, y: Y0 / mh, w: (X1 + 1 - X0) / mw, h: (Y1 + 1 - Y0) / mh };
   }
-  return { w: mw, h: mh, pixels: px.buffer, max: Math.round(max * 10) / 10, hint: hint };
+  var arrows = mx ? movementArrows(mx, my, W, H, function (x, y) { return D[Math.floor(y / F) * mw + Math.floor(x / F)] >= 2; }) : [];
+  return { w: mw, h: mh, pixels: px.buffer, max: Math.round(max * 10) / 10, hint: hint, arrows: arrows, W: W, H: H };
+}
+// The arrows of the movement map (owner 21 Nov 2026): on a coarse grid (18 rows of arrows on the page), the direction in which the fine
+// alignment moved that part of copy 2, as [x, y, dx, dy] in working pixels; only where it moved by 2 px or more (keep(x, y)).
+// The map gives, for every place of the result, where in the (roughly placed) copy its ink came from: the ink moved by (x - mx, y - my).
+var MV_ROWS = 18;
+function movementArrows(mx, my, W, H, keep) {
+  var S = Math.max(16, Math.round(H / MV_ROWS)), out = [];
+  for (var y = S >> 1; y < H; y += S) for (var x = S >> 1; x < W; x += S) {
+    var p = y * W + x, sx = mx[p], sy = my[p];
+    if (!(sx > -50 && sx < W + 50 && sy > -50 && sy < H + 50)) continue;
+    if (keep && !keep(x, y)) continue;
+    var dx = x - sx, dy = y - sy;
+    if (Math.hypot(dx, dy) < 2) continue;
+    out.push([x, y, Math.round(dx * 10) / 10, Math.round(dy * 10) / 10]);
+  }
+  return out;
 }
 
 
-module.exports = { movementMap, MV_BIG, MV_EDGE };
+module.exports = { movementMap, movementArrows, MV_BIG, MV_EDGE };

@@ -13,7 +13,13 @@
   var R = null;                        // the current run (null = none)
   function T() { return window.BookWorkspace && window.BookWorkspace.tab; }
   function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function threads() { return Math.max(1, navigator.hardwareConcurrency || 2); }
+  // helpers at the same time: at most one per processor thread, and (item 31) at most as many as the memory allows - a helper may need
+  // about 1.2 GB for a large scan, and about 4 GB are left to Windows and the other programs
+  function threads() {
+    var n = Math.max(1, navigator.hardwareConcurrency || 2), t = T(), gb = t && t.memoryGB ? t.memoryGB() : null;
+    if (gb) n = Math.min(n, Math.max(1, Math.floor((gb - 4) / 1.2)));
+    return n;
+  }
   function half() { return Math.max(1, Math.floor(threads() / 2)); }
   function copyName(id) { var l = T().copyList().filter(function (c) { return c.id === id; })[0]; return l ? l.name : 'copy ' + id; }
 
@@ -56,6 +62,7 @@
     ids.forEach(function (c) { for (var r = 0; r < rows; r++) { var b = t.refFor(r); if (t.cellKey(c, r) && b != null && b !== c) q.push({ c: c, row: r }); } });
     R = { ids: ids, n: Math.max(1, Math.min(n || half(), threads())), queue: q, pos: 0, done: 0, skipped: 0, failed: [], times: [], workers: [], paused: false, warn: null, stopped: false,
       finished: false, ignore: {}, t0: Date.now(), resultsId: t.resultsId() };
+    offered = null; if (t.setBgRun) t.setBgRun({ ids: ids.slice(), n: R.n });       // kept in the project until the run is finished or stopped (item 21)
     for (var i = 0; i < R.n; i++) R.workers.push(newWorker());
     render(); pump();
   }
@@ -78,7 +85,7 @@
       var tiles = t.tileSetting(row, c), quad = t.boxSetting(row, b), p = { c0: b, k0: k0, c1: c, k1: k1, tiles: tiles, quad: quad, i0: await t.scanInfo(b, row), i1: await t.scanInfo(c, row) };
       if (await BCResults.has(p)) { run0.skipped++; return; }
       var f0 = await t.scanFile(b, row), f1 = await t.scanFile(c, row);
-      p.i0 = BCResults.fileInfo(f0); p.i1 = BCResults.fileInfo(f1);
+      p.i0 = await BCResults.fileInfo(f0); p.i1 = await BCResults.fileInfo(f1);
       if (run0.stopped) return;
       if (!w.ready) { await w.e.init(); w.ready = true; }
       var r = await w.e.alignStore(f0, b + '#' + k0 + '#' + p.i0.size + '#' + p.i0.mtime + '#' + JSON.stringify(quad || null), f1, tiles, quad);
@@ -99,6 +106,7 @@
   }
   function finish() {
     R.finished = true; BCResults.flush();
+    var t = T(); if (t && t.setBgRun && t.resultsId() === R.resultsId) t.setBgRun(null);
     R.workers.forEach(function (w) { try { w.e.terminate(); } catch (e) { /* ignore */ } }); R.workers = [];
     render();
   }
@@ -139,13 +147,30 @@
     el.innerHTML = h; el.hidden = false;
     if (!el.__bc) { el.__bc = true; el.addEventListener('click', onClick); }
   }
+  // A run that did not finish (the program was closed meanwhile): when the project is opened again, offer to go on (item 21)
+  var offered = null;
+  function offer(run) {
+    var t = T(), el = t && t.bgSlot(); if (!el || R || !run) return;
+    var ref = t.refCopy(), ids = (run.ids || []).filter(function (id) { return id !== ref && t.copyList().some(function (c) { return c.id === id; }); });
+    if (!ids.length || ref == null || !t.hasProjectFile() || !t.isDesktop()) return;
+    offered = { ids: ids, n: run.n || half() };
+    var who = ids.length === 1 ? '“' + esc(copyName(ids[0])) + '”' : ids.length + ' copies';
+    el.className = 'ws-banner ws-bg';
+    el.innerHTML = '<span><b>The background alignment was not finished</b> (' + who + ' onto the reference copy). Going on skips the pages that are already stored.</span>' +
+      '<button class="ws-tb primary" data-bg="resume">Continue aligning</button><button class="ws-tb" data-bg="forget">No, thanks</button>';
+    el.hidden = false;
+    if (!el.__bc) { el.__bc = true; el.addEventListener('click', onClick); }
+  }
   function onClick(e) {
-    var b = e.target.closest && e.target.closest('[data-bg]'); if (!b || !R) return;
+    var b = e.target.closest && e.target.closest('[data-bg]'); if (!b) return;
     var a = b.dataset.bg, t = T();
+    if (a === 'resume' && offered) { var o = offered; offered = null; start(o.ids, o.n); return; }
+    if (a === 'forget') { offered = null; if (t.setBgRun) t.setBgRun(null); hideStrip(); return; }
+    if (!R) return;
     if (a === 'pause') { R.paused = true; render(); }
     else if (a === 'go' || a === 'ignore') { if (a === 'ignore' && R.warn) R.ignore[R.warn.c] = true; R.warn = null; R.paused = false; render(); pump(); }
     else if (a === 'goto' && R.warn) t.goTo(R.warn.c, R.warn.row);
-    else if (a === 'stop') { var r = R; stop(true); t.toast('Background alignment stopped: ' + r.done + ' page' + (r.done === 1 ? '' : 's') + ' aligned and kept. Starting it again goes on where it stopped.'); }
+    else if (a === 'stop') { var r = R; stop(true); if (t.setBgRun) t.setBgRun(null); t.toast('Background alignment stopped: ' + r.done + ' page' + (r.done === 1 ? '' : 's') + ' aligned and kept. Starting it again goes on where it stopped.'); }
     else if (a === 'close') { R = null; render(); }
     else if (a === 'details') {
       var h = '<h3>Pages that could not be aligned</h3><div class="ws-bgfail"><ul>' + R.failed.map(function (f) { return '<li><b>' + esc(copyName(f.c)) + '</b>, ' + esc(t.rowLabel(f.row)) + ': ' + esc(f.msg) + '</li>'; }).join('') +
@@ -155,7 +180,7 @@
   }
 
   window.BCBackground = {
-    open: open, start: start, stop: function () { stop(true); }, render: render,
+    open: open, start: start, stop: function () { stop(true); offered = null; }, render: render, offer: offer,
     running: function () { return !!(R && !R.finished); },
     state: function () { return R ? { total: R.queue.length, done: R.done, skipped: R.skipped, failed: R.failed.length, paused: R.paused, warn: R.warn, finished: R.finished, helpers: R.n } : null; },
     MISMATCH: MISMATCH

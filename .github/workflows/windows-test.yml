@@ -1,7 +1,7 @@
 # 1. "windows": on a real Windows machine (Windows paths, upper/lower case, locked files): the desktop program's scan reader
 #    (desktop/server.js) with the workspace in Chromium and Firefox, and the Compare tab with the real alignment.
 # 2. "quick": the workspace and library-folder tests (Chromium).
-# 3. "publish": ONLY when both passed (and only for main): puts the folder "app" on the website (GitHub Pages).
+# 3. "publish": ONLY when "windows" and "quick" passed (and only for main): puts the folder "app" on the website (GitHub Pages).
 #    A failed test therefore never reaches the website; the last good version stays online.
 #    The website can also be refreshed by hand: Actions > this workflow > Run workflow (the tests run first).
 name: Tests, then website
@@ -108,6 +108,29 @@ jobs:
           text="${text//'%'/'%25'}"; text="${text//$'\r'/'%0D'}"; text="${text//$'\n'/'%0A'}"
           echo "::notice title=Linux test output::$text"
 
+  # 4. "longrun" (item 38): a whole book of 90 pages aligned in the background on Windows. It does not hold back the website.
+  longrun:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: '1'
+      BOOKCOMPARE_BROWSERS: chromium
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install the browser
+        run: |
+          pip install playwright pillow
+          python -m playwright install chromium
+      - name: A whole book in the background
+        shell: cmd
+        timeout-minutes: 35
+        run: python tests\workspace\test_longrun.py
   publish:
     needs: [windows, quick]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')

@@ -1,6 +1,6 @@
 # Tests for the whole-book workspace
 
-`test_modes.py` checks the Visualization menu of the two-image screen : it loads a sample pair, presses Compare and walks through all six modes twice (Difference, Toggle, Top and bottom, Left and right, Only image 1, Only image 2), checks that the removed Slide mode has left nothing behind and that no script error appears.
+`test_modes.py` checks the Visualization menu of the two-image screen : it loads a sample pair, presses Compare and walks through all six modes twice (Superimposed, Toggle, Top and bottom, Left and right, Only image 1, Only image 2), checks that the removed Slide mode has left nothing behind and that no script error appears.
 
     python3 -m http.server 8765 -d app          # in the repository folder, in another window
     python3 tests/workspace/test_modes.py       # prints MODES OK
@@ -27,7 +27,7 @@ Set `BOOKCOMPARE_URL=file:///.../app/index.html` to run the tests against the ap
 
 `tests/windows/installer-checks.ps1` tests the installer of the desktop program on a real Windows machine (silent install into a chosen folder, test mode, uninstall; the installer's pages clicked through). It runs on GitHub (`.github/workflows/desktop.yml`).
 
-`test_compare_tab.py` checks the Compare tab with the **real alignment engine** (sample pictures of the app in three made-up copies, one of them incomplete), through the desktop program's scan reader, in Chromium and Firefox: COMPARE opens the tab and aligns, next/previous page, keys (Page Up / Page Down turn the page; the arrow keys do not), copy menus and swap, the single bottom bar with the view switcher (opens when the pointer rests on the view name, by click, keys 1-6; the book map never covers an opened menu; copy names in the Difference colour note), page list and search, skipping pages a copy lacks, the PAGES tab, flags (button, colours, key F, filter, grid, undo) the book map (opens near the pointer, picture, jump, grey ticks, pin) and annotations (drawn, moved, resized, commented, coloured, deleted, hidden with the mouse; kept per page, shown for another pair, undo) and focus mode (what is hidden, keys, Esc and the Leave button). It takes a few minutes.
+`test_compare_tab.py` checks the Compare tab with the **real alignment engine** (sample pictures of the app in three made-up copies, one of them incomplete), through the desktop program's scan reader, in Chromium and Firefox: COMPARE opens the tab and aligns, next/previous page, keys (Page Up / Page Down turn the page; the arrow keys do not), copy menus and swap, the single bottom bar with the view switcher (opens when the pointer rests on the view name, by click, keys 1-6; the book map never covers an opened menu; copy names in the Superimposed colour note), page list and search, skipping pages a copy lacks, the PAGES tab, flags (button, colours, key F, filter, grid, undo) the book map (opens near the pointer, picture, jump, grey ticks, pin) and annotations (drawn, moved, resized, commented, coloured, deleted, hidden with the mouse; kept per page, shown for another pair, undo) and focus mode (what is hidden, keys, Esc and the Leave button). It takes a few minutes.
 `test_compare_tab.py` also runs the **speed test** (menu, table with a scan the browser cannot open, the three alignment types, copy button, Stop, closing in the middle, nothing in the project changed).
 
     python3 tests/workspace/test_compare_tab.py   # prints ALL COMPARE TAB TESTS PASSED
@@ -55,3 +55,14 @@ skipped; the Compare tab shows a pair with the reference from the stored movemen
 page; a changed tile setting is aligned again. Chromium (BOOKCOMPARE_BROWSERS=chromium,firefox for both). Needs Node.
 
     python3 tests/workspace/test_background.py    # prints ALL BACKGROUND ALIGNMENT TESTS PASSED
+
+Since 0.10.0 it also checks the dots of stored pages and the aligned count in the headings, that a new file date with the same
+content keeps a stored result valid (fingerprint), that a run that did not finish is offered again, and "Stored alignments …" with
+its clean-up.
+
+## test_longrun.py
+A whole "book" in the background (item 38): two copies of 90 pages (sample pages, each a little shifted, turned, lighter or darker),
+aligned onto the reference with two helpers. Checks that every page is stored, nothing fails, the helpers are replaced after 40 pages
+each and the run still finishes, the speed does not fall off, and the scans are unchanged. Several minutes; needs Node and Pillow.
+
+    python3 tests/workspace/test_longrun.py       # prints LONG RUN TEST PASSED   (BOOKCOMPARE_LONGRUN_PAGES=120 for more)

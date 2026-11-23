@@ -43,6 +43,19 @@ function projectPart(rel) {
 
 /* opts: { port, appDir, dataDir, testPickFile, pick(kind, start, title, name) -> Promise<null | string | {folder, files}>, takeOpen() -> path | null,
            quit(), log(text) } */
+// A short fingerprint of a scan's content (item 29): SHA-1 of its first and last 64 KB. Stored alignments are checked against it (with the
+// size) instead of the file's date, so they stay valid when the scans are copied to another computer. app/js/results-store.js does the same.
+function fingerprint(full, size) {
+  const fd = fs.openSync(full, 'r');
+  try {
+    const n = Math.min(65536, size), head = Buffer.alloc(n);
+    if (n) fs.readSync(fd, head, 0, n, 0);
+    const t0 = Math.max(n, size - 65536), tail = Buffer.alloc(size - t0);
+    if (tail.length) fs.readSync(fd, tail, 0, tail.length, t0);
+    return require('crypto').createHash('sha1').update(head).update(tail).digest('hex').slice(0, 16);
+  } finally { fs.closeSync(fd); }
+}
+
 function createServer(opts) {
   const port = opts.port, appDir = path.resolve(opts.appDir), appRoot = appDir + path.sep;
   const allowedHosts = ['localhost:' + port, '127.0.0.1:' + port], allowedOrigins = ['http://localhost:' + port, 'http://127.0.0.1:' + port];
@@ -186,8 +199,14 @@ function createServer(opts) {
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     const why = apiAllowed(req);
     if (why) return err(res, 403, 'refused', 'Refused (' + why + ').');
-    if (p === '/api/ping') return json(res, 200, { app: 'BookCompare', api: 1, version: VERSION, desktop: true, os: IS_WIN ? 'windows' : 'other', dir: appRoot,
+    if (p === '/api/ping') return json(res, 200, { app: 'BookCompare', api: 1, version: VERSION, desktop: true, os: IS_WIN ? 'windows' : 'other', dir: appRoot, mem: require('os').totalmem(),
       pick: opts.testPickFile ? 'test' : (opts.pick ? 'dialog' : 'none'), autostart: false });
+    if (p === '/api/update') {                                   // item 35: check / download / install a new version (desktop/main.js)
+      if (m !== 'POST') return err(res, 405, 'method');
+      if (!opts.update) return json(res, 200, { state: 'unavailable', error: 'Updating is not possible here.' });
+      const b = await readJson(req), cmd = b && /^(check|download|install|state)$/.test(b.cmd) ? b.cmd : 'state';
+      try { return json(res, 200, await opts.update(cmd)); } catch (e) { return json(res, 200, { state: 'error', error: String(e && e.message || e) }); }
+    }
     if (p === '/api/quit') {
       if (m !== 'POST') return err(res, 405, 'method');
       json(res, 200, { ok: true });
@@ -230,7 +249,11 @@ function createServer(opts) {
       if (r.kind === 'project' && !part) return err(res, 403, 'refused', 'Not allowed.');
       let st = null; try { st = fs.statSync(full); } catch (e) { /* missing */ }
       if (st && st.isDirectory()) return json(res, 200, { exists: true, dir: true });
-      if (st && st.isFile() && (r.kind === 'project' || isImage(full))) return json(res, 200, { exists: true, dir: false, size: st.size, mtime: Math.round(st.mtimeMs) });
+      if (st && st.isFile() && (r.kind === 'project' || isImage(full))) {
+        const o = { exists: true, dir: false, size: st.size, mtime: Math.round(st.mtimeMs) };
+        if (isImage(full)) { try { o.fp = fingerprint(full, st.size); } catch (e) { /* busy: no fingerprint */ } }
+        return json(res, 200, o);
+      }
       return err(res, 404, 'not-found', 'Not found.');
     }
     if (p === '/api/file') {
@@ -249,6 +272,12 @@ function createServer(opts) {
       s.on('error', e => { log('file interrupted: ' + e.message); res.destroy(); });
       s.pipe(res);
       return;
+    }
+    if (p === '/api/remove') {                                   // item 28: a stored alignment that is no longer needed (nothing else can be removed)
+      if (m !== 'POST') return err(res, 405, 'method');
+      if (r.kind !== 'project' || part !== 'results' || !/^m-[0-9a-f]{16}\.bin$/.test(path.basename(full))) return err(res, 403, 'refused', 'Only stored alignments can be removed.');
+      try { fs.unlinkSync(full); } catch (e) { if (e.code !== 'ENOENT') return err(res, 500, 'remove', 'Could not remove it.'); }
+      return json(res, 200, { ok: true });
     }
     if (p === '/api/write') {                                    // the ONLY things this program writes: the project file and its results folder
       if (m !== 'PUT') return err(res, 405, 'method');

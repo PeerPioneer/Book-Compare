@@ -23,10 +23,10 @@ const DIFF_PRESETS = [
       note: "Default. Hard to tell apart with red-green colour blindness." },
     { id: "orange-blue", name: "Orange / blue", c1: "#E66100", c2: "#005AC8", n1: "Orange", n2: "Blue",
       note: "Clear for all common forms of colour blindness." },
-    { id: "orange-navy", name: "Orange / dark blue", c1: "#F07800", c2: "#0028A0", n1: "Orange", n2: "Dark blue",
-      note: "Also differs in lightness, so it works in greyscale too." },
     { id: "red-blue",    name: "Red / blue",    c1: "#E60000", c2: "#0046C8", n1: "Red",    n2: "Blue",
       note: "Keeps the red; clear for all common forms of colour blindness." },
+    { id: "teal-pink",   name: "Teal / pink",   c1: "#00A09A", c2: "#E6007E", n1: "Teal",   n2: "Pink",
+      note: "Hard to tell apart with red-green colour blindness (the two look alike)." },
 ];
 let DIFF_COLOR_1 = DIFF_PRESETS[0].c1;
 let DIFF_COLOR_2 = DIFF_PRESETS[0].c2;

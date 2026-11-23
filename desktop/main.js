@@ -42,6 +42,34 @@ function log(text) {
   try { fs.mkdirSync(app.getPath('userData'), { recursive: true }); fs.appendFileSync(path.join(app.getPath('userData'), 'book-compare.log'), new Date().toISOString() + ' ' + text + '\n'); } catch (e) { /* no log */ }
 }
 
+// One-click update (item 35): the page finds a newer version on the Releases page and asks the person; then electron-updater downloads
+// the installer of that release (checked against the size and SHA-512 listed in its latest.yml) and installs it silently after Book
+// Compare closes, then starts the new version. The program is not signed (no certificate): Windows may show its usual warning once.
+let updater = null;
+const upd = { state: 'idle', version: '', percent: 0, error: '' };
+function getUpdater() {
+  if (updater || !app.isPackaged) return updater;
+  try {
+    updater = require('electron-updater').autoUpdater;
+    updater.autoDownload = false; updater.autoInstallOnAppQuit = false; updater.allowPrerelease = false;
+    updater.on('update-available', i => { upd.state = 'available'; upd.version = i.version; });
+    updater.on('update-not-available', () => { upd.state = 'none'; });
+    updater.on('download-progress', p => { upd.state = 'downloading'; upd.percent = Math.round(p.percent || 0); });
+    updater.on('update-downloaded', i => { upd.state = 'ready'; upd.version = i.version; upd.percent = 100; });
+    updater.on('error', e => { upd.state = 'error'; upd.error = String(e && e.message || e).split('\n')[0]; log('update: ' + upd.error); });
+  } catch (e) { log('update: ' + e.message); updater = null; }
+  return updater;
+}
+async function update(cmd) {
+  const u = getUpdater();
+  if (!u) return { state: 'unavailable', error: app.isPackaged ? 'The updater could not be loaded.' : 'Not in the installed program.' };
+  if (cmd === 'check' && upd.state !== 'downloading' && upd.state !== 'ready') { upd.state = 'checking'; upd.error = ''; await u.checkForUpdates().catch(() => { }); }
+  else if (cmd === 'download' && (upd.state === 'available' || upd.state === 'error')) { upd.state = 'downloading'; upd.percent = 0; upd.error = ''; u.downloadUpdate().catch(() => { }); }
+  else if (cmd === 'install' && upd.state === 'ready') { setTimeout(() => { closingForUpdate = true; u.quitAndInstall(true, true); }, 300); return Object.assign({ installing: true }, upd); }
+  return Object.assign({}, upd);
+}
+let closingForUpdate = false;
+
 const PROJECT_FILTER = { name: 'Book Compare project', extensions: ['bookcompare'] };
 async function pick(kind, start, title, name) {
   const o = { title, defaultPath: start || undefined };
@@ -71,7 +99,7 @@ async function start() {
   Menu.setApplicationMenu(null);
   let lastErr = null;
   for (const p of PORTS) {
-    const s = createServer({ port: p, appDir, dataDir: app.getPath('userData'), pick, log, quit: () => app.quit(),
+    const s = createServer({ port: p, appDir, dataDir: app.getPath('userData'), pick, log, quit: () => app.quit(), update,
       takeOpen: () => { const f = pendingOpen; pendingOpen = null; return f; } });
     try { await s.listen(); server = s; port = p; break; } catch (e) { lastErr = e; }
   }
@@ -93,10 +121,24 @@ async function start() {
   });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(origin + '/')) { e.preventDefault(); if (/^https?:\/\//.test(url)) shell.openExternal(url); } });
   // the page asks before it is closed with unsaved changes: show that question as an ordinary window
+  // Closing with unsaved changes (item 27): a project that has a file is saved first, without asking; a project that was never saved
+  // gets the question Save … / Close without saving / Cancel.
+  let closing = false, asking = false;
+  const closeNow = () => { closing = true; if (win && !win.isDestroyed()) win.close(); };
+  const ask = (err) => {
+    const c = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Save …', 'Close without saving', 'Cancel'], defaultId: 0, cancelId: 2,
+      title: 'Book Compare', message: err ? 'The project could not be saved.' : 'The project is not saved yet.',
+      detail: err ? err + '\n\nSave it somewhere else, or close Book Compare without saving?' : 'Save it as a project file before Book Compare closes? Otherwise the changes are lost.' });
+    if (c === 1) return closeNow();
+    if (c === 0) win.webContents.executeJavaScript('window.BookWorkspace ? BookWorkspace.saveForClose() : true').then(ok => { if (ok) closeNow(); }).catch(() => {});
+  };
   win.webContents.on('will-prevent-unload', e => {
-    const c = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Close without saving', 'Cancel'], defaultId: 1, cancelId: 1,
-      title: 'Book Compare', message: 'The project has changes that are not saved.', detail: 'Close Book Compare anyway? The changes will be lost.' });
-    if (c === 0) e.preventDefault();
+    if (closing || closingForUpdate) { e.preventDefault(); return; }    // (asked already, or saved before the update: close)
+    if (asking) return;
+    asking = true;
+    win.webContents.executeJavaScript('window.BookWorkspace && BookWorkspace.beforeClose ? BookWorkspace.beforeClose() : { ok: false }')
+      .then(r => { asking = false; if (r && r.ok) closeNow(); else ask(r && r.err); })
+      .catch(() => { asking = false; ask(''); });
   });
   win.webContents.on('render-process-gone', (e, d) => { log('page stopped: ' + d.reason); if (!SMOKE && d.reason !== 'clean-exit') dialog.showErrorBox('Book Compare', 'The page stopped (' + d.reason + '). It will be loaded again; your last saved project is kept.'); if (win && !win.isDestroyed()) win.reload(); });
 
@@ -120,6 +162,10 @@ async function smokeTest(origin) {
     out.ok = r.workspace && r.compare && r.engine && r.desktopAgent && r.ping.app === 'BookCompare' && r.ping.desktop === true && r.ping.pick === 'dialog'
       && (!SMOKE_OPEN || r.opened === SMOKE_OPEN);
     out.version = app.getVersion(); out.port = port;
+    // the one-click update (item 35): the updater is part of the program and knows where to look
+    out.updater = !!getUpdater() || !app.isPackaged;
+    out.updateConfig = app.isPackaged ? fs.existsSync(path.join(process.resourcesPath, 'app-update.yml')) : true;
+    out.ok = out.ok && out.updater && out.updateConfig;
   } catch (e) { out.error = String(e && e.message || e); }
   fs.writeFileSync(SMOKE, JSON.stringify(out, null, 1));
   app.exit(out.ok ? 0 : 1);

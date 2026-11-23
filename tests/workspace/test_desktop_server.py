@@ -242,6 +242,8 @@ def scenario(p, kind):
     assert os.listdir(os.path.join(BOOKS, 'Project')) == ['Book project.bookcompare'], os.listdir(os.path.join(BOOKS, 'Project'))
     d = project_json()
     assert d['version'] == 2 and len(d['roots']) == 3 and all(os.path.normcase(r['path']).startswith(os.path.normcase(BOOKS)) for r in d['roots']), d['roots']
+    # item 30: every folder is also known by its place seen from the project file, so project and scans can be moved together
+    assert all(r.get('rel', '').startswith('../') and os.path.normcase(os.path.normpath(os.path.join(BOOKS, 'Project', r['rel']))) == os.path.normcase(os.path.normpath(r['path'])) for r in d['roots']), d['roots']
     pg.locator('#ws .ws-hname').first.click(); pg.keyboard.type('A-Renamed'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1500)      # changes are saved by themselves
     assert project_json()['copies'][0]['name'] == 'A-Renamed'
     # single pictures with the Windows "Open" window (S10): a fourth copy with two pictures of Copy-C, then undone
@@ -342,7 +344,7 @@ def scenario(p, kind):
     for _ in range(40):
         pg.wait_for_timeout(300)
         if pg.evaluate("window.BookWorkspace ? BookWorkspace.projectInfo().file : ''") == 'Book project.bookcompare': break
-    assert pg.evaluate("BookWorkspace.projectInfo()") == {'name': 'Book project', 'file': 'Book project.bookcompare', 'state': 'saved', 'legacy': False, 'copies': 3}, pg.evaluate("BookWorkspace.projectInfo()")
+    assert pg.evaluate("BookWorkspace.projectInfo()") == {'name': 'Book project', 'title': '', 'file': 'Book project.bookcompare', 'state': 'saved', 'legacy': False, 'copies': 3}, pg.evaluate("BookWorkspace.projectInfo()")
     assert not pg.evaluate("document.getElementById('ws').hidden") and pg.locator('#ws .ws-hname').count() == 3
     assert jcall('POST', '/api/pending', {})[1].get('none'), 'handed out once only'
     # --- a project of an older version (a folder holding book-compare-project.json): opened, then saved as a project file ----

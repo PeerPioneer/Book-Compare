@@ -57,7 +57,6 @@ class Action {
         this.remove_zoom_listener = remove_zoom_listener;
 
         this.more_menu_el = document.getElementById('more_menu');
-        this.info_dialog_el = document.getElementById('info-dialog');
         this.snack_el = document.getElementById('snack');
 
         this.more_menu_el.addEventListener('MDCMenu:selected', function(e) {
@@ -81,8 +80,8 @@ class Action {
             case 'diff_colors':
                 document.dispatchEvent(new CustomEvent('opendiffcolors'));
                 break;
-            case 'about':
-                this.info_dialog_el.MDCDialog.open();
+            case 'about':                                       // (Book Compare's own About, js/workspace.js)
+                if (window.BookWorkspace && window.BookWorkspace.about) window.BookWorkspace.about();
                 break;
             }
         }.bind(this));
