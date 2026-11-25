@@ -18,7 +18,7 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       PYTHONUTF8: '1'
     steps:
@@ -44,7 +44,7 @@ jobs:
       - name: Compare tab with the real alignment
         if: always()
         shell: cmd
-        timeout-minutes: 15
+        timeout-minutes: 25          # (it takes 13-15 minutes on the Windows runner; 15 was too tight, 25 Nov 2026)
         run: |
           python tests\workspace\test_compare_tab.py > "%TEMP%\bc-compare-test.txt" 2>&1
           set RC=%ERRORLEVEL%
