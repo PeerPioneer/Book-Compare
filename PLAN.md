@@ -1119,7 +1119,7 @@ Built 25 Nov 2026 as **version 0.13.0** (details in CHANGELOG.txt), except D1b.
 | ID | Item | Status |
 |----|------|--------|
 | W1 | Website: the browser asks for every folder at every visit. Opening the project file cannot give access to the folders (a browser grants access per folder, and only the user can). Ways out: Chrome / Edge "Allow on every visit", installing the website as an app, or keeping the copies under one parent folder (one question). Tip in the banner (0.12.0) | **answered** |
-| U3 | No .blockmap / latest.yml on the Releases page any more: only the installer. latest.yml lives on the branch "update" (the program reads it there); without the blockmap an update downloads the whole installer. 0.12.0 still looks on the Releases page, so 0.12.0 → 0.13.0 needs one download by hand | **done 0.13.0** |
+| U3 | No .blockmap / latest.yml on the Releases page (0.13.0): 0.12.0 could not update by itself ("Cannot find latest.yml"). Owner 25 Nov: keep both in every release. latest.yml added to the 0.13.0 release afterwards; from 0.14.0 on all three files again (the branch "update" stays for copies of 0.13.0) | **reverted** |
 | N17 | Colours of the Pages view = Superimposed colours (blue / red by default) | **already so since 0.11.0** |
 | N18 | The "no partner" warning of the background alignment also in the Compare tab | **done 0.13.0** (since 0.12.0 in the code; tested now) |
 | N19 | After the examples, the next project showed the last example page while its own pages loaded: nothing is shown until the new pair is aligned | **done 0.13.0** |

@@ -72,7 +72,7 @@ jobs:
           cat desktop/dist/latest.yml
           test -f desktop/dist/latest.yml && grep -q "version: $v" desktop/dist/latest.yml && grep -q "sha512:" desktop/dist/latest.yml
           test -f desktop/dist/win-unpacked/resources/app-update.yml && cat desktop/dist/win-unpacked/resources/app-update.yml
-          grep -q "provider: generic" desktop/dist/win-unpacked/resources/app-update.yml && grep -q "raw.githubusercontent.com/PeerPioneer/Book-Compare/update/" desktop/dist/win-unpacked/resources/app-update.yml
+          grep -q "provider: github" desktop/dist/win-unpacked/resources/app-update.yml
       - uses: actions/upload-artifact@v5
         with:
           name: Book-Compare-Setup
@@ -89,16 +89,18 @@ jobs:
           if gh release view "v$v" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "v$v is already on the Releases page"; exit 0; fi
           sed "s/VERSION/$v/g" desktop/RELEASE-NOTES.md > notes.md
           grep -q "Book-Compare-Setup-$v.exe" desktop/dist/latest.yml
-          # 0.13.0 (owner): only the installer is on the Releases page
-          gh release create "v$v" "desktop/dist/Book-Compare-Setup-$v.exe" -R "$GITHUB_REPOSITORY" --title "Book Compare $v" --notes-file notes.md --target "$GITHUB_SHA" --latest
-          # The description the one-click update reads (latest.yml: version, size and SHA-512 of the installer) lies on the branch
-          # "update" instead (desktop/package.json: provider "generic"), pointing at the installer on the Releases page. (Without the
-          # blockmap next to the installer the update downloads the whole installer, about 125 MB.)
+          # latest.yml (version, size and SHA-512 of the installer) is what the program's one-click update reads; the blockmap lets an
+          # update download only the parts of the installer that changed. Both stay on the Releases page (owner, 25 Nov 2026: 0.13.0
+          # was published without them for a few hours and 0.12.0 could not update by itself).
+          test -f desktop/dist/latest.yml && test -f "desktop/dist/Book-Compare-Setup-$v.exe.blockmap"
+          gh release create "v$v" "desktop/dist/Book-Compare-Setup-$v.exe" "desktop/dist/Book-Compare-Setup-$v.exe.blockmap" desktop/dist/latest.yml -R "$GITHUB_REPOSITORY" --title "Book Compare $v" --notes-file notes.md --target "$GITHUB_SHA" --latest
+          # Copies of 0.13.0 look for latest.yml on the branch "update" instead (their publish setting was "generic"): it is kept
+          # there too, with full addresses of the files on the Releases page.
           mkdir upd && cd upd
           sed -E "s#^(path: |  - url: )(Book-Compare-Setup-$v\.exe)#\1https://github.com/$GITHUB_REPOSITORY/releases/download/v$v/\2#" ../desktop/dist/latest.yml > latest.yml
           cat latest.yml
           grep -q "releases/download/v$v/Book-Compare-Setup-$v.exe" latest.yml
-          printf 'Read by the one-click update of the Book Compare desktop program (desktop/package.json, publish: generic). Written by .github/workflows/desktop.yml for each new version.\n' > README.md
+          printf 'Read by the one-click update of Book Compare 0.13.0 (its publish setting was "generic"). Later versions read latest.yml on the Releases page. Written by .github/workflows/desktop.yml for each new version.\n' > README.md
           git init -q && git checkout -q -b update && git add latest.yml README.md
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Update description for version $v"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/$GITHUB_REPOSITORY.git" update

@@ -39,7 +39,7 @@
       }
     ],
     "publish": [
-      { "provider": "generic", "url": "https://raw.githubusercontent.com/PeerPioneer/Book-Compare/update/" }
+      { "provider": "github", "owner": "PeerPioneer", "repo": "Book-Compare", "releaseType": "release" }
     ],
     "fileAssociations": [
       {

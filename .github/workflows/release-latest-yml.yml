@@ -1,0 +1,29 @@
+name: Update file on the Releases page
+# The one-click update of Book Compare reads latest.yml on the Releases page (0.12.0 and older, and again from 0.14.0 on).
+# 0.13.0 was published without it (25 Nov 2026), so 0.12.0 could not update by itself. This puts it there, made from the
+# copy on the branch "update" (same installer, same SHA-512). It does nothing when the newest release has latest.yml already.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-latest-yml.yml']
+permissions:
+  contents: write
+jobs:
+  latest-yml:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Put latest.yml on the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | grep -qx latest.yml; then echo "$tag has latest.yml already"; exit 0; fi
+          v=${tag#v}
+          curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/latest.yml" -o abs.yml
+          grep -q "^version: $v$" abs.yml
+          sed -E "s#https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/##" abs.yml > latest.yml
+          cat latest.yml
+          grep -q "^path: Book-Compare-Setup-$v.exe$" latest.yml
+          gh release upload "$tag" latest.yml -R "$GITHUB_REPOSITORY"
