@@ -60,7 +60,7 @@ def main():
         # 0.13.0: the note stands in the left panel (it does not cover the picture)
         assert pg.evaluate("document.getElementById('ct_excard').closest('.ct-side') !== null"), 'the note is in the left panel'
         # the other examples, one after the other with the note's button, and the "Try it" of each
-        vname = lambda: pg.inner_text('#ct_vpill')
+        vname = lambda: pg.inner_text('#ct_vval')
         for i in range(1, n):
             pg.click('#ct_excard [data-ex=next]'); wait_aligned(pg, 'example %d' % (i + 1))
             assert pg.evaluate("BookWorkspace.tab.state().row") == i and ('example %d of %d' % (i + 1, n)) in pg.inner_text('#ct_excard').lower()

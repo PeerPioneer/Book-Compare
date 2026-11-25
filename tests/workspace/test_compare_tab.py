@@ -118,7 +118,7 @@ def scenario(p, kind):
     pg.click('#fold_btn'); pg.wait_for_timeout(400); assert not pg.is_visible('#pane_o1') and pg.evaluate("localStorage.getItem('bookcompare_side_panels')") == 'folded'
     # item 2: no burger; a handle on the edge of the left panel folds it away and back
     assert pg.inner_text('#ct_sidebtn').strip() == '\u2039' and pg.is_visible('.ct-side')
-    pg.click('#ct_sidebtn'); pg.wait_for_timeout(300); assert not pg.is_visible('.ct-side') and pg.inner_text('#ct_sidebtn').strip() == '\u203a' and pg.locator('#ct_sidebtn').bounding_box()['x'] < 5
+    pg.click('#ct_sidebtn'); pg.wait_for_timeout(300); assert not pg.is_visible('.ct-side') and pg.inner_text('#ct_sidebtn').strip() == '\u203a' and pg.locator('#ct_sidebtn').bounding_box()['x'] <= 10      # (0.14.0: beside the slim line that is left of the panel)
     pg.click('#ct_sidebtn'); pg.wait_for_timeout(300); assert pg.is_visible('.ct-side')
     assert pg.evaluate("document.querySelector('#result canvas').width") > 100, 'the superimposed picture should be drawn'
     # the tile alignment (V3) is the default: it runs in the background helper and sends copy 2 back bent onto copy 1, as big as copy 1
@@ -133,12 +133,13 @@ def scenario(p, kind):
     lh0 = pg.locator('#ct_list').bounding_box()['height']
     pg.click('#ct_alhead'); pg.wait_for_timeout(150)
     assert pg.get_attribute('#ct_alhead', 'aria-expanded') == 'true' and pg.is_visible('#ct_albody') and pg.evaluate("localStorage.getItem('bookcompare_alsec')") == 'open'
-    assert pg.locator('#ct_list').bounding_box()['height'] < lh0 - 40, 'the page list gets the height the folded section leaves'
+    lh1 = pg.locator('#ct_list').bounding_box()['height']; assert lh1 <= lh0 and lh1 >= 140, ('the page list gets the height the sections leave, at least 150 px (the panel scrolls when needed)', lh0, lh1)
     # the coloured edges of the two copy boxes are the colours of the Superimposed view (blue / red by default)
     assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c1')).borderLeftColor") == 'rgb(0, 70, 200)'
     assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c2')).borderLeftColor") == 'rgb(230, 0, 0)'
-    # "Paper …" next to the colour legend (0.11.0): a copy's paper whiter, display only, kept in the project
-    pg.click('#legend_paper'); pg.wait_for_timeout(300)
+    # "Paper" (0.11.0; 0.14.0: in the options of the Superimposed view in the left panel): a copy's paper whiter, display only, kept in the project
+    assert not pg.is_visible('#legend_paper') and not pg.is_visible('#legend_colors'), 'no buttons in the legend over the picture any more'
+    pg.click('#ct_paper'); pg.wait_for_timeout(300)
     assert pg.locator('#ws-float .ct-prow').count() == 2 and 'B-Test' in pg.inner_text('#ws-float .ws-dlg')
     c2id = pg.evaluate("BookWorkspace.tab.state().pair[1]")
     pg.click('#ws-float .ct-seg[data-k="1"] button[data-v="1"]'); pg.wait_for_timeout(300)
@@ -199,34 +200,38 @@ def scenario(p, kind):
     # copy 2: the up arrow button of the panel goes back to B (there are no keys for switching copies any more)
     pg.click('#ct_list li[data-i="0"]'); wait_aligned(pg, 'row 1 again')
     pg.click('#ct_c2up'); wait_aligned(pg, 'copy 2 up'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
-    # ---------------------------------------------------------------- ONE bottom bar and the view switcher
+    # ---------------------------------------------------------------- 0.14.0 (owner, idea F): no teal bar; views, link and navigation in the left panel
     def vis(sel): return pg.evaluate("(s) => { const e = document.querySelector(s); return !!e && e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden'; }", sel)
-    assert pg.evaluate("[...document.querySelectorAll('#compare_screen > footer .bar')].filter(b => b.offsetParent !== null).length") == 1, 'only one bar at the bottom (the dark teal one)'
-    assert not vis('#back') and not vis('#compare') and not vis('#visualisation_select'), 'no Back button, no old menus in the Compare tab'
-    assert vis('#ct_prev') and vis('#ct_next') and vis('#ct_flag') and vis('#ct_vpill') and vis('#link_toggle'), 'page turning, flag, view switcher and Linked are all in that bar'
-    assert not vis('#more') and vis('#ct_more'), 'one menu: the ⋮ is in the top bar, not in the bottom bar'
-    tb = pg.locator('#compare_screen > footer .bar.step3').bounding_box(); pb = pg.locator('#ct_prev').bounding_box(); vb_ = pg.locator('#ct_vpill').bounding_box()
-    assert tb['y'] - 2 <= pb['y'] and pb['y'] + pb['height'] <= tb['y'] + tb['height'] + 2 and tb['y'] - 2 <= vb_['y'] and vb_['y'] + vb_['height'] <= tb['y'] + tb['height'] + 2, ('the controls sit inside the teal bar', tb, pb, vb_)
-    assert pg.inner_text('#ct_vlab').strip() == 'Superimposed' and pg.locator('#ct_vdots i').count() == 6 and pg.evaluate("document.getElementById('ct_vpop').hidden"), 'the pill shows only the current view; the others are folded away'
-    # a quick pass of the pointer opens nothing; resting on the pill unfolds the six names (after about 180 ms); leaving closes it again
-    pbx = pg.locator('#ct_vpill').bounding_box(); pg.mouse.move(pbx['x'] + pbx['width'] / 2, pbx['y'] + pbx['height'] / 2); pg.mouse.move(700, 300); pg.wait_for_timeout(500)
-    assert pg.evaluate("document.getElementById('ct_vpop').hidden"), 'a quick pass does not open the views'
-    pg.mouse.move(pbx['x'] + pbx['width'] / 2, pbx['y'] + pbx['height'] / 2); pg.wait_for_timeout(600)
-    assert not pg.evaluate("document.getElementById('ct_vpop').hidden") and pg.locator('#ct_vpop button').count() == 6, 'resting on the view name unfolds the six views'
-    assert [t.split('\n')[-1].strip() for t in pg.locator('#ct_vpop button').all_inner_texts()] == ['Superimposed', 'Toggle', 'Top and bottom', 'Left and right', 'Copy 1', 'Copy 2'], pg.locator('#ct_vpop button').all_inner_texts()
-    assert pg.get_attribute('#ct_vpop button[data-i="4"]', 'title') == 'A-Test' and pg.get_attribute('#ct_vpop button[data-i="5"]', 'title') == 'B-Test', 'the tip of Copy 1 / Copy 2 is the name the owner gave the copy'
-    pg.mouse.move(700, 300); pg.wait_for_timeout(800); assert pg.evaluate("document.getElementById('ct_vpop').hidden"), 'leaving closes the list'
-    pg.click('#ct_vpill'); assert not pg.evaluate("document.getElementById('ct_vpop').hidden"), 'a click opens it too (for touch)'
-    pg.click('#ct_vpop button[data-i="1"]'); pg.wait_for_timeout(300)
-    assert pg.inner_text('#ct_vlab').strip() == 'Toggle' and pg.evaluate("document.getElementById('ct_vpop').hidden"), 'a click on a name switches the view and folds the list away'
-    assert pg.is_visible('#toggle'), 'the toggle speed is shown in the Toggle view ...'
-    pg.keyboard.press('3'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vlab').strip() == 'Top and bottom', 'key 3 = Top and bottom'
-    assert not pg.is_visible('#toggle'), '... and only there'
-    pg.keyboard.press('5'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vlab').strip() == 'Copy 1', 'key 5 = only copy 1'
-    assert pg.is_visible('#o1_note') and not pg.is_visible('#o2_switch'), 'copy 1 is never changed: a note instead of the switch'
+    assert pg.evaluate("[...document.querySelectorAll('#compare_screen > footer .bar')].filter(b => b.offsetParent !== null).length") == 0, 'no teal bar below the pictures'
+    assert not vis('#back') and not vis('#compare') and not vis('#visualisation_select') and not vis('#link_toggle') and not vis('#more'), 'no Back button, no old menus or buttons in the Compare tab'
+    side = pg.locator('.ct-side').bounding_box(); nav = pg.locator('#ct_nav').bounding_box()
+    for sel in ('#ct_prev', '#ct_next', '#ct_flag', '#ct_where'):
+        bb = pg.locator(sel).bounding_box()
+        assert bb['x'] >= side['x'] - 1 and bb['x'] + bb['width'] <= side['x'] + side['width'] + 1 and bb['y'] >= nav['y'] - 1, (sel, 'the page navigation is at the bottom of the left panel', bb, nav)
+    vp = pg.viewport_size
+    assert abs(nav['y'] + nav['height'] - (pg.locator('#ct_map').bounding_box()['y'])) <= 2 or nav['y'] + nav['height'] >= vp['height'] - 30, ('pinned to the bottom', nav)
+    assert pg.evaluate("getComputedStyle(document.querySelector('#ct_where b')).fontWeight") == '700', 'the page name is bold'
+    fb = pg.locator('#ct_flag').bounding_box(); nb = pg.locator('#ct_next').bounding_box(); assert 0 <= fb['x'] - (nb['x'] + nb['width']) <= 12 and fb['width'] <= 26, ('the flag: small, next to ›', fb, nb)
+    # the View section: six radio buttons; the options of the chosen view only
+    assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'true' and pg.inner_text('#ct_vval') == 'Superimposed'
+    assert [t.strip() for t in pg.locator('#ct_vlist .ct-vrow .nm').all_inner_texts()] == ['Superimposed', 'Toggle', 'Top and bottom', 'Left and right', 'Copy 1', 'Copy 2']
+    assert pg.get_attribute('#ct_v_diff', 'aria-checked') == 'true' and pg.locator('#ct_vlist [role=radio][aria-checked=true]').count() == 1
+    assert pg.get_attribute('#ct_v_onlyimage1', 'title') == 'A-Test' and pg.get_attribute('#ct_v_onlyimage2', 'title') == 'B-Test', 'the tip of Copy 1 / Copy 2 is the name the owner gave the copy'
+    def optH(v): return pg.evaluate("(v) => document.querySelector('#ct_vo_' + v).getBoundingClientRect().height", v)
+    assert vis('#ct_colors') and vis('#ct_paper') and optH('toggle') < 1 and optH('onlyimage2') < 1, 'only the options of the chosen view are open'
+    sq = pg.evaluate("[...document.querySelectorAll('#ct_colors rect')].map(r => r.getAttribute('fill').toLowerCase())"); assert sq == ['#e60000', '#0046c8'], ('the colour squares: copy 2 behind, copy 1 in front', sq)
+    pg.click('#ct_v_toggle'); pg.wait_for_timeout(450)
+    assert pg.inner_text('#ct_vval') == 'Toggle' and pg.get_attribute('#ct_v_toggle', 'aria-checked') == 'true' and optH('diff') < 1 and optH('toggle') > 20, 'Toggle chosen: its speed unfolds, the Superimposed options fold away'
+    assert pg.get_attribute('#ct_speed button[data-sp="2"]', 'aria-pressed') == 'true'
+    pg.click('#ct_speed button[data-sp="4"]'); pg.wait_for_timeout(150)
+    assert pg.evaluate("document.querySelector('#toggle button.mdc-tab.active').dataset.speed") == '4' and pg.get_attribute('#ct_speed button[data-sp="4"]', 'aria-pressed') == 'true', 'Fast'
+    pg.click('#ct_speed button[data-sp="2"]'); pg.wait_for_timeout(100)
+    pg.keyboard.press('3'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vval') == 'Top and bottom', 'key 3 = Top and bottom'
+    pg.keyboard.press('5'); pg.wait_for_timeout(450); assert pg.inner_text('#ct_vval') == 'Copy 1', 'key 5 = only copy 1'
+    assert vis('#o1_note') and optH('onlyimage2') < 1, 'copy 1 is never changed: a note instead of the switch'
     assert 'A-Test' in pg.inner_text('#pane_o1 .pane__label'), 'the label names the copy as the grid does'
-    # N1: in the Copy 2 view, Aligned | Original scan
-    pg.keyboard.press('6'); pg.wait_for_timeout(400); assert pg.inner_text('#ct_vlab').strip() == 'Copy 2' and pg.is_visible('#o2_switch') and not pg.is_visible('#o1_note')
+    # N1: in the Copy 2 view, Aligned | Original scan (under its name in the panel)
+    pg.keyboard.press('6'); pg.wait_for_timeout(450); assert pg.inner_text('#ct_vval') == 'Copy 2' and vis('#o2_switch') and optH('onlyimage1') < 1
     lab = pg.inner_text('#pane_o2 .pane__label'); assert lab.startswith('Copy 2, aligned') and 'B-Test' in lab, lab
     assert pg.get_attribute('#o2_switch button[data-o2=aligned]', 'aria-pressed') == 'true'
     px_al = pg.evaluate("(() => { const c = document.querySelector('#pane_o2 canvas'); return [c.width, c.height, c.toDataURL().length]; })()")
@@ -237,7 +242,24 @@ def scenario(p, kind):
     pg.keyboard.press('3'); pg.wait_for_timeout(400); assert not pg.evaluate("BCCopy2View.original()") and pg.inner_text('#pane_o2 .pane__label').startswith('Copy 2, aligned'), 'other views always show copy 2 aligned'
     pg.keyboard.press('6'); pg.wait_for_timeout(400); assert pg.evaluate("BCCopy2View.original()"), 'the choice is kept for the Copy 2 view'
     pg.click('#o2_switch button[data-o2=aligned]'); pg.wait_for_timeout(300)
-    pg.keyboard.press('1'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vlab').strip() == 'Superimposed'
+    pg.click('#ct_v_diff'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vval') == 'Superimposed'
+    # the link of the panels: a button with the link symbol, crossed out when the panels move on their own
+    assert pg.get_attribute('#ct_link', 'aria-pressed') == 'true' and 'Zoom and move all panels together' in pg.inner_text('#ct_link') and pg.evaluate("BCLink.linked()")
+    assert pg.evaluate("getComputedStyle(document.querySelector('#ct_link .ct-linkx')).opacity") == '0'
+    pg.click('#ct_link'); pg.wait_for_timeout(300)
+    assert pg.get_attribute('#ct_link', 'aria-pressed') == 'false' and not pg.evaluate("BCLink.linked()") and pg.evaluate("getComputedStyle(document.querySelector('#ct_link .ct-linkx')).opacity") == '1', 'unlinked: the symbol is crossed out'
+    pg.click('#ct_link'); pg.wait_for_timeout(250); assert pg.evaluate("BCLink.linked()")
+    # the View section folds too, and is remembered
+    pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'false' and pg.evaluate("localStorage.getItem('bookcompare_vsec')") == 'folded' and pg.locator('#ct_vbody').bounding_box()['height'] < 2
+    pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'true'
+    # the panel folded away: a slim line with the tab, and the navigation stays as a small card in the bottom left corner
+    pg.click('#ct_sidebtn'); pg.wait_for_timeout(500)
+    assert not vis('.ct-side') and vis('.ct-sline') and pg.locator('.ct-sline').bounding_box()['width'] <= 10, 'a slim line is left of the panel'
+    assert vis('#ct_prev') and vis('#ct_next') and vis('#ct_flag') and vis('#ct_where') and 'folded' in pg.get_attribute('#ct_nav', 'class')
+    nav2 = pg.locator('#ct_nav').bounding_box(); assert nav2['x'] <= 1 and nav2['width'] <= 110 and nav2['y'] > vp['height'] / 2, ('a small card at the bottom left', nav2)
+    assert pg.locator('#workspace').bounding_box()['x'] <= 10, 'the pictures get the width'
+    pg.click('#ct_next'); wait_aligned(pg, 'next page with the panel folded'); pg.click('#ct_prev'); wait_aligned(pg, 'back')
+    pg.click('#ct_sidebtn'); pg.wait_for_timeout(400); assert vis('.ct-side') and not vis('.ct-sline') and 'folded' not in pg.get_attribute('#ct_nav', 'class')
     # the colour note of the Superimposed view names the copies the way the grid does (not "image 1" / "image 2")
     wait_aligned(pg, 'difference again'); legend = pg.inner_text('#pane_main .pane__label') if pg.locator('#pane_main .pane__label').count() else ''
     assert 'A-Test' in legend and 'B-Test' in legend and 'image 1' not in legend and 'image 2' not in legend, legend
@@ -394,12 +416,12 @@ def scenario(p, kind):
     def row_now(): return pg.evaluate("BookWorkspace.tab.state().row")
     wait_aligned(pg, 'focus mode start'); assert row_now() == 1
     h0 = pg.locator('#pane_main').bounding_box()
-    assert pg.is_visible('#ct_focusbtn') and pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#ct_vpill')
+    assert pg.is_visible('#ct_focusbtn') and pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#ct_vsec')
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(500)
-    for sel in ('.ct-top', '#ct_list', '#ct_prev', '#ct_flag', '#ct_map', '#ct_vpill', '.ct-side'):
+    for sel in ('.ct-top', '#ct_list', '#ct_prev', '#ct_flag', '#ct_map', '#ct_vsec', '.ct-side'):
         assert not pg.is_visible(sel), 'focus mode hides ' + sel
     assert pg.is_visible('.ct-leave') and pg.is_visible('#pane_main') and pg.is_visible('#fold_strip') and pg.is_visible('#ct_pen') and not pg.is_visible('#ct_sidebtn'), 'the pictures and the annotation tools stay'
-    h1 = pg.locator('#pane_main').bounding_box(); assert h1['height'] > h0['height'] + 60 and h1['x'] < 5 and h1['y'] < 5, (h0, h1)      # the pictures got the room
+    h1 = pg.locator('#pane_main').bounding_box(); assert h1['height'] > h0['height'] + 40 and h1['x'] < 5 and h1['y'] < 5, (h0, h1)      # the pictures got the room
     assert pg.is_visible('.ct-toast') and 'Focus mode' in pg.inner_text('.ct-toast')
     pg.keyboard.press('PageDown'); wait_aligned(pg, 'focus: key page down'); assert row_now() == 2
     assert 'Page 3' in pg.inner_text('.ct-toast'), pg.inner_text('.ct-toast')
@@ -407,13 +429,13 @@ def scenario(p, kind):
     pg.keyboard.press('f'); assert pg.evaluate("BookWorkspace.tab.rowInfo(2).flag") is None
     pg.keyboard.press('PageUp'); wait_aligned(pg, 'focus: key page up'); assert row_now() == 1 and 'Page 2' in pg.inner_text('.ct-toast') and 'flagged' in pg.inner_text('.ct-toast')
     pg.keyboard.press('Escape'); pg.wait_for_timeout(500)
-    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#ct_vpill') and not pg.is_visible('.ct-leave'), 'Esc brings everything back'
+    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_prev') and pg.is_visible('#ct_vsec') and not pg.is_visible('.ct-leave'), 'Esc brings everything back'
     h2 = pg.locator('#pane_main').bounding_box(); assert abs(h2['height'] - h0['height']) < 3, (h0, h2)
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(300); pg.click('.ct-leave'); pg.wait_for_timeout(400); assert pg.is_visible('.ct-top') and not pg.is_visible('.ct-leave'), 'the Leave button works too'
     pg.click('#ct_focusbtn'); pg.wait_for_timeout(300); pg.evaluate("CompareTab.leave()"); pg.wait_for_timeout(400)       # leaving the tab ends focus mode
     assert not pg.evaluate("document.getElementById('ws').hidden")
     pg.locator('#ws .ws-lbl[data-r="1"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'focus: back from the pages')
-    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_vpill'), 'Compare opens normally again'
+    assert pg.is_visible('.ct-top') and pg.is_visible('#ct_list') and pg.is_visible('#ct_vsec'), 'Compare opens normally again'
     # the Pages tab and back: the same pair and row are shown again without aligning anew
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
     assert not pg.evaluate("document.getElementById('ws').hidden"), 'Pages layer visible'

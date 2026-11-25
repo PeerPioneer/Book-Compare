@@ -1,12 +1,13 @@
 /* Book Compare - the Compare tab (js/compare-tab.js): left panel, tabs and page bar around the result screen. */
 div.result_container { --ct-top-h: 0px; --ct-side-w: 0px; }
 div.result_container.ct-on { --ct-top-h: 46px; --ct-side-w: 300px; }
-div.result_container.ct-on.ct-noside { --ct-side-w: 0px; }
+div.result_container.ct-on.ct-noside { --ct-side-w: 8px; }
+div.result_container.ct-on { --ct-nav-h: 64px; }
 div.result_container.ct-on.ct-focus { --ct-top-h: 0px; --ct-side-w: 0px; }
 div.result_container.ct-on #workspace { top: var(--ct-top-h); left: var(--ct-side-w); }
 div.result_container.ct-on.ct-stale #workspace { opacity: .4; transition: opacity .15s; }
 div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
-.ct-leave[hidden], .ct-sideh[hidden], .ct-top[hidden], .ct-side[hidden], .ct-barleft[hidden], .ct-view[hidden], .ct-busy[hidden], .ct-spin[hidden], .ct-map[hidden], .ct-tip[hidden], .ct-flagpal[hidden], .ct-filters[hidden], .ct-fcols[hidden] { display: none !important; }
+.ct-leave[hidden], .ct-sideh[hidden], .ct-sline[hidden], .ct-top[hidden], .ct-side[hidden], .ct-barleft[hidden], .ct-view[hidden], .ct-busy[hidden], .ct-spin[hidden], .ct-map[hidden], .ct-tip[hidden], .ct-flagpal[hidden], .ct-filters[hidden], .ct-fcols[hidden] { display: none !important; }
 .ct-top *, .ct-side *, .ct-barleft *, .ct-view *, .ct-busy *, .ct-map * { box-sizing: border-box; }
 
 .ct-top { position: absolute; top: 0; left: 0; right: 0; height: 46px; z-index: 3; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #fff; border-bottom: 1px solid #cfdcdc; color: #1b2a2a; }
@@ -20,7 +21,7 @@ div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
 .ct-tab[aria-selected="true"] { color: #008080; border-bottom-color: #008080; }
 .ct-tab:hover { color: #008080; }
 
-.ct-side { position: absolute; top: var(--ct-top-h); left: 0; bottom: 0; width: var(--ct-side-w); z-index: 3; display: flex; flex-direction: column; min-height: 0; background: #f6f9f9; border-right: 1px solid #cfdcdc; color: #1b2a2a; font-size: 14px; }
+.ct-side { position: absolute; top: var(--ct-top-h); left: 0; bottom: var(--ct-nav-h, 0px); width: var(--ct-side-w); z-index: 3; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; background: #f6f9f9; border-right: 1px solid #cfdcdc; color: #1b2a2a; font-size: 14px; }
 .ct-copies { padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 6px; }
 .ct-copy { border: 1px solid #cfdcdc; background: #fff; border-radius: 6px; padding: 6px 10px 5px; border-left-width: 5px; }
 .ct-copy.c1 { border-left-color: var(--ct-c1, #0046c8); }
@@ -76,7 +77,7 @@ div.result_container.ct-on .ct-mv:not([hidden]) { display: block; }
 .ct-search { display: block; padding: 6px 12px; }
 .ct-search input { width: 100%; font: inherit; font-size: 13.5px; border: 1px solid #cfdcdc; border-radius: 4px; padding: 6px 8px; background: #fff; color: inherit; }
 .ct-search input:focus, .ct-copy select:focus-visible, .ct-align select:focus-visible { outline: 2px solid #008080; outline-offset: 1px; }
-.ct-list { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid #e2ebeb; border-bottom: 1px solid #e2ebeb; background: #fff; }
+.ct-list { list-style: none; margin: 0; padding: 0; flex: 1 0 auto; min-height: 150px; height: 0; overflow-y: auto; border-top: 1px solid #e2ebeb; border-bottom: 1px solid #e2ebeb; background: #fff; }
 .ct-list li { display: flex; align-items: center; gap: 8px; padding: 6px 14px; cursor: pointer; font-size: 14px; }
 .ct-list li:hover { background: #eaf4f4; }
 .ct-list li.cur { background: #bfe3e3; font-weight: 500; }
@@ -113,58 +114,86 @@ div.result_container.ct-on .ct-mv:not([hidden]) { display: block; }
 .ct-btn { font: inherit; font-size: 13px; border: 1px solid #008080; background: #fff; color: #008080; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
 .ct-btn:hover { background: #008080; color: #fff; }
 
-/* ONE bar at the bottom: the dark teal bar of the app. Left: page turning and flag. Middle: the view switcher. Right: Linked and More as symbols.
-   (The old light bar and the Back button are gone; the PAGES tab at the top does what Back did.) */
-body.ct-active .bar.step3 { display: flex; align-items: center; min-height: 54px; padding: 0 10px; gap: 4px; }
-body.ct-active .bar.step3 > * { margin: 0; }
-body.ct-active .bar.step3 > #back, body.ct-active .bar.step3 > div.mdc-tab, body.ct-active .bar.step3 #compare { display: none !important; }
-body.ct-active .bar.step3 > .bar_right { display: contents; }
-.ct-barleft { order: 1; display: flex; align-items: center; gap: 2px; color: #fff; }
-.ct-view { order: 2; margin-left: auto; display: flex; align-items: center; }
-body.ct-active .bar.step3 #action { order: 3; margin: 0 auto 0 14px; }
-body.ct-active .bar.step3 #link_toggle { order: 4; }
-body.ct-active .bar.step3 #more { order: 5; }
-body.ct-active .bar.step3 #link_toggle, body.ct-active .bar.step3 #more { height: 40px; min-width: 40px; padding: 0 6px; flex: 0 0 auto; }
-body.ct-active .bar.step3 #link_toggle .mdc-tab__text-label, body.ct-active .bar.step3 #more .mdc-tab__text-label { display: none; }
-body.ct-active .bar.step3 #link_toggle .mdc-tab__icon, body.ct-active .bar.step3 #more .mdc-tab__icon { font-size: 24px; width: 24px; height: 24px; margin: 0; }
-.ct-bb { width: 36px; height: 36px; border: 0; background: transparent; color: #fff; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
-.ct-bb:hover { background: rgba(255, 255, 255, .2); }
-.ct-bb:focus-visible, .ct-vpill:focus-visible, .ct-vpop button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-.ct-where { min-width: 86px; text-align: center; line-height: 1.2; color: #fff; padding: 0 4px; }
-.ct-where b { display: block; font-size: 15px; font-weight: 500; white-space: nowrap; }
-.ct-where span { font-size: 12px; color: rgba(255, 255, 255, .82); white-space: nowrap; }
+/* 0.14.0 (owner, idea F): no teal bar below the pictures in the Compare tab. The views, the link of the panels and the page navigation are
+   in the left panel; the colour and paper buttons moved from the legend over the picture into the options of the Superimposed view. */
+body.ct-active #compare_screen > footer .bar { display: none !important; }
+body.ct-active #legend_colors, body.ct-active #legend_paper { display: none !important; }
+
+/* the page navigation, pinned to the bottom of the left panel */
+.ct-nav { position: absolute; left: 0; bottom: 0; z-index: 4; box-sizing: border-box; width: var(--ct-side-w); height: var(--ct-nav-h); display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border-top: 1px solid #cfdcdc; border-right: 1px solid #cfdcdc; color: #1b2a2a; }
+.ct-nav[hidden] { display: none !important; }
+.ct-nav * { box-sizing: border-box; }
+.ct-bb { width: 44px; height: 44px; flex: 0 0 auto; border: 0; background: #e6f2f2; color: #00605c; border-radius: 10px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
+.ct-bb:hover { background: #d3ebea; }
+.ct-bb svg { width: 28px; height: 28px; }
+.ct-bb:focus-visible, .ct-vrow:focus-visible, .ct-obtn:focus-visible, .ct-link:focus-visible { outline: 2px solid #008080; outline-offset: 1px; }
+.ct-where { flex: 1; min-width: 0; text-align: center; line-height: 1.2; color: #1b2a2a; padding: 0 2px; }
+.ct-where b { display: block; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-where span { display: block; font-size: 11.5px; color: #5a6d6d; white-space: nowrap; }
+.ct-where em { font-style: normal; }
+/* the panel folded away: a slim line with the tab on its edge, and the navigation as a small card in the bottom left corner */
+.ct-sline { position: absolute; top: var(--ct-top-h); left: 0; bottom: 0; width: var(--ct-side-w); z-index: 3; box-sizing: border-box; background: #f6f9f9; border-right: 1px solid #cfdcdc; }
+.ct-nav.folded { width: 104px; height: auto; display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "w w" "p n" "f f"; justify-items: center; align-items: center; gap: 4px; padding: 10px 8px 4px; border: 1px solid #cfdcdc; border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; box-shadow: 2px -2px 10px rgba(0, 40, 40, .12); }
+.ct-nav.folded #ct_where { grid-area: w; width: 100%; }
+.ct-nav.folded #ct_prev { grid-area: p; }
+.ct-nav.folded #ct_next { grid-area: n; }
+.ct-nav.folded .ct-flagwrap { grid-area: f; margin: 0; }
+.ct-nav.folded .ct-bb:not(.ct-flagbtn) { width: 40px; height: 38px; }
+.ct-nav.folded .ct-where em { display: none; }
+.ct-nav.folded .ct-where b { font-size: 15px; }
+div.result_container.ct-noside .ct-annocard { left: 104px; }
+div.result_container.ct-on.ct-noside #workspace .pane__hbar { padding-left: 97px; }      /* (the navigation card covers the left end of the scroll bar) */
 
 /* flag button and its colour choice */
-.ct-flagwrap { position: relative; display: inline-block; margin-left: 4px; }
+.ct-flagwrap { position: relative; display: inline-block; margin-left: -2px; }
+.ct-flagbtn { width: 24px; height: 30px; background: none; color: #7a8b8b; border-radius: 6px; }
+.ct-flagbtn:hover { background: #eef6f6; }
+.ct-flagbtn svg { width: 15px; height: 15px; }
 .ct-flagbtn svg { color: var(--ct-flag, currentColor); filter: drop-shadow(0 0 .6px rgba(0, 0, 0, .55)); }
-.ct-flagbtn[aria-pressed="true"] { background: rgba(255, 255, 255, .26); }
-.ct-flagbtn[aria-pressed="true"]:hover { background: rgba(255, 255, 255, .36); }
+.ct-flagbtn[aria-pressed="true"] { background: #e6f2f2; }
+.ct-flagbtn[aria-pressed="true"]:hover { background: #d3ebea; }
 .ct-flagpal { position: absolute; bottom: calc(100% + 10px); left: 0; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 3px 14px rgba(0, 40, 40, .25); white-space: nowrap; }
 .ct-flagpal .rm { border: 0; background: none; color: #5a6d6d; font: inherit; font-size: 13px; cursor: pointer; padding: 0 2px 0 6px; text-decoration: underline; }
 .ct-flagpal .rm:hover { color: #a00; }
 
-/* the view switcher: the name of the view on screen in a bubble, with six dots. Resting on it (or a click) lets the bubble grow
-   smoothly to the right with the six views in it (0.12.0); what stands to its right slides along; the bar keeps its colour. */
-.ct-view { position: relative; }
-.ct-vpill { position: relative; z-index: 1; box-sizing: border-box; height: 36px; display: inline-flex; align-items: center; gap: 10px; overflow: hidden; font: inherit; font-size: 14px; font-weight: 500; letter-spacing: .02em; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .65); border-radius: 999px; padding: 0 14px; cursor: pointer; white-space: nowrap; transition: width .26s ease, border-color .15s, background-color .15s; }
-.ct-vpill:hover { background: rgba(255, 255, 255, .12); border-color: #fff; }
-.ct-view.open .ct-vpill { border-color: #fff; }
-.ct-view.rowopen .ct-vpill { background: transparent; }
-.ct-vpill > * { transition: opacity .14s; }
-.ct-view.rowopen .ct-vpill > * { opacity: 0; }
-.ct-vdots { display: inline-flex; align-items: center; gap: 3px; }
-.ct-vdots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, .5); }
-.ct-vdots i.on { width: 7px; height: 7px; background: #fff; }
-.ct-vpop { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 2; box-sizing: border-box; height: 36px; display: flex; align-items: center; gap: 2px; padding: 0 3px; white-space: nowrap; background: transparent; visibility: hidden; clip-path: inset(0 100% 0 0 round 999px); }
-.ct-vpop[hidden] { display: none; }
-.ct-view.rowopen .ct-vpop { visibility: visible; clip-path: inset(0 0 0 0 round 999px); transition: clip-path .26s ease; }
-.ct-vpop button { font: inherit; font-size: 13.5px; color: #fff; background: transparent; border: 0; border-radius: 999px; height: 28px; padding: 0 12px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-.ct-vpop button:hover { background: rgba(255, 255, 255, .18); }
-.ct-vpop button.on { background: #fff; color: #006a6a; font-weight: 500; }
-.ct-vpop .k { font-size: 11px; opacity: .75; }
-/* not enough room in the bar (a narrow window): the six names stand one under the other above the bubble, in the bar's colour */
-.ct-vpop.col { visibility: visible; clip-path: none; top: auto; bottom: calc(100% + 8px); transform: none; height: auto; flex-direction: column; align-items: stretch; gap: 0; padding: 6px; border-radius: 10px; background: #008080; box-shadow: 0 3px 14px rgba(0, 40, 40, .35); }
-.ct-vpop.col button { border-radius: 6px; justify-content: flex-start; height: 32px; }
+/* the views in the left panel (0.14.0): radio buttons; the options of the chosen view unfold under it, smoothly, one at a time */
+.ct-vsec { margin-bottom: 6px; }
+.ct-vbody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s ease; border-top: 1px solid transparent; }
+.ct-vsec.open .ct-vbody { grid-template-rows: 1fr; border-top-color: #e6eeee; }
+.ct-vbin { overflow: hidden; min-height: 0; }
+.ct-vlist { padding: 4px 6px 2px; }
+.ct-vrow { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 6px 8px; border-radius: 6px; font: inherit; font-size: 13.5px; color: #1b2a2a; cursor: pointer; text-align: left; }
+.ct-vrow:hover { background: #eef6f6; }
+.ct-radio { flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #9aaeae; display: inline-grid; place-items: center; }
+.ct-radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: transparent; transition: background-color .15s; }
+.ct-vitem.on .ct-radio { border-color: #008080; }
+.ct-vitem.on .ct-radio::after { background: #008080; }
+.ct-vrow .nm { flex: 1; min-width: 0; }
+.ct-vitem.on .ct-vrow .nm { font-weight: 500; }
+.ct-vrow .k { font-size: 11px; color: #7a8b8b; }
+.ct-vopt { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s ease; }
+.ct-vitem.on .ct-vopt { grid-template-rows: 1fr; }
+.ct-vopt-in { overflow: hidden; min-height: 0; padding: 0 6px 0 34px; }
+.ct-vopt-in > :last-child { margin-bottom: 8px; }
+.ct-vopt-in > :first-child { margin-top: 2px; }
+.ct-vbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.ct-obtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cfdcdc; background: #fff; border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 12.5px; color: #00605c; cursor: pointer; }
+.ct-obtn:hover { border-color: #008080; background: #f4fafa; }
+.ct-obtn svg { flex: 0 0 auto; }
+.ct-vnote { margin: 0; font-size: 12px; line-height: 1.4; color: #33494a; }
+.ct-vopt #o1_note { display: block; font-size: 12px; line-height: 1.4; color: #33494a; }
+.ct-vopt #o2_switch { display: flex; border: 1px solid #b9cccc; border-radius: 6px; overflow: hidden; background: #fff; }
+.ct-vopt #o2_switch button { flex: 1; padding: 5px 6px; font-size: 12px; font-weight: 400; }
+.ct-vopt #o2_switch button + button { border-left: 1px solid #b9cccc; }
+.ct-vopt #o2_switch button.on { background: #00807a; color: #fff; }
+.ct-vopt .ct-seg { margin: 0; }
+.ct-linkrow { margin: 2px 6px 0; padding: 6px 0 8px; border-top: 1px solid #e6eeee; }
+.ct-link { display: flex; align-items: center; gap: 9px; width: 100%; border: 1px solid #9fcfcf; background: #e6f2f2; color: #00605c; border-radius: 8px; padding: 6px 9px; font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; transition: background-color .2s, color .2s, border-color .2s; }
+.ct-link svg { flex: 0 0 auto; }
+.ct-link .ct-linkx { opacity: 0; transition: opacity .2s; }
+.ct-link.off { background: #fff; color: #7a8b8b; border-color: #cfdcdc; }
+.ct-link.off .ct-linkx { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .ct-vbody, .ct-vopt, .ct-link, .ct-link .ct-linkx { transition: none; } }
 /* every menu and popup of the bar lies above the thin book map line */
 #compare_screen > footer .mdc-menu-surface { z-index: 40; }
 
@@ -306,7 +335,7 @@ body.ct-active #compare_screen > footer #more { display: none !important; }
 .ct-btn.pri:hover { background: #006a6a; }
 
 /* the background alignment in the Compare tab (0.12.0): its warning (and, smaller, how far it is) over the top of the picture */
-.ct-bgslot { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 8; box-sizing: border-box; max-width: min(760px, calc(100% - 80px)); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 40, 40, .2); font-size: 13px; line-height: 1.4; }
+.ct-bgslot { position: absolute; left: calc(var(--ct-side-w) + (100% - var(--ct-side-w)) / 2); top: calc(var(--ct-top-h) + 10px); transform: translateX(-50%); z-index: 8; box-sizing: border-box; max-width: min(760px, calc(100% - 80px)); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 40, 40, .2); font-size: 13px; line-height: 1.4; }
 .ct-bgslot[hidden] { display: none; }
 .ct-bgslot.warn { border-color: #e0a100; background: #fff8e6; }
 .ct-bgslot.small { padding: 4px 10px; font-size: 12px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0, 40, 40, .15); }

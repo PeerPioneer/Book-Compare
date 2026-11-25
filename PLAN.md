@@ -1114,7 +1114,7 @@ Built 25 Nov 2026 as **version 0.12.0** (details in CHANGELOG.txt).
 
 ### 11.1f The owner's notes of 25 November 2026 (on 0.12.0)
 
-Built 25 Nov 2026 as **version 0.13.0** (details in CHANGELOG.txt), except D1b.
+Built 25 Nov 2026 as **version 0.13.0** (details in CHANGELOG.txt); D1b and S1 as **version 0.14.0**.
 
 | ID | Item | Status |
 |----|------|--------|
@@ -1125,7 +1125,8 @@ Built 25 Nov 2026 as **version 0.13.0** (details in CHANGELOG.txt), except D1b.
 | N19 | After the examples, the next project showed the last example page while its own pages loaded: nothing is shown until the new pair is aligned | **done 0.13.0** |
 | W2 | "Windows protected your PC" without paying for a certificate: SignPath Foundation (free signing for open-source projects; the owner applies), or the Microsoft Store (free for individual developers; Store signs the app). Updates from inside the program never show the warning, only the first installation | **options given to the owner** |
 | D2 | Examples: welcome page kept; then Toggle, the movement map, side by side zoomed in, a bent page (whole-page step vs tiles), the whole book in the Pages view (three copies, a flag, an annotation); the note stands in the left panel with a "Try it" button | **done 0.13.0** |
-| D1b | Left panel as in idea F with the owner's changes: no teal bar; copies, View menu (radio buttons, the options of the chosen view unfold, one at a time; Superimposed: two-squares colour icon, Paper = page with a sun), at the bottom of the View menu a link BUTTON "Zoom and move all panels together" (no tick box; the symbol is crossed out when the panels are not linked), Alignment, then the navigation pinned to the bottom of the panel (bigger, bold, smaller flag next to ›); the book-map idea accepted. Owner 25 Nov (evening): when the panel is folded the navigation must stay visible: mock-up of a slim strip that keeps it in the same corner (board "The left panel folded away") | **waiting for the owner's OK on the folded-panel mock-up; NOT to be built before** |
+| D1b | Left panel as in idea F with the owner's changes (no teal bar; copies, View with radio buttons and unfolding options, link button crossed out when off, Alignment, pages; navigation pinned at the bottom; folded panel = slim line + navigation card in the bottom left corner, without the copy names - owner 25 Nov evening) | **done 0.14.0** |
+| S1 | Owner: alignments "not saved" (A-Wn1 against D-W, page 8 → 7 → 8 aligned again). As decided 21 Nov (D4) only pairs with the reference were stored; a pair of two other copies is aligned directly (copy 2 onto copy 1, not via the reference). Now every aligned pair is kept in the project file | **done 0.14.0** |
 
 ### 11.2 After version 1
 

@@ -394,7 +394,7 @@
         link_icon.textContent = state.linked ? 'link' : 'link_off';
         link_label.textContent = state.linked ? 'Linked' : 'Unlinked';
     };
-    link_btn.addEventListener('click', () => {
+    const toggle_link = () => {
         state.linked = !state.linked;
         show_link_state();
         if (state.linked) {
@@ -403,8 +403,12 @@
                 if (p !== state.last) p.apply_view(v);
             });
         }
-    });
+        document.dispatchEvent(new CustomEvent('linkchange'));
+    };
+    link_btn.addEventListener('click', toggle_link);
     show_link_state();
+    // 0.14.0: the Compare tab has its own button for this in the left panel ("Zoom and move all panels together", js/compare-tab.js)
+    window.BCLink = { linked: () => state.linked, toggle: toggle_link };
 
     // Splitters (drag to resize)
     const splitter = (node, move) => {
@@ -512,11 +516,7 @@
         copy2.set_label(label(1, showing_original() ? 'Copy 2, original scan' : 'Copy 2, aligned'));
     };
     const o2_switch = el('o2_switch');
-    // 0.12.0 (owner): the switch stands in the teal bar, where the options of the other views are (#onlyimage2 is shown only in the Copy 2 view);
-    // the short note of the Copy 1 view likewise
-    { const slot2 = el('onlyimage2'), slot1 = el('onlyimage1'), n1 = el('o1_note');
-      if (slot2) slot2.appendChild(o2_switch);
-      if (slot1 && n1) slot1.appendChild(n1); }
+    // (0.14.0: the switch and the short note of the Copy 1 view stand in the left panel of the Compare tab, under the name of their view: js/compare-tab.js)
     const render_o2_switch = () => {
         o2_switch.querySelectorAll('button').forEach((b) => {
             const on = (b.dataset.o2 === 'original') === o2_original;
@@ -553,7 +553,7 @@
                    `\n[[${DIFF_COLOR_2}]]${nm(preset && preset.n2)} = ${copy(1)}`;
         }
         main.set_label((current_mode === 'toggle' ? 'Toggle (copy 1 and copy 2 in turn)' : 'Superimposed') + note);
-        if (current_mode === 'diff') {                    // the colour choice sits right next to the legend (item 11)
+        if (current_mode === 'diff' && !document.body.classList.contains('ct-active')) {   // the colour choice next to the legend (item 11); in the Compare tab: in the left panel (0.14.0)
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'pane__lblbtn'; b.id = 'legend_colors';
             b.textContent = 'Change colors …'; b.title = 'Choose the two colors of the Superimposed view';

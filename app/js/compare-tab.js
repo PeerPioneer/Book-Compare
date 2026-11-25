@@ -72,6 +72,14 @@
       '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2 (key ,)" aria-label="Previous copy">&#8249;</button>' +
       '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2 (key .)" aria-label="Next copy">&#8250;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
       '</div>' +
+      // 0.14.0 (owner, idea F): the views are chosen in the left panel (radio buttons); the options of the chosen view unfold under it,
+      // one at a time; at the end, the link of the panels. The teal bar below the pictures is gone.
+      '<div class="ct-alsec ct-vsec open" id="ct_vsec">' +
+      '<button class="ct-alhead" id="ct_vhead" aria-expanded="true" aria-controls="ct_vbody"><span class="ct-tri" aria-hidden="true"></span><span class="ct-altitle">View</span><span class="ct-alval" id="ct_vval">Superimposed</span></button>' +
+      '<div class="ct-vbody" id="ct_vbody"><div class="ct-vbin"><div class="ct-vlist" id="ct_vlist" role="radiogroup" aria-label="View"></div>' +
+      '<div class="ct-linkrow"><button type="button" class="ct-link" id="ct_link" aria-pressed="true">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/><path class="ct-linkx" d="M4 4l16 16"/></svg>' +
+      '<span>Zoom and move all panels together</span></button></div></div></div></div>' +
       '<div class="ct-alsec" id="ct_tiles">' +
       '<button class="ct-alhead" id="ct_alhead" aria-expanded="false" aria-controls="ct_albody"><span class="ct-tri" aria-hidden="true"></span><span class="ct-altitle">Alignment of this page</span><span class="ct-alval" id="ct_alval">Standard</span></button>' +
       '<div class="ct-albody" id="ct_albody" hidden>' +
@@ -106,21 +114,15 @@
     ui.busy.hidden = true;
     ui.busy.innerHTML = '<div class="ct-busybox"><div class="ct-spin" id="ct_spin"></div><p id="ct_busytxt"></p><div class="ct-busyacts" id="ct_busyacts"></div></div>';
 
-    // the left part of the ONE bar at the bottom: page turning and the flag
-    ui.bar = el('div', 'ct-barleft');
+    // the page navigation (0.14.0, owner): pinned to the bottom of the left panel; when the panel is folded away it stays, as a small card
+    // in the bottom left corner beside the slim line that is left of the panel
+    ui.bar = el('div', 'ct-barleft ct-nav'); ui.bar.id = 'ct_nav';
     ui.bar.innerHTML =
       '<button class="ct-bb" id="ct_prev" title="Previous page (Page Up)" aria-label="Previous page"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>' +
       '<div class="ct-where" id="ct_where" aria-live="polite"></div>' +
       '<button class="ct-bb" id="ct_next" title="Next page (Page Down)" aria-label="Next page"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>' +
       '<span class="ct-flagwrap"><button class="ct-bb ct-flagbtn" id="ct_flag" aria-pressed="false" aria-haspopup="true" aria-label="Flag page" title="Flag this page (F). Click again to change the colour."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path id="ct_flagpath" fill="currentColor"></path></svg></button>' +
       '<div class="ct-flagpal" id="ct_flagpal" role="group" aria-label="Flag colour" hidden></div></span>';
-
-    // the middle part: the view switcher. Only the name of the view on screen is shown (with one dot for each of the six views);
-    // the six names unfold when the pointer rests on it (or when it is clicked or tapped), a click on a name switches.
-    ui.view = el('div', 'ct-view');
-    ui.view.innerHTML =
-      '<button class="ct-vpill" id="ct_vpill" aria-haspopup="true" aria-expanded="false" title="Change the view (keys 1 to 6)"><span id="ct_vlab">Superimposed</span><span class="ct-vdots" id="ct_vdots" aria-hidden="true"></span></button>' +
-      '<div class="ct-vpop" id="ct_vpop" role="menu" aria-label="Views" hidden></div>';
 
     ui.map = el('div', 'ct-map'); ui.map.id = 'ct_map';
     ui.map.hidden = true;
@@ -134,14 +136,13 @@
     ui.leave = el('button', 'ct-leave', 'Leave focus mode'); ui.leave.hidden = true; ui.leave.title = 'Bring back the panel, tabs and bars (Esc)';
     ui.toast = el('div', 'ct-toast'); ui.toast.hidden = true; ui.toast.setAttribute('role', 'status');
     ui.sideh = el('button', 'ct-sideh'); ui.sideh.id = 'ct_sidebtn'; ui.sideh.type = 'button';      // the fold handle on the right edge of the left panel
-    rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.sideh); rc.appendChild(ui.busy); rc.appendChild(ui.leave); rc.appendChild(ui.toast);
-    var tealbar = footer.querySelector('.bar');                                             // the dark teal bar: the only bar below the pictures
-    tealbar.insertBefore(ui.bar, tealbar.firstChild);
-    tealbar.insertBefore(ui.view, tealbar.querySelector('.bar_right'));
+    ui.sline = el('div', 'ct-sline'); ui.sline.hidden = true;                                 // what is left of the folded panel: a slim line
+    rc.appendChild(ui.top); rc.appendChild(ui.side); rc.appendChild(ui.sline); rc.appendChild(ui.bar); rc.appendChild(ui.sideh); rc.appendChild(ui.busy); rc.appendChild(ui.leave); rc.appendChild(ui.toast);
+    var tealbar = footer.querySelector('.bar');                                             // the dark teal bar of the base app: hidden in the Compare tab (0.14.0)
     footer.insertBefore(ui.map, tealbar);
     ui.tealbar = tealbar;
     ui.rc = rc;
-    [ui.top, ui.side, ui.bar, ui.view].forEach(function (e) { e.hidden = true; });
+    [ui.top, ui.side, ui.bar].forEach(function (e) { e.hidden = true; });
     // the coloured edge of the two copy boxes shows the colours chosen for the Superimposed view (0.11.0)
     var paintCopies = function () {
       try { ui.side.style.setProperty('--ct-c1', DIFF_COLOR_1); ui.side.style.setProperty('--ct-c2', DIFF_COLOR_2); } catch (e) { /* viz.js not loaded */ }
@@ -151,7 +152,7 @@
 
     var $ = function (id) { return document.getElementById(id); };
     ui.c1 = $('ct_c1'); ui.c2 = $('ct_c2'); ui.list = $('ct_list'); ui.q = $('ct_q'); ui.where = $('ct_where');
-    ui.vpill = $('ct_vpill'); ui.vpop = $('ct_vpop'); ui.vlab = $('ct_vlab'); ui.vdots = $('ct_vdots');
+    ui.vlist = $('ct_vlist'); ui.vval = $('ct_vval'); ui.link = $('ct_link');
     ui.skip = $('ct_skip');
     ui.filters = $('ct_filters'); ui.fcols = $('ct_fcols'); ui.flag = $('ct_flag'); ui.pal = $('ct_flagpal');
     ui.svg = $('ct_mapsvg'); ui.tip = $('ct_tip'); ui.hov = $('ct_maphov'); ui.pin = $('ct_pin');
@@ -245,7 +246,6 @@
     document.addEventListener('click', function (e) {
       if (!ui.pal.hidden && !e.target.closest('.ct-flagwrap')) closePalette();
       if (!e.target.closest('.ct-map')) ui.map.classList.remove('open');                  // (opened by a tap on a touch screen)
-      if (!e.target.closest('.ct-view')) closeView();
     });
     wireViews();
     ui.svg.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse' || e.pointerType === 'pen') showTip(e); });
@@ -264,6 +264,14 @@
       if (st.on && w > 0 && Math.abs(w - mapW) >= 1) renderMap();
     }).observe(ui.svg);
     document.addEventListener('keydown', onKey);
+    // 0.14.0: the left panel scrolls now. Something that brings an element of it into view (a test robot, a browser feature) may also slide
+    // the screens of the base app sideways; while the Compare tab is open it is put back at once (the screens never stand half-way here)
+    var snapT = 0;
+    document.addEventListener('scroll', function () {
+      if (!st.on) return;
+      clearTimeout(snapT);
+      snapT = setTimeout(function () { if (st.on && Math.abs(ui.rc.getBoundingClientRect().left) > 1) E.go_to_screen(E.compare.cc, { inline: 'end', behavior: 'auto' }); }, 120);
+    }, true);
     document.addEventListener('openpaper', function () { if (st.on) paperDialog(); });
   }
 
@@ -303,11 +311,12 @@
     ui.rc.classList.toggle('ct-focus', f); document.body.classList.toggle('ct-focus', f);
     ui.sideh.hidden = !st.on || f;
     ui.sideh.innerHTML = st.side ? '&#8249;' : '&#8250;';
-    ui.sideh.title = st.side ? 'Fold the left panel away' : 'Show the left panel (copies and pages)';
+    ui.sideh.title = st.side ? 'Fold the left panel away (the page navigation stays)' : 'Show the left panel (copies, views, alignment and pages)';
     ui.sideh.setAttribute('aria-label', ui.sideh.title); ui.sideh.setAttribute('aria-expanded', st.side ? 'true' : 'false');
-    ui.top.hidden = !st.on || f; ui.side.hidden = !st.on || !st.side || f; ui.bar.hidden = !st.on; ui.view.hidden = !st.on; ui.map.hidden = !st.on; ui.leave.hidden = !f;
+    ui.top.hidden = !st.on || f; ui.side.hidden = !st.on || !st.side || f; ui.sline.hidden = !st.on || st.side || f; ui.bar.hidden = !st.on || f; ui.map.hidden = !st.on; ui.leave.hidden = !f;
+    ui.bar.classList.toggle('folded', !st.side);
     if (!st.on) ui.toast.hidden = true;
-    ui.map.style.setProperty('--ct-map-left', (st.on && st.side ? 300 : 0) + 'px');           // the opened map does not cover the left panel
+    ui.map.style.setProperty('--ct-map-left', (st.on ? (st.side ? 300 : 104) : 0) + 'px');    // the opened map does not cover the left panel (or the page navigation)
     document.body.classList.toggle('ct-active', st.on);
     renderPin();
     if (window.CompareAnnot) CompareAnnot.setActive(st.on);
@@ -357,7 +366,7 @@
   function renderBar(s) {
     s = s || W().state();
     var r = W().rowInfo(s.row);
-    ui.where.innerHTML = '<b>' + esc(r.label) + '</b><span>position ' + (s.row + 1) + ' of ' + s.rows + '</span>';
+    ui.where.innerHTML = '<b title="' + esc(r.label) + '">' + esc(r.label) + '</b><span><em>position </em>' + (s.row + 1) + ' of ' + s.rows + '</span>';
     renderTitle();
     renderFlagBtn(r); moveMarker(s); renderTiles(s);
   }
@@ -501,7 +510,7 @@
     card.innerHTML = '<button class="x" data-ex="close" aria-label="Close this note" title="Close this note">&times;</button>' +
       '<div class="k">Example ' + (s.row + 1) + ' of ' + n + '</div><h4>' + esc(ex.title) + '</h4><p>' + esc(ex.text) + '</p>' +
       (ex.welcome ? '<p class="leg">' + sq(DIFF_COLOR_1) + ' only in copy A &nbsp; ' + sq(DIFF_COLOR_2) + ' only in copy B &nbsp; ' + sq('#2a1a24') + ' in both</p>' +
-        '<p>Page Down (or the arrow at the bottom) goes to the next example. The “?” at the top explains the rest.</p>' : '') +
+        '<p>Page Down (or the arrow › at the bottom of this panel) goes to the next example. The “?” at the top explains the rest.</p>' : '') +
       (t ? '<button class="ct-btn pri ct-extry" data-ex="try" data-act="' + esc(t.act) + '">' + esc(t.act === 'rough' && st.roughOn && t.back ? t.back : t.label) + '</button>' : '') +
       '<div class="acts">' + (last ? '' : '<button class="ct-btn' + (t ? '' : ' pri') + '" data-ex="next">Next example &#8250;</button>') +
       '<button class="ct-btn" data-ex="own">Start your own project</button></div>' +
@@ -643,100 +652,96 @@
   function forget() { st.shown = null; st.lastTiles = null; if (ui) ui.rc.classList.add('ct-blank'); }
 
 
-  /* ---------------------------------------------------------------- the view switcher (middle of the bar) */
+  /* ---------------------------------------------------------------- the views (left panel, 0.14.0) */
   var VIEWS = [['diff', 'Superimposed'], ['toggle', 'Toggle'], ['topbottom', 'Top and bottom'], ['leftright', 'Left and right'], ['onlyimage1', 'Copy 1'], ['onlyimage2', 'Copy 2']];
-  var vt = { open: 0, close: 0, w: 0 };
   function viewIndex() { var m = E && E.action_bar ? E.action_bar.MODE : 'diff'; for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i][0] === m) return i; return 0; }
   function copyName(slot) {
     var s = W().state(), n = '';
     s.copies.forEach(function (c) { if (c.id === s.pair[slot]) n = c.name; });
     return n;
   }
-  function renderView() {
-    if (!ui || !ui.vpill || !st.on) return;                                                  // (the two-image screens have no copies and no switcher)
-    var cur = viewIndex();
-    ui.vlab.textContent = VIEWS[cur][1];
-    var dots = ''; VIEWS.forEach(function (v, i) { dots += '<i' + (i === cur ? ' class="on"' : '') + '></i>'; });
-    ui.vdots.innerHTML = dots;
+  // The two squares of the colour button (as in Photoshop): the one in front is copy 1, the one behind copy 2, in the colours chosen now
+  function squaresSvg() {
+    var c1 = '#0046c8', c2 = '#e60000'; try { c1 = DIFF_COLOR_1; c2 = DIFF_COLOR_2; } catch (e) { /* viz.js not loaded */ }
+    return '<svg viewBox="0 0 22 18" width="22" height="18" aria-hidden="true"><rect x="8" y="5" width="12" height="12" rx="2" fill="' + c2 + '" stroke="#fff" stroke-width="1.5"/><rect x="2" y="1" width="12" height="12" rx="2" fill="' + c1 + '" stroke="#fff" stroke-width="1.5"/></svg>';
+  }
+  var SUN_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M12.5 11.5v-1.2M12.5 18.7v-1.2M9 14.5H7.8M17.2 14.5H16M10 12l-.8-.8M15.8 17.8l-.8-.8M10 17l-.8.8M15.8 11.2l-.8.8"/><circle cx="12.5" cy="14.5" r="1.6"/></svg>';
+  // the options of each view, unfolded under its name when it is chosen (the same as in the teal bar before; the Copy 2 switch and the
+  // note of the Copy 1 view are the elements of js/panes.js, moved here)
+  function viewOptions(id) {
+    if (id === 'diff') return '<div class="ct-vbtns"><button type="button" class="ct-obtn" id="ct_colors" title="The colours of copy 1 (in front) and copy 2 (behind). Click to choose others.">' + squaresSvg() + '<span>Colours</span></button>' +
+      '<button type="button" class="ct-obtn" id="ct_paper" title="Paper still tinted in a copy’s colour? Make the paper of one copy whiter (only the picture on screen changes)">' + SUN_SVG + '<span>Paper</span></button></div>';
+    if (id === 'toggle') return '<div class="ct-seg" id="ct_speed" role="group" aria-label="Speed of the toggle"><button type="button" data-sp="1">Slow</button><button type="button" data-sp="2">Normal</button><button type="button" data-sp="4">Fast</button></div>';
+    if (id === 'topbottom') return '<p class="ct-vnote">Copy 1 above, copy 2 (aligned) below.</p>';
+    if (id === 'leftright') return '<p class="ct-vnote">Copy 1 on the left, copy 2 (aligned) on the right.</p>';
+    return '';
+  }
+  function buildViews() {
     var h = '';
     VIEWS.forEach(function (v, i) {
-      var tip = i === 4 ? copyName(0) : i === 5 ? copyName(1) : '';
-      h += '<button role="menuitemradio" aria-checked="' + (i === cur) + '" data-i="' + i + '"' + (i === cur ? ' class="on"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '><span class="k">' + (i + 1) + '</span>' + esc(v[1]) + '</button>';
+      h += '<div class="ct-vitem" data-i="' + i + '"><button type="button" class="ct-vrow" role="radio" aria-checked="false" data-i="' + i + '" id="ct_v_' + v[0] + '"><span class="ct-radio" aria-hidden="true"></span><span class="nm">' + esc(v[1]) + '</span><span class="k" title="Key ' + (i + 1) + '">' + (i + 1) + '</span></button>' +
+        '<div class="ct-vopt"><div class="ct-vopt-in" id="ct_vo_' + v[0] + '">' + viewOptions(v[0]) + '</div></div></div>';
     });
-    ui.vpop.innerHTML = h;
+    ui.vlist.innerHTML = h;
+    var o1 = document.getElementById('o1_note'), o2 = document.getElementById('o2_switch');
+    if (o1) { o1.textContent = 'Copy 1 is shown as it was scanned: copy 2 is aligned onto it, copy 1 is never changed.'; o1.removeAttribute('title'); document.getElementById('ct_vo_onlyimage1').appendChild(o1); }
+    if (o2) document.getElementById('ct_vo_onlyimage2').appendChild(o2);
   }
-  // The view switcher (0.12.0, owner): resting on the bubble (or a click) lets it grow smoothly to the right and shows the six views
-  // in it; what stands to its right in the bar (the options of the view, Linked) slides along. The bar keeps its colour. Only where
-  // the bar has no room for that (a narrow window) do the six names open in a list above the bubble.
-  function openView() {
-    clearTimeout(vt.close); clearTimeout(vt.open);
-    if (!ui.vpop.hidden) return;
-    closePalette();
-    var bar = ui.tealbar;
-    ui.vpop.classList.remove('col'); ui.vpop.style.cssText = ''; ui.vpill.style.width = '';
-    ui.vpop.hidden = false;                                                                   // (laid out, but not visible yet: see .ct-vpop)
-    var pw = ui.vpill.offsetWidth, rw = ui.vpop.offsetWidth;
-    // room: from the bubble to the right end of the bar, less what stands to the right of the bubble
-    var br = bar.getBoundingClientRect(), pr = ui.vpill.getBoundingClientRect(), after = 0;
-    [].forEach.call(bar.children, function (c) { if (c !== ui.view && c.offsetParent && c.getBoundingClientRect().left >= pr.right - 1) after += c.offsetWidth + 8; });
-    if (pr.left + rw + after + 14 > br.right) {
-      ui.vpop.classList.add('col');
-      var w = ui.vpop.offsetWidth, cx = pr.left + pr.width / 2 - ui.view.getBoundingClientRect().left;
-      ui.vpop.style.left = Math.max(-pr.left + br.left + 6, cx - w / 2) + 'px';
-      ui.view.classList.add('open');
-    } else {
-      ui.vpill.style.width = pw + 'px'; void ui.vpill.offsetWidth;                               // from the bubble's own width ...
-      ui.vpill.style.width = rw + 'px';                                                         // ... smoothly to the width of the six names
-      ui.view.classList.add('open', 'rowopen');
-    }
-    ui.vpill.setAttribute('aria-expanded', 'true');
+  function renderSpeed() {
+    var a = document.querySelector('#toggle button.mdc-tab.active'), sp = a ? a.dataset.speed : '2';
+    [].forEach.call(document.querySelectorAll('#ct_speed button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.sp === sp)); });
   }
-  function closeView() {
-    clearTimeout(vt.close); clearTimeout(vt.open);
-    if (!ui || !ui.vpop || ui.vpop.hidden) return;
-    var row = ui.view.classList.contains('rowopen');
-    ui.vpop.hidden = true; ui.vpill.setAttribute('aria-expanded', 'false'); ui.view.classList.remove('open', 'rowopen');
-    if (!row) { ui.vpill.style.width = ''; return; }
-    var cur = ui.vpill.offsetWidth;                                                            // back to the bubble's own width, smoothly
-    ui.vpill.style.transition = 'none'; ui.vpill.style.width = ''; var nw = ui.vpill.offsetWidth;
-    ui.vpill.style.width = cur + 'px'; void ui.vpill.offsetWidth; ui.vpill.style.transition = '';
-    ui.vpill.style.width = nw + 'px';
-    clearTimeout(vt.w); vt.w = setTimeout(function () { if (ui.vpop.hidden) ui.vpill.style.width = ''; }, 300);
+  function renderLink() {
+    var on = !window.BCLink || BCLink.linked();
+    ui.link.setAttribute('aria-pressed', String(on)); ui.link.classList.toggle('off', !on);
+    ui.link.title = on ? 'On: zooming or moving one panel zooms and moves the others too. Click to let every panel zoom and move on its own.' : 'Off: every panel zooms and moves on its own. Click to zoom and move them together again.';
   }
+  function renderView() {
+    if (!ui || !ui.vlist || !st.on) return;
+    var cur = viewIndex();
+    ui.vval.textContent = VIEWS[cur][1];
+    [].forEach.call(ui.vlist.querySelectorAll('.ct-vitem'), function (it) {
+      var on = +it.dataset.i === cur, b = it.querySelector('.ct-vrow');
+      it.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
+    });
+    var t4 = document.getElementById('ct_v_onlyimage1'), t5 = document.getElementById('ct_v_onlyimage2');
+    if (t4) t4.title = copyName(0); if (t5) t5.title = copyName(1);
+    renderSpeed(); renderLink();
+  }
+  function closeView() { /* (0.12.0's view bubble in the teal bar is gone: nothing to fold away) */ }
   function setView(i, says) {
     var v = VIEWS[i]; if (!v || !E) return;
     E.compare.visualisation_select.MDCSelect.setValue(v[0]);                                // the base app reacts to this menu (hidden in the Compare tab)
-    renderView(); closeView();
+    renderView();
     if (says && st.focus) toast('View: ' + v[1]);
   }
   function wireViews() {
-    ui.vpill.onclick = function (e) {
-      if (ui.vpop.hidden) { openView(); if (e.detail === 0) { var c = ui.vpop.querySelector('.on'); if (c) c.focus(); } }
-      else closeView();
+    buildViews();
+    var vOpen = true; try { vOpen = localStorage.getItem('bookcompare_vsec') !== 'folded'; } catch (x) { /* private mode */ }
+    var setV = function (open, keep) {
+      document.getElementById('ct_vsec').classList.toggle('open', open); document.getElementById('ct_vhead').setAttribute('aria-expanded', String(open));
+      if (keep) { try { localStorage.setItem('bookcompare_vsec', open ? 'open' : 'folded'); } catch (x) { /* private mode */ } }
     };
-    ui.view.addEventListener('pointerenter', function (e) {
-      if (e.pointerType !== 'mouse') return;
-      clearTimeout(vt.close); clearTimeout(vt.open); vt.open = setTimeout(openView, 180);       // rests for a moment: the others unfold (a quick pass does nothing)
+    setV(vOpen, false);
+    document.getElementById('ct_vhead').onclick = function () { setV(!document.getElementById('ct_vsec').classList.contains('open'), true); };
+    ui.vlist.addEventListener('click', function (e) {
+      var b = e.target.closest('.ct-vrow'); if (b) { setView(+b.dataset.i); return; }
+      var sp = e.target.closest('#ct_speed button[data-sp]');
+      if (sp) { var t = document.querySelector('#toggle button.mdc-tab[data-speed="' + sp.dataset.sp + '"]'); if (t) t.click(); renderSpeed(); return; }
+      if (e.target.closest('#ct_colors')) { document.dispatchEvent(new CustomEvent('opendiffcolors')); return; }
+      if (e.target.closest('#ct_paper')) { paperDialog(); return; }
     });
-    ui.view.addEventListener('pointerleave', function (e) {
-      if (e.pointerType !== 'mouse') return;
-      clearTimeout(vt.open); vt.close = setTimeout(closeView, 350);
-    });
-    ui.vpop.addEventListener('click', function (e) {
-      var b = e.target.closest('button[data-i]'); if (b) setView(+b.dataset.i);
-    });
-    ui.view.addEventListener('keydown', function (e) {
-      if (ui.vpop.hidden) return;
-      var bs = [].slice.call(ui.vpop.querySelectorAll('button')), i = bs.indexOf(document.activeElement);
-      if (e.key === 'Escape') { closeView(); ui.vpill.focus(); }
-      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') bs[(i + 1) % bs.length].focus();
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') bs[(i + bs.length - 1) % bs.length].focus();
-      else if (e.key === 'Home') bs[0].focus();
-      else if (e.key === 'End') bs[bs.length - 1].focus();
-      else return;
+    ui.vlist.addEventListener('keydown', function (e) {                                       // a group of radio buttons: the arrow keys choose
+      if (!e.target.closest('.ct-vrow')) return;
+      var d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
+      var i = (viewIndex() + d + VIEWS.length) % VIEWS.length; setView(i);
+      var b = ui.vlist.querySelector('.ct-vrow[data-i="' + i + '"]'); if (b) b.focus();
       e.preventDefault(); e.stopPropagation();
     });
+    ui.link.onclick = function () { if (window.BCLink) BCLink.toggle(); renderLink(); };
+    document.addEventListener('linkchange', renderLink);
     document.addEventListener('modechange', renderView);
+    document.addEventListener('diffcolorschange', function () { var c = document.getElementById('ct_colors'); if (c) c.querySelector('svg').outerHTML = squaresSvg(); });
   }
 
   /* ---------------------------------------------------------------- moving around */
@@ -799,7 +804,7 @@
       '<tr><td>' + k('Delete') + '</td><td>delete the selected annotation</td></tr>' +
       '<tr><td>' + k('Esc') + '</td><td>let go of an annotation; leave focus mode</td></tr>' +
       '</tbody></table>' +
-      '<ul><li><b>Left panel:</b> the two copies, how they are aligned, and the pages. The small tab on its right edge folds it away.</li>' +
+      '<ul><li><b>Left panel:</b> the two copies; the <b>View</b> (the options of the chosen view unfold under its name: colours and paper of the Superimposed view, speed of the Toggle, Aligned / Original scan of the Copy 2 view); <b>Zoom and move all panels together</b> (the link; crossed out when every panel zooms and moves on its own); how this page is aligned; the pages; and, at the bottom, the page navigation and the flag. The small tab on its right edge folds the panel away: the page navigation stays in the bottom left corner.</li>' +
       '<li><b>Copy 1 and copy 2</b> can be shown in two small panels beside the superimposed picture: the strip at the right edge opens them.</li>' +
       '<li><b>Copy 2 view</b> (key 6): <b>Aligned</b> shows copy 2 as the alignment moved it, <b>Original scan</b> as it was scanned. Copy 1 is never changed.</li>' +
       '<li><b>Movement map</b> (left panel) colours the parts of copy 2 that the fine alignment moved, with arrows for the direction.</li>' +
@@ -832,18 +837,22 @@
     var g = eng = { e: AlignEngine.create(), ref: null, jobs: 0, ready: false };
     g.loading = g.e.init().then(function () { g.ready = true; g.loading = null; }, function () { g.loading = null; if (eng === g) dropEngine(); });
   }
-  // Stored alignments (V10, desktop program): a pair whose copy 1 is the reference copy (or stands in for it on this page) is kept in the
-  // project file (0.12.0); when it is there and still fits, the page is shown from it at once. Other pairs are aligned directly, and the next page
-  // in the direction of travel is prepared meanwhile (D2, kept in memory only, prepared by a second helper).
+  // Stored alignments (V10): the movement of every pair that has been aligned is kept in the project file (0.12.0: a pair with the reference
+  // copy; 0.14.0, owner: every pair, so that going back to a page, or to a pair seen before, shows it at once instead of aligning it again).
+  // When it is there and still fits, the page is shown from it. Without a project file (the examples, a project not saved yet) the last few
+  // pairs are kept in memory. The next page in the direction of travel is prepared meanwhile by a second helper (D2).
   async function storeKey(d) {
-    if (!d.ids || !window.BCResults || !BCResults.available() || !W().refFor || W().refFor(d.row) !== d.ids[0]) return null;
+    if (!d.ids || !window.BCResults || !BCResults.available()) return null;
     return { c0: d.ids[0], k0: d.keys[0], c1: d.ids[1], k1: d.keys[1], i0: await BCResults.fileInfo(d.files[0]), i1: await BCResults.fileInfo(d.files[1]), tiles: d.tiles || null, quad: d.quad || null };
   }
-  function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null), JSON.stringify(d.quad || null)].join('|') : null; }
+  function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null), JSON.stringify(d.quad || null), window.BCResults ? BCResults.ENGINE : ''].join('|') : null; }
   var pre = { e: null, ready: false, jobs: 0, cache: new Map(), busy: null };          // the helper that prepares the next page, and what it prepared
+  var mem = new Map(), MEM_MAX = 8;                                                     // pairs aligned while there is no project file (0.14.0)
+  function remember(d, bin) { var k = preKey(d); if (!k || !bin) return; mem.delete(k); mem.set(k, bin); while (mem.size > MEM_MAX) mem.delete(mem.keys().next().value); }
   function preTake(d) { var k = preKey(d), v = k && pre.cache.get(k); if (v) pre.cache.delete(k); return v || null; }
   async function stored(d) {
-    var hit = preTake(d); if (hit) return hit;
+    var hit = preTake(d); if (hit) { var p0 = await storeKey(d); if (p0) BCResults.save(p0, hit, {}).catch(function () { }); else remember(d, hit); return hit; }
+    var k = preKey(d); if (k && mem.has(k)) { var m = mem.get(k); mem.delete(k); mem.set(k, m); return m; }
     var p = await storeKey(d); return p ? BCResults.read(p) : null;
   }
   function prepareNext(s) {
@@ -857,7 +866,7 @@
       try {
         var d = await W().loadRow(i); if (!d || my !== st.token) return;
         d.tiles = W().tileSetting(i, d.ids[1]); d.quad = W().boxSetting(i, d.ids[0]);
-        var k = preKey(d); if (pre.cache.has(k)) return;
+        var k = preKey(d); if (pre.cache.has(k) || mem.has(k)) return;
         var p = await storeKey(d); if (p && await BCResults.has(p)) return;                       // stored already: nothing to prepare
         if (pre.e && pre.jobs >= MAX_JOBS) { try { pre.e.terminate(); } catch (x) { /* ignore */ } pre.e = null; }
         if (!pre.e) { pre.e = AlignEngine.create(); pre.ready = false; pre.jobs = 0; }
@@ -901,8 +910,9 @@
       if (my !== st.token) return null;
       setBusy('Aligning copy 2 onto copy 1 … (rough position, then the fine alignment in tiles; a few seconds)');
       g.jobs++;
-      var sk = await storeKey(d), r = await g.e.alignColor(d.files[1], d.tiles, !!sk);
+      var sk = await storeKey(d), r = await g.e.alignColor(d.files[1], d.tiles, true);
       if (sk && r.bin) BCResults.save(sk, r.bin, { u: r.unmatched_tiles, max: r.movement && r.movement.max, sparse: !!r.sparse }).catch(function () { });
+      else if (r.bin) remember(d, r.bin);
       r.bin = null;
       await loading;
       if (my !== st.token) return null;
@@ -1001,6 +1011,6 @@
     forget: forget,
     exampleAction: function (a) { exampleAction(a); },
     // the background alignment's notice (js/background-align.js): shown in the Compare tab too, over the picture (0.12.0)
-    bgSlot: function () { if (!ui) return null; var s = document.getElementById('ct_bgslot'); if (!s) { s = el('div', 'ct-bgslot'); s.id = 'ct_bgslot'; s.hidden = true; ui.view.appendChild(s); } return s; }
+    bgSlot: function () { if (!ui) return null; var s = document.getElementById('ct_bgslot'); if (!s) { s = el('div', 'ct-bgslot'); s.id = 'ct_bgslot'; s.hidden = true; ui.rc.appendChild(s); } return s; }
   };
 })();

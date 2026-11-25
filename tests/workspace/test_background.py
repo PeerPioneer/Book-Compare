@@ -193,14 +193,20 @@ def scenario(p, kind):
     if pg.get_attribute('#ct_alhead', 'aria-expanded') != 'true': pg.click('#ct_alhead'); pg.wait_for_timeout(150)      # the folded section "Alignment of this page"
     pg.select_option('#ct_c1', label='B-Test'); pg.wait_for_timeout(300); pg.select_option('#ct_c2', label='C-Test'); wait_aligned(pg, 'B against C')
     lt = pg.evaluate("CompareTab.lastTiles()"); assert not lt.get('stored'), 'B against C is not a pair with the reference: aligned directly'
+    # 0.14.0 (owner): every pair that has been aligned is kept in the project file, not only pairs with the reference; the next page,
+    # prepared meanwhile, too
+    def bc_entries(): return [e for e in index()['entries'].values() if e['c0'] == B and e['c1'] == C]
     for _ in range(240):
         pg.wait_for_timeout(500)
         pr = pg.evaluate("CompareTab.prepared()")
-        if pr['busy'] is None and pr['cached'] >= 1: break
-    assert pr['cached'] >= 1, ('the next page should have been prepared', pr)
+        if pr['busy'] is None and len(bc_entries()) >= 2: break
+    assert len(bc_entries()) == 2, ('B against C on this page and the next page prepared are stored', pr, len(bc_entries()))
     pg.click('#ct_next'); wait_aligned(pg, 'prepared page')
     lt = pg.evaluate("CompareTab.lastTiles()"); assert lt.get('stored') is True, ('the prepared page is shown without aligning', lt)
-    assert len(index()['entries']) == 4, 'pairs without the reference are not stored on disk'
+    pg.click('#ct_prev'); wait_aligned(pg, 'B against C, back to page 1')
+    lt = pg.evaluate("CompareTab.lastTiles()"); assert lt.get('stored') is True, ('going back: shown from the project file, not aligned again', lt)
+    NST = len(index()['entries']); assert NST == 6, NST
+    pg.click('#ct_next'); wait_aligned(pg, 'B against C, page 2 again')
     # a changed tile setting: the stored result no longer fits, the page is aligned again and stored anew
     pg.select_option('#ct_c1', label='A-Ref'); pg.wait_for_timeout(300); pg.select_option('#ct_c2', label='B-Test'); wait_aligned(pg, 'A against B, page 2')
     assert pg.evaluate("CompareTab.lastTiles()").get('stored') is True
@@ -209,19 +215,19 @@ def scenario(p, kind):
     def settings():
         for _ in range(40):
             v = [e['valid'].split('|')[-1] for e in index()['entries'].values()]
-            if len(v) == 4: return sorted(v)
+            if len(v) == NST: return sorted(v)
             time.sleep(0.25)
         return sorted(v)
     for _ in range(40):
-        if settings() == ['8x2', 'std', 'std', 'std']: break
+        if settings() == ['8x2'] + ['std'] * (NST - 1): break
         time.sleep(0.25)
-    assert settings() == ['8x2', 'std', 'std', 'std'], ('one file per pair of scans: it now holds the stiffer alignment', settings())
+    assert settings() == ['8x2'] + ['std'] * (NST - 1), ('one record per pair of scans: it now holds the stiffer alignment', settings())
     pg.click('#ct_tiles button[data-tp=std]'); wait_aligned(pg, 'standard again')
     assert not pg.evaluate("CompareTab.lastTiles()").get('stored'), 'back to the standard setting: aligned again'
     for _ in range(40):
-        if settings() == ['std'] * 4: break
+        if settings() == ['std'] * NST: break
         time.sleep(0.25)
-    assert settings() == ['std'] * 4, settings()
+    assert settings() == ['std'] * NST, settings()
     pg.click('#ct_prev'); wait_aligned(pg, 'page 1 again'); assert pg.evaluate("CompareTab.lastTiles()").get('stored') is True
     # --- the printed area (V2b): shown on the pictures, a corner dragged, aligned again at once, saved for the scan; back to automatic ---
     assert not pg.is_visible('#pane_main .ct-qbox')
@@ -256,12 +262,14 @@ def scenario(p, kind):
     # --- item 28: how much is stored, and removing what is no longer needed ------------------------------------------------------------
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(500)
     menu(pg, 'stored'); dlg = pg.inner_text('#ws-scrim')
-    assert '4 pages stored' in dlg and 'still needed' in dlg and 'MB' in dlg, dlg
+    n_all = len(index()['entries'])
+    assert ('%d pages stored' % n_all) in dlg and 'still needed' in dlg and 'MB' in dlg, dlg
     pg.click('#ws-scrim [data-close]')
     pg.locator('#ws .ws-cell[data-c="1"][data-r="1"]').click(); pg.click('#ws-toolbar [data-act=del]'); pg.wait_for_timeout(1500)    # p2 of B-Test leaves the grid
-    menu(pg, 'stored'); dlg = pg.inner_text('#ws-scrim'); assert '1 of them is no longer needed' in dlg, dlg
+    gone = 2                                                                                     # A against B and B against C on that page
+    menu(pg, 'stored'); dlg = pg.inner_text('#ws-scrim'); assert ('%d of them are no longer needed' % gone) in dlg, dlg
     pg.click('#st-prune'); pg.wait_for_timeout(800)
-    pk = pack(); assert len(pk['moves']) == 3 and len(pk['bins']) == 3, sorted(pk['moves'])
+    pk = pack(); assert len(pk['moves']) == n_all - gone and len(pk['bins']) == n_all - gone, sorted(pk['moves'])
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 
