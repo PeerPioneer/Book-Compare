@@ -1,6 +1,6 @@
 // Book Compare's service worker: keeps the website's files so that it also opens without a connection.
 // Change CACHE_NAME whenever a file listed here changes, so that the browsers load the new files.
-const CACHE_NAME = "imcomp-mdc-pwa-v33";
+const CACHE_NAME = "imcomp-mdc-pwa-v34";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -38,6 +38,11 @@ const staticAssets = [
     './fonts/material-icons.ttf',
     './images/examples/welcome-1.jpg',
     './images/examples/welcome-2.jpg',
+    './images/examples/bent-1.jpg',
+    './images/examples/bent-2.jpg',
+    './images/examples/book-1.jpg',
+    './images/examples/book-2.jpg',
+    './images/examples/book-3.jpg',
     './images/usecases/book/case2-traherne2-a-original.jpg',
     './images/usecases/book/case2-traherne2-b-original.jpg',
     './images/usecases/music/case5-music-sheet-1.jpg',

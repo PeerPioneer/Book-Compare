@@ -1076,7 +1076,7 @@
     return readProject({ dir: new HDir({ id: j.id, path: j.path, kind: j.kind }, '', j.name), file: j.file });
   }
   // another project replaces this one: a background alignment of this one stops, its stored results are written out
-  function projectChanging() { if (window.BCBackground) window.BCBackground.stop(true); if (window.BCResults) window.BCResults.reset(); }
+  function projectChanging() { if (window.BCBackground) window.BCBackground.stop(true); if (window.BCResults) window.BCResults.reset(); if (window.CompareTab && CompareTab.forget) CompareTab.forget(); }
   async function adopt(json, t) {
     if (!json || json.format !== 'book-compare-project' || !Array.isArray(json.copies)) { toast('This is not a Book Compare project file.'); return false; }
     projectChanging();
@@ -1323,7 +1323,7 @@
     bn.hidden = !lost.length || (!allow.length && !find.length);
     if (bn.hidden) return;
     var h = '';
-    if (allow.length) h += '<span>The browser locks your scans after a restart (<b>' + nameList(lost) + '</b>). Pictures you have seen before are still shown. When you compare two pages the browser asks for permission by itself; to see every page now, allow access here.</span><button class="ws-tb primary" data-act="allow">Allow access now</button>';
+    if (allow.length) h += '<span>The browser locks your scans after a restart (<b>' + nameList(lost) + '</b>). Pictures you have seen before are still shown. When you compare two pages the browser asks for permission by itself; to see every page now, allow access here. <i>Tip: choose “Allow on every visit” when Chrome or Edge asks, or install the website as an app (the symbol at the right of the address bar): then it does not ask again.</i></span><button class="ws-tb primary" data-act="allow">Allow access now</button>';
     if (find.length) h += '<span>' + (allow.length ? 'For some copies the folder is not known on this computer. ' : 'Book Compare cannot find the scans of <b>' + nameList(lost) + '</b> on this computer. ') + 'Choose the folder that holds them (one choice is enough for all copies inside it).</span><button class="ws-tb' + (allow.length ? '' : ' primary') + '" data-act="reconnect">Choose scan folder …</button>';
     else if (allow.length > 1) h += '<button class="ws-tb" data-act="reconnect" title="Pick the folder that holds all your copies once. After that a single permission is enough.">Choose one folder for all …</button>';
     bn.innerHTML = h;
@@ -2091,6 +2091,11 @@
     hasProjectFile: function () { return !!proj.target; },
     saveAs: function () { return saveProjectAs(); },
     goTo: goTo,
+    // the Compare tab at that page, with copy0 as copy 1 and copy1 as copy 2 (0.12.0: "Go to the page" of the background alignment's warning)
+    compareAt: function (copy0, copy1, row) {
+      if (!copyById(copy0) || !copyById(copy1) || row < 0 || row >= rows()) return;
+      S.pair = [copy0, copy1]; S.sel.row = row; touch(); compareNow();
+    },
     bgSlot: function () { return root ? $('#ws-bg') : null; },
     rowLabel: function (i) { return rowLabel(i); },
     toast: function (t) { toast(t); },
@@ -2402,24 +2407,29 @@
     var X = window.BCExamples; if (!X) return false;
     show();
     if (S && S.copies.length && !S.examples && !(await mayReplace())) return false;
-    var files = [{}, {}], keys = [[], []];
+    var nc = X.copies.length, files = [], cells = [];
+    for (var c0 = 0; c0 < nc; c0++) { files.push({}); cells.push([]); }
     try {
-      for (var i = 0; i < X.list.length; i++) for (var k = 0; k < 2; k++) {
-        var src = X.list[i].files[k], name = (i + 1) + ' ' + X.list[i].label + ' - ' + src.split('/').pop();
+      for (var i = 0; i < X.list.length; i++) for (var k = 0; k < nc; k++) {
+        var src = X.list[i].files[k];
+        if (!src) { cells[k].push(null); continue; }                                           // (a copy without this page)
+        var name = (i + 1) + ' ' + X.list[i].label + ' - ' + src.split('/').pop();
         var resp = await fetch(src); if (!resp.ok) throw new Error(src + ': ' + resp.status);
         var blob = await resp.blob();
-        files[k][name] = new File([blob], name, { type: blob.type || 'image/jpeg', lastModified: 0 }); keys[k].push(name);
+        files[k][name] = new File([blob], name, { type: blob.type || 'image/jpeg', lastModified: 0 }); cells[k].push(name);
       }
     } catch (e) { toast('The examples could not be loaded (' + ((e && e.message) || e) + ').'); return false; }
     projectChanging();
     S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null;
     S.examples = true; S.title = 'Examples'; S.projectId = 'examples';
-    for (var c = 0; c < 2; c++) {
+    for (var c = 0; c < nc; c++) {
       var r = newRoot(X.copies[c]); r.files = files[c];
-      var cp = { id: c + 1, name: X.copies[c], folder: r.name, w: 0, keys: keys[c].slice(), cells: keys[c].slice(), locs: [{ root: r.id, path: '' }] };
+      var keys = cells[c].filter(function (x) { return x; });
+      var cp = { id: c + 1, name: X.copies[c], folder: r.name, w: 0, keys: keys, cells: cells[c].slice(), locs: [{ root: r.id, path: '' }] };
       REG[cp.id] = cp; S.copies.push(cp);
     }
-    S.nextCopy = 3; X.list.forEach(function (e, j) { S.labels[String(j)] = e.label; });
+    S.nextCopy = nc + 1; X.list.forEach(function (e, j) { S.labels[String(j)] = e.label; });
+    S.flags = cleanFlags(X.flags || {}); S.annots = cleanAnnots(X.annotations || {}); S.nextAnn = maxAnnId() + 1;
     S.pair = [1, 2]; S.sel = { ci: 0, row: 0 };
     proj.target = null; proj.pack = null; proj.legacy = null; proj.state = 'none'; proj.name = 'Examples'; dirty = false;
     renderAll(); renderSave();

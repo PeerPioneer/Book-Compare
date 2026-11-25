@@ -57,18 +57,49 @@ def main():
             print('ok ', v, '(', vis, 'picture panel(s) )')
         pg.keyboard.press('1'); pg.wait_for_timeout(300)
 
-        # the other examples, one after the other with the card's button
+        # 0.13.0: the note stands in the left panel (it does not cover the picture)
+        assert pg.evaluate("document.getElementById('ct_excard').closest('.ct-side') !== null"), 'the note is in the left panel'
+        # the other examples, one after the other with the note's button, and the "Try it" of each
+        vname = lambda: pg.inner_text('#ct_vpill')
         for i in range(1, n):
             pg.click('#ct_excard [data-ex=next]'); wait_aligned(pg, 'example %d' % (i + 1))
             assert pg.evaluate("BookWorkspace.tab.state().row") == i and ('example %d of %d' % (i + 1, n)) in pg.inner_text('#ct_excard').lower()
             t = pg.evaluate("CompareTab.lastTiles()"); print('ok  example', i + 1, pg.evaluate("BCExamples.list[%d].label" % i), 'unmatched %.1f %%' % (100 * t['unmatched_tiles']))
             assert t['unmatched_tiles'] < 0.45, t
+            act = pg.evaluate("(BCExamples.list[%d].tryit || {}).act || ''" % i)
+            if act == 'toggle':
+                pg.click('#ct_excard [data-ex=try]'); pg.wait_for_timeout(500); assert 'Toggle' in vname(), vname()
+                pg.keyboard.press('1'); pg.wait_for_timeout(300)
+            elif act == 'movement':
+                pg.click('#ct_excard [data-ex=try]'); pg.wait_for_timeout(800)
+                assert pg.is_visible('#pane_main .ct-mv') and pg.is_checked('#ct_mv'), 'the movement map is shown'
+                pg.click('#ct_mv'); pg.wait_for_timeout(200)
+            elif act == 'sidebyside':
+                pg.click('#ct_excard [data-ex=try]'); pg.wait_for_timeout(900); assert 'Left and right' in vname(), vname()
+                pg.keyboard.press('1'); pg.wait_for_timeout(300)
+            elif act == 'rough':
+                assert t['unmatched_tiles'] < 0.05, ('the tiles follow the bent page', t)
+                pg.click('#ct_excard [data-ex=try]'); pg.wait_for_timeout(300)
+                pg.wait_for_function("!document.querySelector('.ct-busy').offsetParent", timeout=60000); pg.wait_for_timeout(300)
+                assert 'Back to the tile alignment' in pg.inner_text('#ct_excard [data-ex=try]'), pg.inner_text('#ct_excard')
+                pg.click('#ct_excard [data-ex=try]'); pg.wait_for_timeout(600)
+                assert 'whole-page step only' in pg.inner_text('#ct_excard [data-ex=try]')
         assert pg.locator('#ct_excard [data-ex=next]').count() == 0, 'the last example has no "Next"'
-        pg.click('#ct_excard [data-ex=close]'); pg.wait_for_timeout(200); assert not pg.is_visible('#ct_excard'), 'the card can be closed'
+        # the page list shows the flag and the annotation of the examples
+        assert pg.evaluate("BookWorkspace.tab.rowInfo(2).flag") == 2 and pg.evaluate("BookWorkspace.tab.rowInfo(3).ann") == 1
+        # the last one: the whole book in the Pages view (three copies; copy C has only the last page)
+        pg.click('#ct_excard [data-ex=try]'); pg.wait_for_timeout(800)
+        assert pg.is_visible('#ws') and pg.locator('#ws .ws-hname').count() == 3, 'the Pages view with three copies'
+        assert pg.locator('#ws .ws-cell.filled[data-c="2"]').count() == 1, 'copy C has one page'
+        pg.locator('#ws .ws-lbl[data-r="5"]').first.click(); pg.wait_for_timeout(300); pg.click('#ws-compare'); wait_aligned(pg, 'back in the Compare tab')
+        assert pg.is_visible('#ct_excard'), 'the note is still there after the Pages view'
+        pg.click('#ct_excard [data-ex=close]'); pg.wait_for_timeout(200); assert not pg.is_visible('#ct_excard'), 'the note can be closed'
 
         # "Start your own project": an empty project, nothing of the examples is left
         pg.click('#ct_prev'); wait_aligned(pg, 'back one'); pg.click('#ct_excard [data-ex=own]'); pg.wait_for_timeout(800)
         assert pg.is_visible('#ws') and pg.locator('#ws .ws-empty').count() == 1 and pg.locator('#ws .ws-hname').count() == 0, 'an empty new project'
+        # 0.13.0 (owner): the last picture of the examples is not shown again while the pages of the next project load
+        assert pg.evaluate("document.querySelector('div.result_container').classList.contains('ct-blank')"), 'the old picture is hidden'
         b.close()
     bad = [e for e in errs if 'favicon' not in e]
     assert not bad, 'script errors: ' + '; '.join(bad[:5])

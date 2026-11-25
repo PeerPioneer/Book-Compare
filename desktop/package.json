@@ -1,7 +1,7 @@
 {
   "name": "book-compare",
   "productName": "Book Compare",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Compare scans of copies of early printed books, page by page.",
   "author": "Torge Schiefelbein",
   "license": "BSD-2-Clause",
@@ -39,7 +39,7 @@
       }
     ],
     "publish": [
-      { "provider": "github", "owner": "PeerPioneer", "repo": "Book-Compare", "releaseType": "release" }
+      { "provider": "generic", "url": "https://raw.githubusercontent.com/PeerPioneer/Book-Compare/update/" }
     ],
     "fileAssociations": [
       {

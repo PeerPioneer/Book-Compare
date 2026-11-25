@@ -5,6 +5,7 @@ div.result_container.ct-on.ct-noside { --ct-side-w: 0px; }
 div.result_container.ct-on.ct-focus { --ct-top-h: 0px; --ct-side-w: 0px; }
 div.result_container.ct-on #workspace { top: var(--ct-top-h); left: var(--ct-side-w); }
 div.result_container.ct-on.ct-stale #workspace { opacity: .4; transition: opacity .15s; }
+div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
 .ct-leave[hidden], .ct-sideh[hidden], .ct-top[hidden], .ct-side[hidden], .ct-barleft[hidden], .ct-view[hidden], .ct-busy[hidden], .ct-spin[hidden], .ct-map[hidden], .ct-tip[hidden], .ct-flagpal[hidden], .ct-filters[hidden], .ct-fcols[hidden] { display: none !important; }
 .ct-top *, .ct-side *, .ct-barleft *, .ct-view *, .ct-busy *, .ct-map * { box-sizing: border-box; }
 
@@ -287,19 +288,31 @@ body.ct-active #compare_screen > footer #more { display: none !important; }
 .ct-psw { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 3px; }
 .ct-pnote { font-size: 12.5px; color: #5a6d6d; }
 
-/* the examples project (0.11.0): a card per example over the superimposed picture */
-.ct-excard { position: absolute; left: 12px; bottom: 34px; z-index: 6; box-sizing: border-box; width: min(400px, calc(100% - 70px)); padding: 14px 16px 12px; background: rgba(255, 255, 255, .97); color: #1b2a2a; border: 1px solid #bcd6d6; border-left: 4px solid #00807a; border-radius: 8px; box-shadow: 0 4px 18px rgba(0, 40, 40, .25); font-size: 13.5px; line-height: 1.45; }
+/* the examples project: the note of each example, in the left panel above the page list (0.13.0: it no longer covers the picture) */
+.ct-excard { position: relative; margin: 6px 12px 4px; box-sizing: border-box; padding: 12px 14px 10px; background: #f1f8f8; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; font-size: 13px; line-height: 1.45; }
 .ct-excard[hidden] { display: none; }
 .ct-excard * { box-sizing: border-box; }
-.ct-excard .k { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: #5a6d6d; }
-.ct-excard h4 { margin: 2px 0 6px; font-size: 16px; font-weight: 600; }
+.ct-excard .k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #5a6d6d; }
+.ct-excard h4 { margin: 2px 24px 6px 0; font-size: 15px; font-weight: 600; }
 .ct-excard p { margin: 0 0 8px; }
 .ct-excard .leg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12.5px; }
 .ct-excard .sq { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; }
-.ct-excard .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ct-excard .ct-extry { display: block; width: 100%; margin: 2px 0 8px; }
+.ct-excard .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .ct-excard small { display: block; margin-top: 8px; font-size: 11.5px; color: #6b7c7c; }
-.ct-excard .x { position: absolute; top: 6px; right: 8px; width: 26px; height: 26px; border: 0; background: none; font-size: 20px; line-height: 1; color: #5a6d6d; cursor: pointer; border-radius: 4px; }
-.ct-excard .x:hover { background: #e6f2f2; }
-div.result_container.ct-focus .ct-excard { display: none; }
+.ct-excard .x { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: 0; background: none; font-size: 20px; line-height: 1; color: #5a6d6d; cursor: pointer; border-radius: 4px; }
+.ct-excard .x:hover { background: #e0eeee; }
 .ct-btn.pri { background: #008080; color: #fff; }
 .ct-btn.pri:hover { background: #006a6a; }
+
+/* the background alignment in the Compare tab (0.12.0): its warning (and, smaller, how far it is) over the top of the picture */
+.ct-bgslot { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 8; box-sizing: border-box; max-width: min(760px, calc(100% - 80px)); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 40, 40, .2); font-size: 13px; line-height: 1.4; }
+.ct-bgslot[hidden] { display: none; }
+.ct-bgslot.warn { border-color: #e0a100; background: #fff8e6; }
+.ct-bgslot.small { padding: 4px 10px; font-size: 12px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0, 40, 40, .15); }
+.ct-bgslot span { flex: 1 1 260px; }
+.ct-bgslot.small span { flex: 0 1 auto; }
+.ct-bgslot button { font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 6px; border: 1px solid #9cc5c5; background: #fff; color: #00605c; cursor: pointer; }
+.ct-bgslot button:hover { background: #eef7f7; }
+.ct-bgslot .ws-bgbar { display: inline-block; width: 80px; height: 5px; border-radius: 3px; background: #e2eeee; overflow: hidden; vertical-align: middle; }
+.ct-bgslot .ws-bgbar i { display: block; height: 100%; background: #008080; }

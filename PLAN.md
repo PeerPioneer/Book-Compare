@@ -1108,9 +1108,23 @@ Built 25 Nov 2026 as **version 0.12.0** (details in CHANGELOG.txt).
 | N14 | Aligned / Original scan switch of the Copy 2 view in the teal bar | **done 0.12.0** |
 | N15 | Menu section headings more pronounced | **done 0.12.0** |
 | N16 | Orange dot on the pen button removed | **done 0.12.0** |
-| N17 | Grid marks: copy 1 green, copy 2 red? Since 0.11.0 they follow the Superimposed colours (blue / red by default) | **asked the owner** |
-| D1 | Redesign of the bottom bar: seven ideas (A-G), link button (four places), colours/Paper into the bar | **mock-ups made; waiting for the owner's choice** |
-| D2 | Examples: card covers the picture; show more of what Book Compare can do (views, grid, tile alignment) | **proposals given; waiting for the owner** |
+| N17 | Grid marks: copy 1 green, copy 2 red? Since 0.11.0 they follow the Superimposed colours (blue / red by default) | **settled (owner agreed 25 Nov)** |
+| D1 | Redesign of the bottom bar: seven ideas (A-G), link button (four places), colours/Paper into the bar | **owner chose F with changes, see 11.1f** |
+| D2 | Examples: card covers the picture; show more of what Book Compare can do (views, grid, tile alignment) | **done 0.13.0, see 11.1f** |
+
+### 11.1f The owner's notes of 25 November 2026 (on 0.12.0)
+
+Built 25 Nov 2026 as **version 0.13.0** (details in CHANGELOG.txt), except D1b.
+
+| ID | Item | Status |
+|----|------|--------|
+| W1 | Website: the browser asks for every folder at every visit. Opening the project file cannot give access to the folders (a browser grants access per folder, and only the user can). Ways out: Chrome / Edge "Allow on every visit", installing the website as an app, or keeping the copies under one parent folder (one question). Tip in the banner (0.12.0) | **answered** |
+| U3 | No .blockmap / latest.yml on the Releases page any more: only the installer. latest.yml lives on the branch "update" (the program reads it there); without the blockmap an update downloads the whole installer. 0.12.0 still looks on the Releases page, so 0.12.0 → 0.13.0 needs one download by hand | **done 0.13.0** |
+| N17 | Colours of the Pages view = Superimposed colours (blue / red by default) | **already so since 0.11.0** |
+| N18 | The "no partner" warning of the background alignment also in the Compare tab | **done 0.13.0** (since 0.12.0 in the code; tested now) |
+| N19 | After the examples, the next project showed the last example page while its own pages loaded: nothing is shown until the new pair is aligned | **done 0.13.0** |
+| D2 | Examples: welcome page kept; then Toggle, the movement map, side by side zoomed in, a bent page (whole-page step vs tiles), the whole book in the Pages view (three copies, a flag, an annotation); the note stands in the left panel with a "Try it" button | **done 0.13.0** |
+| D1b | Left panel as in idea F with the owner's changes: no teal bar; copies, View menu (radio buttons, the options of the chosen view unfold, one at a time; Superimposed: two-squares colour icon, Paper symbol; link at the bottom), Alignment, then the navigation (bigger, bold, smaller flag next to ›) | **detailed mock-up made; NOT to be built before the owner approves it** |
 
 ### 11.2 After version 1
 

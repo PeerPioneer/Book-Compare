@@ -117,13 +117,32 @@
     if (window.BCResults) BCResults.flush();
     if (!quiet) render(); else hideStrip();
   }
-  function hideStrip() { var t = T(), el = t && t.bgSlot(); if (el) { el.hidden = true; el.innerHTML = ''; } }
+  function hideStrip() { var t = T(), el = t && t.bgSlot(); if (el) { el.hidden = true; el.innerHTML = ''; } renderCompare(); }
+  // 0.12.0 (owner): the Compare tab, where one works most of the time, shows the warning too (with the same buttons; "Go to the page"
+  // opens that page there), and, small, how far the run is
+  function renderCompare() {
+    var cs = window.CompareTab && CompareTab.bgSlot ? CompareTab.bgSlot() : null; if (!cs) return;
+    if (!R || R.finished) { cs.hidden = true; cs.innerHTML = ''; return; }
+    var total = R.queue.length, through = R.done + R.skipped + R.failed.length, pct = total ? Math.round(100 * through / total) : 100;
+    if (R.warn) {
+      var w = R.warn, t = T();
+      cs.className = 'ct-bgslot warn';
+      cs.innerHTML = '<span><b>Background alignment paused:</b> on ' + esc(t.rowLabel(w.row)) + ', ' + Math.round(100 * w.share) + ' % of the ink of “' + esc(copyName(w.c)) + '” has no partner on “' + esc(copyName(w.ref)) + '”. The rows of the grid may be out of step there.</span>' +
+        '<button data-bg="goto">Go to the page</button><button data-bg="go">Continue</button><button data-bg="ignore">Do not ask again for “' + esc(copyName(w.c)) + '”</button><button data-bg="stop">Stop</button>';
+    } else {
+      cs.className = 'ct-bgslot small';
+      cs.innerHTML = '<span>' + (R.paused ? 'Background alignment paused' : 'Aligning in the background') + ' · ' + through + ' of ' + total + '</span><span class="ws-bgbar" title="' + pct + ' %"><i style="width:' + pct + '%"></i></span>' +
+        (R.paused ? '<button data-bg="go">Continue</button>' : '<button data-bg="pause">Pause</button>');
+    }
+    cs.hidden = false;
+    if (!cs.__bc) { cs.__bc = true; cs.addEventListener('click', onClick); }
+  }
 
   /* ---------------------------------------------------------------- the strip in the Pages view */
   function minutes(s) { return s < 90 ? 'about a minute' : s < 3600 ? 'about ' + Math.round(s / 60) + ' minutes' : 'about ' + (s / 3600).toFixed(1).replace('.0', '') + ' hours'; }
   function render() {
-    var t = T(), el = t && t.bgSlot(); if (!el) return;
-    if (!R) { el.hidden = true; el.innerHTML = ''; return; }
+    var t = T(), el = t && t.bgSlot(); if (!el) { renderCompare(); return; }
+    if (!R) { el.hidden = true; el.innerHTML = ''; renderCompare(); return; }
     var total = R.queue.length, through = R.done + R.skipped + R.failed.length, h = '', who = R.ids.length === 1 ? '“' + esc(copyName(R.ids[0])) + '”' : R.ids.length + ' copies';
     var pct = total ? Math.round(100 * through / total) : 100;
     el.className = 'ws-banner ws-bg' + (R.warn ? ' warn' : '');
@@ -146,6 +165,7 @@
     }
     el.innerHTML = h; el.hidden = false;
     if (!el.__bc) { el.__bc = true; el.addEventListener('click', onClick); }
+    renderCompare();
   }
   // A run that did not finish (the program was closed meanwhile): when the project is opened again, offer to go on (item 21)
   var offered = null;
@@ -169,7 +189,7 @@
     if (!R) return;
     if (a === 'pause') { R.paused = true; render(); }
     else if (a === 'go' || a === 'ignore') { if (a === 'ignore' && R.warn) R.ignore[R.warn.c] = true; R.warn = null; R.paused = false; render(); pump(); }
-    else if (a === 'goto' && R.warn) t.goTo(R.warn.c, R.warn.row);
+    else if (a === 'goto' && R.warn) { if (window.CompareTab && CompareTab.isOpen() && t.compareAt) t.compareAt(R.warn.ref, R.warn.c, R.warn.row); else t.goTo(R.warn.c, R.warn.row); }
     else if (a === 'stop') { var r = R; stop(true); if (t.setBgRun) t.setBgRun(null); t.toast('Background alignment stopped: ' + r.done + ' page' + (r.done === 1 ? '' : 's') + ' aligned and kept. Starting it again goes on where it stopped.'); }
     else if (a === 'close') { R = null; render(); }
     else if (a === 'details') {

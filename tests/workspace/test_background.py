@@ -138,6 +138,9 @@ def scenario(p, kind):
     if os.environ.get('BOOKCOMPARE_SHOTS'): pg.wait_for_timeout(3000); pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-strip.png'))
     t = wait_strip(pg, ['Paused:', 'finished'])
     assert 'Paused:' in t and 'has no partner' in t and 'C-Test' in t, t
+    # 0.13.0 (owner): the Compare tab shows the same warning, with the same buttons
+    cw = pg.evaluate("(() => { const s = document.getElementById('ct_bgslot'); return s ? [s.className, s.textContent, s.querySelectorAll('[data-bg]').length] : null; })()")
+    assert cw and 'warn' in cw[0] and 'has no partner' in cw[1] and 'C-Test' in cw[1] and cw[2] == 4, cw
     if os.environ.get('BOOKCOMPARE_SHOTS'): pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-paused.png'))
     pg.click('#ws-bg [data-bg=goto]'); pg.wait_for_timeout(500)
     sel = pg.evaluate("[document.querySelector('#ws .ws-cell.sel') && document.querySelector('#ws .ws-cell.sel').dataset.c, document.querySelector('#ws .ws-cell.sel') && document.querySelector('#ws .ws-cell.sel').dataset.r]")

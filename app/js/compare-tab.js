@@ -479,32 +479,48 @@
 
   /* ---------------------------------------------------------------- the examples project (0.11.0, js/examples.js): a card per example */
   var exHidden = {};
+  // 0.13.0: the note stands in the left panel (above the page list), so that it never covers the picture; it has one "Try it" button
   function renderExCard() {
-    var pane = document.getElementById('pane_main'); if (!pane) return;
     var card = document.getElementById('ct_excard');
     var X = window.BCExamples, s = st.on && W().examples() ? W().state() : null, ex = s && X && X.list[s.row];
     if (!ex || exHidden[s.row]) { if (card) card.hidden = true; return; }
     if (!card) {
       card = el('div', 'ct-excard'); card.id = 'ct_excard'; card.setAttribute('role', 'note');
-      pane.appendChild(card);
+      var lh = ui.side.querySelector('.ct-listhead'); ui.side.insertBefore(card, lh);
       card.addEventListener('click', function (e) {
         var b = e.target.closest('button[data-ex]'); if (!b) return;
         var a = b.dataset.ex;
         if (a === 'close') { exHidden[W().state().row] = true; renderExCard(); }
         else if (a === 'next') stepPage(1);
         else if (a === 'own') { toPages(); BookWorkspace.startAction('new'); }
+        else if (a === 'try') exampleAction(b.dataset.act);
       });
     }
-    var n = X.list.length, last = s.row >= n - 1;
+    var n = X.list.length, last = s.row >= n - 1, t = ex.tryit;
     var sq = function (c) { return '<span class="sq" style="background:' + c + '"></span>'; };
     card.innerHTML = '<button class="x" data-ex="close" aria-label="Close this note" title="Close this note">&times;</button>' +
       '<div class="k">Example ' + (s.row + 1) + ' of ' + n + '</div><h4>' + esc(ex.title) + '</h4><p>' + esc(ex.text) + '</p>' +
       (ex.welcome ? '<p class="leg">' + sq(DIFF_COLOR_1) + ' only in copy A &nbsp; ' + sq(DIFF_COLOR_2) + ' only in copy B &nbsp; ' + sq('#2a1a24') + ' in both</p>' +
         '<p>Page Down (or the arrow at the bottom) goes to the next example. The “?” at the top explains the rest.</p>' : '') +
-      '<div class="acts">' + (last ? '' : '<button class="ct-btn pri" data-ex="next">Next example &#8250;</button>') +
-      '<button class="ct-btn' + (last ? ' pri' : '') + '" data-ex="own">Start your own project</button></div>' +
+      (t ? '<button class="ct-btn pri ct-extry" data-ex="try" data-act="' + esc(t.act) + '">' + esc(t.act === 'rough' && st.roughOn && t.back ? t.back : t.label) + '</button>' : '') +
+      '<div class="acts">' + (last ? '' : '<button class="ct-btn' + (t ? '' : ' pri') + '" data-ex="next">Next example &#8250;</button>') +
+      '<button class="ct-btn" data-ex="own">Start your own project</button></div>' +
       (ex.welcome ? '<small>' + esc(X.credit) + '</small>' : '');
     card.hidden = false;
+  }
+  // the "Try it" of an example (js/examples.js): it shows one ability on the page on screen
+  function exampleAction(act) {
+    if (act === 'toggle') setView(1);
+    else if (act === 'movement') { setView(0); if ($('ct_albody').hidden) $('ct_alhead').click(); st.mvOn = true; $('ct_mv').checked = true; drawMovement(); var hb = $('ct_hintshow'); if (hb) { hb.textContent = 'Hide'; hb.setAttribute('aria-pressed', 'true'); } }
+    else if (act === 'sidebyside') {
+      setView(3);
+      setTimeout(function () {
+        var zb = [].filter.call(document.querySelectorAll('#compare_container .pane__btn[title="Zoom in"]'), function (b) { return b.offsetParent; })[0];
+        if (zb) { zb.click(); zb.click(); }
+      }, 250);
+    }
+    else if (act === 'rough') { setView(0); showRough(!st.roughOn).then(renderExCard); renderExCard(); }
+    else if (act === 'pages') toPages();
   }
 
   /* ---------------------------------------------------------------- flags */
@@ -622,7 +638,9 @@
     (acts || []).forEach(function (x) { var b = el('button', 'ct-btn', esc(x[0])); b.onclick = x[1]; a.appendChild(b); });
   }
   function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (window.CompareBox) CompareBox.refresh(); if (ui.busy.classList.contains('bad')) setBusy(null); if (ui.mv) ui.mv.hidden = true; var h = document.getElementById('ct_hint'); if (h) h.hidden = true; var w = document.getElementById('ct_warn'); if (w) w.hidden = true; }   // a new wish makes an old message obsolete
-  function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale'); }
+  function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale', 'ct-blank'); }
+  // another project (0.12.0, owner): the pictures of the old one are not shown, not even dimmed, until the first page of the new one is ready
+  function forget() { st.shown = null; st.lastTiles = null; if (ui) ui.rc.classList.add('ct-blank'); }
 
 
   /* ---------------------------------------------------------------- the view switcher (middle of the bar) */
@@ -979,6 +997,10 @@
     toast: function (t) { if (ui) toast(t); },
     preload: function () { try { preload(); } catch (e) { /* not important */ } },
     titleChanged: function () { if (ui) renderTitle(); },
-    saveChanged: function () { if (ui) renderSaveChip(); }
+    saveChanged: function () { if (ui) renderSaveChip(); },
+    forget: forget,
+    exampleAction: function (a) { exampleAction(a); },
+    // the background alignment's notice (js/background-align.js): shown in the Compare tab too, over the picture (0.12.0)
+    bgSlot: function () { if (!ui) return null; var s = document.getElementById('ct_bgslot'); if (!s) { s = el('div', 'ct-bgslot'); s.id = 'ct_bgslot'; s.hidden = true; ui.view.appendChild(s); } return s; }
   };
 })();
