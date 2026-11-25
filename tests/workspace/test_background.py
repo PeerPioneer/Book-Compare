@@ -16,6 +16,7 @@ Run:  python3 tests/workspace/test_background.py   (needs Node)
 """
 import hashlib, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import common
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -81,7 +82,8 @@ def add_copy(pg, folder, name):
     pg.click('#ac-folder'); pg.wait_for_timeout(900)
     pg.fill('#ac-name', name); pg.click('#ac-ok'); pg.wait_for_timeout(800)
 def menu(pg, m): pg.click('#ws-more'); pg.click('[data-m=%s]' % m); pg.wait_for_timeout(500)
-def project(): return json.load(open(os.path.join(PROJ, 'Test book.bookcompare'), encoding='utf-8'))
+def pack(): return common.read_pack(os.path.join(PROJ, 'Test book.bookcompare'))     # 0.12.0: the stored alignments are inside the project file
+def project(): return pack()['project']
 def strip(pg): return pg.inner_text('#ws-bg') if pg.is_visible('#ws-bg') else ''
 def wait_strip(pg, words, secs=240):
     for _ in range(secs * 2):
@@ -95,14 +97,14 @@ def wait_aligned(pg, why, secs=120):
         if pg.evaluate("!document.querySelector('.ct-busy').offsetParent && !document.querySelector('div.result_container').classList.contains('ct-stale')"): return
         if pg.locator('.ct-busy.bad:visible').count(): raise AssertionError(why + ': ' + pg.inner_text('.ct-busy'))
     raise AssertionError(why + ': the alignment did not finish. ' + pg.inner_text('.ct-busy'))
-def index(): return json.load(open(os.path.join(RES, 'index.json'), encoding='utf-8'))
+def index(): return {'entries': pack()['moves']}
 def wait_index(n, secs=20):
     for _ in range(secs * 4):
         try:
             if len(index()['entries']) >= n: return index()
         except Exception: pass
         time.sleep(0.25)
-    raise AssertionError('index.json did not get %d entries: %s' % (n, os.listdir(RES) if os.path.isdir(RES) else 'no folder'))
+    raise AssertionError('the project file did not get %d stored alignments' % n)
 
 def scenario(p, kind):
     shutil.rmtree(RES, ignore_errors=True)
@@ -144,11 +146,11 @@ def scenario(p, kind):
     t = wait_strip(pg, ['finished'])
     assert '4 pages aligned' in t, t
     idx = wait_index(4)
-    names = sorted(f for f in os.listdir(RES) if f.endswith('.bin'))
-    assert len(names) == 4 and sorted(idx['entries']) == names, (names, sorted(idx['entries']))
+    names = sorted(pack()['bins'])
+    assert len(names) == 4 and sorted(idx['entries']) == names and not os.path.exists(RES), (names, sorted(idx['entries']), 'no results folder any more')
     assert all(e['c0'] == A and e['c1'] in (B, C) for e in idx['entries'].values()), idx['entries']
     assert max(e['u'] for e in idx['entries'].values() if e['c1'] == C) > 0.3, 'the mismatched page is stored with its share of ink without partner'
-    sizes = [os.path.getsize(os.path.join(RES, n)) for n in names]; assert all(5000 < s < 3000000 for s in sizes), sizes
+    sizes = list(pack()['bins'].values()); assert all(5000 < s < 3000000 for s in sizes), sizes
     pg.click('#ws-bg [data-bg=close]'); pg.wait_for_timeout(200); assert not pg.is_visible('#ws-bg')
     # started again: everything is stored already
     menu(pg, 'bg'); pg.click('#bg-go'); t = wait_strip(pg, ['finished'], 60)
@@ -256,7 +258,7 @@ def scenario(p, kind):
     pg.locator('#ws .ws-cell[data-c="1"][data-r="1"]').click(); pg.click('#ws-toolbar [data-act=del]'); pg.wait_for_timeout(1500)    # p2 of B-Test leaves the grid
     menu(pg, 'stored'); dlg = pg.inner_text('#ws-scrim'); assert '1 of them is no longer needed' in dlg, dlg
     pg.click('#st-prune'); pg.wait_for_timeout(800)
-    assert len(index()['entries']) == 3 and len([f for f in os.listdir(RES) if f.endswith('.bin')]) == 3, os.listdir(RES)
+    pk = pack(); assert len(pk['moves']) == 3 and len(pk['bins']) == 3, sorted(pk['moves'])
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

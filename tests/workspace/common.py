@@ -120,12 +120,38 @@ def setup3(p):
 def lock(pg, *names): pg.evaluate("n=>{window.__locked=new Set(n); window.__prompts=[];}", list(names))
 def prompts(pg): return pg.evaluate("window.__prompts")
 def hid(pg, sel): return pg.evaluate("s=>document.querySelector(s).hidden", sel)
+# 0.12.0: a .bookcompare file is a log of records (app/js/project-pack.js); the project is the last PROJ record. Files of older versions: JSON.
+PACK_JS = """async (f) => { const b = new Uint8Array(await f.arrayBuffer()), M = [0x89,0x42,0x43,0x50,0x0d,0x0a,0x1a,0x0a];
+  if (!M.every((v, i) => b[i] === v)) return new TextDecoder().decode(b);
+  let off = 8, last = null; const v = new DataView(b.buffer);
+  while (off + 12 <= b.length) { const k = String.fromCharCode(b[off], b[off+1], b[off+2], b[off+3]), n = v.getUint32(off + 4, true);
+    if (off + 12 + n > b.length) break; if (k === 'PROJ') last = [off + 12, n]; off += 12 + n; }
+  return new TextDecoder().decode(b.subarray(last[0], last[0] + last[1])); }"""
 def read_project(pg, which='proj'):
     # the project file in that folder: <name>.bookcompare (or, if there is none, the project file of an older version)
     import json as _j
-    return _j.loads(pg.evaluate("""async(w)=>{ let leg = null; for await (const [n, h] of __h[w].entries()) { if (h.kind !== 'file') continue;
-      if (/\\.bookcompare$/i.test(n)) return await (await h.getFile()).text(); if (n === 'book-compare-project.json') leg = h; }
+    return _j.loads(pg.evaluate("""async(w)=>{ const rd = """ + PACK_JS + """; let leg = null; for await (const [n, h] of __h[w].entries()) { if (h.kind !== 'file') continue;
+      if (/\\.bookcompare$/i.test(n)) return await rd(await h.getFile()); if (n === 'book-compare-project.json') leg = h; }
       return await (await leg.getFile()).text(); }""", which))
+def read_pack(path):
+    """A project file on disk: {'project': dict, 'moves': {name: meta}, 'bins': {name: length}, 'size': bytes, 'pack': True/False}."""
+    import json as _j, struct, zlib
+    b = open(path, 'rb').read()
+    if b[:8] != bytes([0x89, 0x42, 0x43, 0x50, 0x0d, 0x0a, 0x1a, 0x0a]):
+        return {'project': _j.loads(b.decode('utf-8-sig')), 'moves': {}, 'bins': {}, 'size': len(b), 'pack': False}
+    off, proj, moves, bins = 8, None, {}, {}
+    while off + 12 <= len(b):
+        k = b[off:off + 4].decode('ascii', 'replace'); n, crc = struct.unpack_from('<II', b, off + 4); c = b[off + 12:off + 12 + n]
+        if len(c) < n: break
+        if zlib.crc32(c) & 0xffffffff == crc:
+            if k == 'PROJ': proj = _j.loads(c.decode('utf-8'))
+            elif k == 'MOVE':
+                nl = struct.unpack_from('<H', c, 0)[0]; name = c[2:2 + nl].decode('utf-8'); ml = struct.unpack_from('<I', c, 2 + nl)[0]
+                moves[name] = _j.loads(c[6 + nl:6 + nl + ml].decode('utf-8')); bins[name] = n - 6 - nl - ml
+            elif k == 'DROP':
+                for name in _j.loads(c.decode('utf-8')): moves.pop(name, None); bins.pop(name, None)
+        off += 12 + n
+    return {'project': proj, 'moves': moves, 'bins': bins, 'size': len(b), 'pack': True}
 def project_files(pg, which='proj'):
     return pg.evaluate("async(w)=>{const o=[]; for await (const [n, h] of __h[w].entries()) o.push(n); return o.sort();}", which)
 def reopen(ctx, url=URL):

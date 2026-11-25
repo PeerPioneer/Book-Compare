@@ -262,8 +262,20 @@ function createServer(opts) {
       else if (!isImage(full)) return err(res, 403, 'refused', 'Only pictures can be read.');
       let st; try { st = fs.statSync(full); } catch (e) { st = null; }
       if (!st || !st.isFile()) return err(res, 404, 'not-found', 'File not found.');
-      const head = { 'Content-Type': TYPES[path.extname(full).toLowerCase()] || 'application/octet-stream', 'Content-Length': st.size, 'Cache-Control': 'no-store', 'X-Mtime-Ms': String(Math.round(st.mtimeMs)) };
+      const head = { 'Content-Type': TYPES[path.extname(full).toLowerCase()] || 'application/octet-stream', 'Content-Length': st.size, 'Cache-Control': 'no-store', 'X-Mtime-Ms': String(Math.round(st.mtimeMs)), 'X-Size': String(st.size) };
       if (m === 'HEAD') { res.writeHead(200, head); return res.end(); }
+      // a part of the project file (0.12.0: the project file holds the stored alignments too, app/js/project-pack.js): "Range: bytes=a-b"
+      const rg = /^bytes=(\d+)-(\d+)$/.exec(req.headers.range || '');
+      if (rg && r.kind === 'project') {
+        const a = +rg[1], b = Math.min(+rg[2], st.size - 1);
+        if (a > b) { res.writeHead(416, { 'Content-Range': 'bytes */' + st.size }); return res.end(); }
+        let fd2; try { fd2 = fs.openSync(full, 'r'); } catch (e) { return err(res, 423, 'busy', 'Another program is using this file right now.'); }
+        res.writeHead(206, Object.assign(head, { 'Content-Length': b - a + 1, 'Content-Range': 'bytes ' + a + '-' + b + '/' + st.size }));
+        const s2 = fs.createReadStream(null, { fd: fd2, start: a, end: b, highWaterMark: 1 << 20 });
+        s2.on('error', e => { log('file interrupted: ' + e.message); res.destroy(); });
+        s2.pipe(res);
+        return;
+      }
       // the file is opened BEFORE the answer starts: if another program holds it, the page gets a clear "busy" answer
       let fd;
       try { fd = fs.openSync(full, 'r'); } catch (e) { log('file busy: ' + path.basename(full) + ': ' + e.message); return err(res, 423, 'busy', 'Another program is using this file right now.'); }
@@ -275,11 +287,68 @@ function createServer(opts) {
     }
     if (p === '/api/remove') {                                   // item 28: a stored alignment that is no longer needed (nothing else can be removed)
       if (m !== 'POST') return err(res, 405, 'method');
-      if (r.kind !== 'project' || part !== 'results' || !/^m-[0-9a-f]{16}\.bin$/.test(path.basename(full))) return err(res, 403, 'refused', 'Only stored alignments can be removed.');
+      if (r.kind !== 'project' || part !== 'results') return err(res, 403, 'refused', 'Only stored alignments can be removed.');
+      // 0.12.0: the results folder of an older version, once its contents are in the project file: its index, then the folder when empty
+      if (rel.replace(/^\/+|\/+$/g, '').split('/').length === 1) {
+        try { fs.rmdirSync(full); } catch (e) { if (e.code !== 'ENOENT') return err(res, 409, 'not-empty', 'The folder is not empty.'); }
+        return json(res, 200, { ok: true });
+      }
+      if (!/^m-[0-9a-f]{16}\.bin$/.test(path.basename(full)) && path.basename(full) !== 'index.json') return err(res, 403, 'refused', 'Only stored alignments can be removed.');
       try { fs.unlinkSync(full); } catch (e) { if (e.code !== 'ENOENT') return err(res, 500, 'remove', 'Could not remove it.'); }
       return json(res, 200, { ok: true });
     }
-    if (p === '/api/write') {                                    // the ONLY things this program writes: the project file and its results folder
+    // 0.12.0: the project file is a log that grows at its end (app/js/project-pack.js). "at" is where the page expects the end: a
+    // longer file (a record cut off by a crash) is cut there first; a shorter one was changed by someone else: refused.
+    if (p === '/api/append') {
+      if (m !== 'POST') return err(res, 405, 'method');
+      if (r.kind !== 'project' || part !== 'file') return err(res, 403, 'refused', 'Only the project file can be written.');
+      const at = parseInt(url.searchParams.get('at'), 10);
+      if (!(at >= 8)) return err(res, 400, 'bad-request', 'Where?');
+      let bytes; try { bytes = await readBody(req, 128 * 1024 * 1024); } catch (e) { return err(res, 413, 'too-large', 'Too large.'); }
+      let fd;
+      for (let i = 0; ; i++) {
+        try { fd = fs.openSync(full, 'r+'); break; }
+        catch (e) {
+          if (e.code === 'ENOENT') return err(res, 404, 'not-found', 'The project file is gone.');
+          if (i >= 20) { log('append: ' + e.message); return err(res, 423, 'busy', 'Another program is using the project file right now.'); }
+          await new Promise(r2 => setTimeout(r2, 100));
+        }
+      }
+      try {
+        const size = fs.fstatSync(fd).size;
+        if (size < at) return err(res, 409, 'changed', 'The project file was changed by another program. Please open it again.');
+        if (size > at) fs.ftruncateSync(fd, at);
+        let done = 0; while (done < bytes.length) done += fs.writeSync(fd, bytes, done, bytes.length - done, at + done);
+        fs.fsyncSync(fd);
+      } catch (e) { log('append: ' + e.message); return err(res, 500, 'write', 'The project file could not be written.'); }
+      finally { try { fs.closeSync(fd); } catch (e) { /* closed */ } }
+      return json(res, 200, { ok: true, size: at + bytes.length });
+    }
+    // tidying up: a new file of the first "prefix" bytes and the given parts of the old one, then it replaces the old file in one step
+    if (p === '/api/compact') {
+      if (m !== 'POST') return err(res, 405, 'method');
+      if (r.kind !== 'project' || part !== 'file') return err(res, 403, 'refused', 'Only the project file can be written.');
+      let body; try { body = JSON.parse((await readBody(req, 16 * 1024 * 1024)).toString('utf8')); } catch (e) { body = null; }
+      const ranges = body && Array.isArray(body.ranges) ? body.ranges : null, prefix = body ? +body.prefix : 0;
+      let st2; try { st2 = fs.statSync(full); } catch (e) { st2 = null; }
+      if (!ranges || !st2 || !(prefix >= 0 && prefix <= st2.size) || ranges.some(q => !Array.isArray(q) || !(q[0] >= 0) || !(q[1] >= 0) || q[0] + q[1] > st2.size))
+        return err(res, 400, 'bad-request', 'Bad parts.');
+      const tmp = full + '.tmp';
+      try {
+        const src = fs.openSync(full, 'r'), dst = fs.openSync(tmp, 'w'), buf = Buffer.alloc(1 << 20);
+        try {
+          const copy = (a, n) => { while (n > 0) { const k = fs.readSync(src, buf, 0, Math.min(n, buf.length), a); if (k <= 0) throw new Error('short read'); fs.writeSync(dst, buf, 0, k); a += k; n -= k; } };
+          copy(0, prefix); ranges.forEach(q => copy(q[0], q[1]));
+          fs.fsyncSync(dst);
+        } finally { fs.closeSync(src); fs.closeSync(dst); }
+      } catch (e) { try { fs.unlinkSync(tmp); } catch (e2) { /* none */ } log('compact: ' + e.message); return err(res, 500, 'write', 'The project file could not be tidied up.'); }
+      for (let i = 0; ; i++) {
+        try { fs.renameSync(tmp, full); break; }
+        catch (e) { if (i >= 20) { log('compact: ' + e.message); try { fs.unlinkSync(tmp); } catch (e2) { /* none */ } return err(res, 423, 'busy', 'Another program is using the project file right now.'); } await new Promise(r2 => setTimeout(r2, 100)); }
+      }
+      return json(res, 200, { ok: true, size: fs.statSync(full).size });
+    }
+    if (p === '/api/write') {                                    // the ONLY things this program writes: the project file (and, until 0.11.0, its results folder)
       if (m !== 'PUT') return err(res, 405, 'method');
       if (r.kind !== 'project' || (part !== 'file' && part !== 'results') || rel.replace(/^\/+|\/+$/g, '').split('/').length < (part === 'results' ? 2 : 1))
         return err(res, 403, 'refused', 'Only the project file and its results can be written.');

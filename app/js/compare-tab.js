@@ -206,8 +206,8 @@
       var b = e.target.closest('button[data-tp]'); if (!b) return;
       setTiles(PRESETS[b.dataset.tp]);
     };
-    $('ct_mv').onchange = function () { st.mvOn = this.checked; drawMovement(); };
-    $('ct_tadvbtn').onclick = function () { var a = $('ct_tadv'); a.hidden = !a.hidden; this.setAttribute('aria-expanded', String(!a.hidden)); };
+    $('ct_mv').onchange = function () { st.mvOn = this.checked; drawMovement(); var hb = $('ct_hintshow'); if (hb) { hb.textContent = st.mvOn ? 'Hide' : 'Show'; hb.setAttribute('aria-pressed', String(st.mvOn)); } };
+    $('ct_tadvbtn').onclick = function () { var a = $('ct_tadv'); a.hidden = !a.hidden; this.setAttribute('aria-expanded', String(!a.hidden)); this.textContent = a.hidden ? 'Advanced …' : '▴ Hide advanced'; };
     $('ct_tapply').onclick = function () {
       var m = Math.round(+$('ct_tmain').value), u = Math.round(+$('ct_tsub').value);
       if (!(m >= 4 && m <= 16 && u >= 1 && u <= 4)) { $('ct_tnote').textContent = 'Main tiles: 4 to 16; sub-tiles: 1 to 4.'; return; }
@@ -447,8 +447,11 @@
     if (!m || !m.hint || st.transform !== 'tiles') { h.hidden = true; return; }
     h.hidden = false;
     h.title = 'Part of this page was moved by about ' + m.hint.px + ' px by the fine alignment, with a sharp edge: a line or block may have been re-set or shifted here.';
-    h.innerHTML = '<b>Shifted block, about ' + m.hint.px + ' px</b> <button class="ct-hintbtn" id="ct_hintshow">Show</button>';
-    $('ct_hintshow').onclick = function () { $('ct_mv').checked = true; st.mvOn = true; drawMovement(); };
+    h.innerHTML = '<b>Shifted block, about ' + m.hint.px + ' px</b> <button class="ct-hintbtn" id="ct_hintshow" aria-pressed="' + !!st.mvOn + '">' + (st.mvOn ? 'Hide' : 'Show') + '</button>';
+    $('ct_hintshow').onclick = function () {                                     // (0.12.0: shows and hides the movement map)
+      st.mvOn = !st.mvOn; $('ct_mv').checked = st.mvOn; drawMovement();
+      this.textContent = st.mvOn ? 'Hide' : 'Show'; this.setAttribute('aria-pressed', String(st.mvOn));
+    };
   }
   // the rough view: copy 2 placed by the whole-page step only; switching back shows the fine result again (kept, not computed again)
   async function showRough(on) {
@@ -624,7 +627,7 @@
 
   /* ---------------------------------------------------------------- the view switcher (middle of the bar) */
   var VIEWS = [['diff', 'Superimposed'], ['toggle', 'Toggle'], ['topbottom', 'Top and bottom'], ['leftright', 'Left and right'], ['onlyimage1', 'Copy 1'], ['onlyimage2', 'Copy 2']];
-  var vt = { open: 0, close: 0 };
+  var vt = { open: 0, close: 0, w: 0 };
   function viewIndex() { var m = E && E.action_bar ? E.action_bar.MODE : 'diff'; for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i][0] === m) return i; return 0; }
   function copyName(slot) {
     var s = W().state(), n = '';
@@ -644,31 +647,43 @@
     });
     ui.vpop.innerHTML = h;
   }
+  // The view switcher (0.12.0, owner): resting on the bubble (or a click) lets it grow smoothly to the right and shows the six views
+  // in it; what stands to its right in the bar (the options of the view, Linked) slides along. The bar keeps its colour. Only where
+  // the bar has no room for that (a narrow window) do the six names open in a list above the bubble.
   function openView() {
     clearTimeout(vt.close); clearTimeout(vt.open);
     if (!ui.vpop.hidden) return;
     closePalette();
-    var bar = ui.tealbar, lk = document.getElementById('link_toggle');
-    var left = ui.bar.offsetLeft + ui.bar.offsetWidth + 10;                                  // the free middle of the bar lies between the left part ...
-    var right = (lk && lk.offsetParent ? lk.offsetLeft : bar.clientWidth - 100) - 10;         // ... and the symbols on the right
-    ui.vpop.hidden = false; ui.vpop.classList.remove('col'); ui.vpop.style.cssText = '';
-    // the six names in one row, over the middle of the bar, if they fit there; else one under the other above the view name
-    var free = right - left;
-    ui.vpop.style.left = left + 'px'; ui.vpop.style.right = (bar.clientWidth - right) + 'px';
-    var need = 0; [].forEach.call(ui.vpop.children, function (b) { need += b.offsetWidth + 2; });
-    if (need + 24 > free) {
-      ui.vpop.classList.add('col'); ui.vpop.style.cssText = '';
-      var pr = ui.vpill.getBoundingClientRect(), br = bar.getBoundingClientRect();
-      var cx = pr.left + pr.width / 2 - br.left, w = ui.vpop.offsetWidth;
-      ui.vpop.style.left = Math.max(6, Math.min(bar.clientWidth - w - 6, cx - w / 2)) + 'px';
+    var bar = ui.tealbar;
+    ui.vpop.classList.remove('col'); ui.vpop.style.cssText = ''; ui.vpill.style.width = '';
+    ui.vpop.hidden = false;                                                                   // (laid out, but not visible yet: see .ct-vpop)
+    var pw = ui.vpill.offsetWidth, rw = ui.vpop.offsetWidth;
+    // room: from the bubble to the right end of the bar, less what stands to the right of the bubble
+    var br = bar.getBoundingClientRect(), pr = ui.vpill.getBoundingClientRect(), after = 0;
+    [].forEach.call(bar.children, function (c) { if (c !== ui.view && c.offsetParent && c.getBoundingClientRect().left >= pr.right - 1) after += c.offsetWidth + 8; });
+    if (pr.left + rw + after + 14 > br.right) {
+      ui.vpop.classList.add('col');
+      var w = ui.vpop.offsetWidth, cx = pr.left + pr.width / 2 - ui.view.getBoundingClientRect().left;
+      ui.vpop.style.left = Math.max(-pr.left + br.left + 6, cx - w / 2) + 'px';
+      ui.view.classList.add('open');
+    } else {
+      ui.vpill.style.width = pw + 'px'; void ui.vpill.offsetWidth;                               // from the bubble's own width ...
+      ui.vpill.style.width = rw + 'px';                                                         // ... smoothly to the width of the six names
+      ui.view.classList.add('open', 'rowopen');
     }
     ui.vpill.setAttribute('aria-expanded', 'true');
-    ui.view.classList.add('open'); ui.view.classList.toggle('rowopen', !ui.vpop.classList.contains('col'));      // in a row the names take the place of the pill
   }
   function closeView() {
     clearTimeout(vt.close); clearTimeout(vt.open);
     if (!ui || !ui.vpop || ui.vpop.hidden) return;
+    var row = ui.view.classList.contains('rowopen');
     ui.vpop.hidden = true; ui.vpill.setAttribute('aria-expanded', 'false'); ui.view.classList.remove('open', 'rowopen');
+    if (!row) { ui.vpill.style.width = ''; return; }
+    var cur = ui.vpill.offsetWidth;                                                            // back to the bubble's own width, smoothly
+    ui.vpill.style.transition = 'none'; ui.vpill.style.width = ''; var nw = ui.vpill.offsetWidth;
+    ui.vpill.style.width = cur + 'px'; void ui.vpill.offsetWidth; ui.vpill.style.transition = '';
+    ui.vpill.style.width = nw + 'px';
+    clearTimeout(vt.w); vt.w = setTimeout(function () { if (ui.vpop.hidden) ui.vpill.style.width = ''; }, 300);
   }
   function setView(i, says) {
     var v = VIEWS[i]; if (!v || !E) return;
@@ -771,7 +786,7 @@
       '<li><b>Copy 2 view</b> (key 6): <b>Aligned</b> shows copy 2 as the alignment moved it, <b>Original scan</b> as it was scanned. Copy 1 is never changed.</li>' +
       '<li><b>Movement map</b> (left panel) colours the parts of copy 2 that the fine alignment moved, with arrows for the direction.</li>' +
       '<li><b>Alignment of this page</b> (left panel, folded at first): Stiffer / Standard / Flexible sets how small the pieces of copy 2 may be that move on their own; the movement map shows what moved; “Printed area” shows the area that is aligned, and its corners can be dragged.</li>' +
-      '<li><b>Annotations:</b> the pen button in the zoom column of the superimposed picture (above the ▲ arrow) unfolds the tools: circle, rectangle, text note, colour, and the eye that hides all annotations. A small orange dot on the pen means that this page has annotations.</li>' +
+      '<li><b>Annotations:</b> the pen button in the zoom column of the superimposed picture (above the ▲ arrow) unfolds the tools: circle, rectangle, text note, colour, and the eye that hides all annotations.</li>' +
       '<li>The arrows button at the top right is <b>focus mode</b>: only the pictures. Esc brings everything back.</li></ul>' +
       // B5: what the comparison cannot show (owner 18 Nov / 21 Nov; was at the bottom of the left panel)
       '<details class="ct-help" id="ct_help"><summary>What the comparison cannot show</summary><ul>' +
@@ -781,7 +796,7 @@
       '<li><b>Pages with almost no ink</b> (title pages, blank pages) are placed by the whole-page step only.</li>' +
       '<li><b>Outside the printed area</b> set by hand nothing is aligned; there the picture only follows the nearest aligned parts.</li>' +
       '<li><b>Paper and scanning</b> (stains, show-through, pencil, a curved page, a dark binding edge) can show as differences. A photo taken at a slant is straightened as a whole first; a wrong page in one copy shows as a page full of differences (more than 30 % of the ink without partner is pointed out).</li>' +
-      '</ul></details>' +
+      '</ul><button type="button" class="ct-helphide" onclick="this.parentNode.open = false">&#9652; Hide this note</button></details>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
   }
 
@@ -800,7 +815,7 @@
     g.loading = g.e.init().then(function () { g.ready = true; g.loading = null; }, function () { g.loading = null; if (eng === g) dropEngine(); });
   }
   // Stored alignments (V10, desktop program): a pair whose copy 1 is the reference copy (or stands in for it on this page) is kept in the
-  // results folder; when it is there and still fits, the page is shown from it at once. Other pairs are aligned directly, and the next page
+  // project file (0.12.0); when it is there and still fits, the page is shown from it at once. Other pairs are aligned directly, and the next page
   // in the direction of travel is prepared meanwhile (D2, kept in memory only, prepared by a second helper).
   async function storeKey(d) {
     if (!d.ids || !window.BCResults || !BCResults.available() || !W().refFor || W().refFor(d.row) !== d.ids[0]) return null;

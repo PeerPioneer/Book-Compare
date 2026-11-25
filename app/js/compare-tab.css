@@ -142,22 +142,28 @@ body.ct-active .bar.step3 #link_toggle .mdc-tab__icon, body.ct-active .bar.step3
 .ct-flagpal .rm { border: 0; background: none; color: #5a6d6d; font: inherit; font-size: 13px; cursor: pointer; padding: 0 2px 0 6px; text-decoration: underline; }
 .ct-flagpal .rm:hover { color: #a00; }
 
-/* the view switcher: the name of the view on screen, a frame and six dots; the six names unfold over the middle of the bar when the pointer rests on it */
-.ct-vpill { display: inline-flex; align-items: center; gap: 10px; font: inherit; font-size: 14px; font-weight: 500; letter-spacing: .02em; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .65); border-radius: 999px; padding: 6px 14px; cursor: pointer; white-space: nowrap; }
-.ct-vpill:hover, .ct-view.open .ct-vpill { background: rgba(255, 255, 255, .16); border-color: #fff; }
-.ct-view.rowopen .ct-vpill { visibility: hidden; }
+/* the view switcher: the name of the view on screen in a bubble, with six dots. Resting on it (or a click) lets the bubble grow
+   smoothly to the right with the six views in it (0.12.0); what stands to its right slides along; the bar keeps its colour. */
+.ct-view { position: relative; }
+.ct-vpill { position: relative; z-index: 1; box-sizing: border-box; height: 36px; display: inline-flex; align-items: center; gap: 10px; overflow: hidden; font: inherit; font-size: 14px; font-weight: 500; letter-spacing: .02em; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .65); border-radius: 999px; padding: 0 14px; cursor: pointer; white-space: nowrap; transition: width .26s ease, border-color .15s, background-color .15s; }
+.ct-vpill:hover { background: rgba(255, 255, 255, .12); border-color: #fff; }
+.ct-view.open .ct-vpill { border-color: #fff; }
+.ct-view.rowopen .ct-vpill { background: transparent; }
+.ct-vpill > * { transition: opacity .14s; }
+.ct-view.rowopen .ct-vpill > * { opacity: 0; }
 .ct-vdots { display: inline-flex; align-items: center; gap: 3px; }
 .ct-vdots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, .5); }
 .ct-vdots i.on { width: 7px; height: 7px; background: #fff; }
-.ct-vpop { position: absolute; top: 0; bottom: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 6px; background: #006060; }
+.ct-vpop { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 2; box-sizing: border-box; height: 36px; display: flex; align-items: center; gap: 2px; padding: 0 3px; white-space: nowrap; background: transparent; visibility: hidden; clip-path: inset(0 100% 0 0 round 999px); }
 .ct-vpop[hidden] { display: none; }
-.ct-vpop button { font: inherit; font-size: 14px; color: #e6f5f5; background: transparent; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.ct-view.rowopen .ct-vpop { visibility: visible; clip-path: inset(0 0 0 0 round 999px); transition: clip-path .26s ease; }
+.ct-vpop button { font: inherit; font-size: 13.5px; color: #fff; background: transparent; border: 0; border-radius: 999px; height: 28px; padding: 0 12px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .ct-vpop button:hover { background: rgba(255, 255, 255, .18); }
-.ct-vpop button.on { background: #fff; color: #006060; font-weight: 500; }
-.ct-vpop .k { font-size: 11.5px; opacity: .75; }
-/* not enough room for six names in a row (a half-width window): they stand one under the other, above the view name */
-.ct-vpop.col { top: auto; bottom: calc(100% + 6px); flex-direction: column; align-items: stretch; gap: 0; padding: 6px; border-radius: 10px; box-shadow: 0 3px 14px rgba(0, 40, 40, .35); }
-.ct-vpop.col button { border-radius: 6px; justify-content: flex-start; }
+.ct-vpop button.on { background: #fff; color: #006a6a; font-weight: 500; }
+.ct-vpop .k { font-size: 11px; opacity: .75; }
+/* not enough room in the bar (a narrow window): the six names stand one under the other above the bubble, in the bar's colour */
+.ct-vpop.col { visibility: visible; clip-path: none; top: auto; bottom: calc(100% + 8px); transform: none; height: auto; flex-direction: column; align-items: stretch; gap: 0; padding: 6px; border-radius: 10px; background: #008080; box-shadow: 0 3px 14px rgba(0, 40, 40, .35); }
+.ct-vpop.col button { border-radius: 6px; justify-content: flex-start; height: 32px; }
 /* every menu and popup of the bar lies above the thin book map line */
 #compare_screen > footer .mdc-menu-surface { z-index: 40; }
 
@@ -211,7 +217,6 @@ div.result_container.ct-on #workspace.ws-three .ct-penbtn { display: flex !impor
 .ct-penbtn svg.fill { fill: #00807a; }
 .ct-penbtn.on { background: #bfe3e3; }
 .ct-penbtn.on svg.fill { fill: #004d4d; }
-.ct-penbtn.has::after { content: ''; position: absolute; right: 3px; top: 3px; width: 6px; height: 6px; border-radius: 50%; background: #e08a00; box-shadow: 0 0 0 1px #fff; }
 .ct-penbtn:focus-visible { outline: 2px solid #008080; outline-offset: -2px; }
 div.result_container.ct-on #workspace.ws-three .ct-annocard { display: flex; }
 .ct-atools { position: absolute; top: 72px; right: 30px; z-index: 6; flex-direction: column; align-items: center; gap: 2px; padding: 5px 3px; background: rgba(255, 255, 255, .94); border: 1px solid #bcd6d6; border-radius: 8px; box-shadow: 0 1px 6px rgba(0, 40, 40, .2); }
@@ -255,6 +260,7 @@ div.result_container.ct-on .ct-qbox { display: block; }
 /* B5: what the comparison cannot show */
 .ct-help { margin-top: 10px; font-size: 12.5px; color: #3c4a4a; }
 .ct-help summary { cursor: pointer; color: #00807a; font-weight: 500; }
+.ct-helphide { display: block; margin: 4px 0 2px; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12.5px; color: #00807a; cursor: pointer; text-decoration: underline; }
 .ct-help ul { margin: 6px 0 0; padding-left: 18px; }
 .ct-help li { margin-bottom: 5px; line-height: 1.35; }
 

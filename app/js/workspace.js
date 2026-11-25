@@ -35,7 +35,7 @@
   var hist = { undo: [], redo: [] };
   // proj.target: where the project is saved: { dir, file } (desktop program: the folder of the file and its name) or { fh } (browser: the file)
   // proj.legacy: a project of an older version that was opened (it is not saved automatically until it is saved as a project file)
-  var proj = { target: null, legacy: null, state: 'none', name: '', err: '', timer: 0, saving: false, again: false };
+  var proj = { target: null, pack: null, carry: null, legacy: null, state: 'none', name: '', err: '', timer: 0, saving: false, again: false };
   var dirty = false;                 // changes not yet written to the project file
   var lastProject = null;            // remembered project { target, name, projectId }
   var cb = { compare: null, leave: null };
@@ -114,56 +114,102 @@
     for (var i = 0; i < Math.max(x.length, y.length); i++) { var p = x[i] || 0, q = y[i] || 0; if (p !== q) return p > q; }
     return false;
   }
-  // Desktop program only: at most once a day, ask GitHub which version is the newest; if it is newer than this one, say so
-  // (once a day at most). Nothing is downloaded or changed by itself: "Download" opens the download page in the browser.
+  // Desktop program only (0.12.0, the notice did not show in 0.10.0/0.11.0: it lived in the Pages view only and the newest version
+  // was looked up at most once a day): at every start, a few seconds in, the program asks for the newest version, first the
+  // updater itself (the same latest.yml that "Update now" uses), else GitHub. A newer one is announced by a card in the bottom right
+  // corner, on every screen (start screen, Pages, Compare). "Later" hides it until the next day; the menu (⋮ → Check for updates)
+  // and "About Book Compare" always show the state and can start the update.
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* no storage */ } }
-  async function checkForUpdate() {
-    if (!DESKTOP || !window.fetch) return;
-    var now = Date.now(), DAY = 20 * 3600 * 1000, latest = lsGet('bc_latest_version');
-    if (!latest || now - (+lsGet('bc_update_checked') || 0) > DAY) {
+  var updInfo = { state: 'unknown', latest: null };          // state: unknown | checking | newer | newest | failed
+  async function lookForUpdate() {
+    if (!DESKTOP) return updInfo;
+    updInfo.state = 'checking';
+    var latest = null;
+    try { await helperReady; if (HELPER) { var st = await hjson('/api/update', { cmd: 'check' }); if (st && (st.state === 'available' || st.state === 'downloading' || st.state === 'ready') && st.version) latest = st.version; else if (st && st.state === 'none') latest = DESKTOP; } } catch (e) { /* ask GitHub */ }
+    if (!latest && window.fetch) {
       try {
         var r = await fetch(RELEASES_API, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } });
-        if (r.ok) { var j = await r.json(); if (j && j.tag_name) { latest = String(j.tag_name).replace(/^v/i, ''); lsSet('bc_latest_version', latest); } }
-        lsSet('bc_update_checked', String(now));
-      } catch (e) { return; }                                                     // offline: try again next time
+        if (r.ok) { var j = await r.json(); if (j && j.tag_name) latest = String(j.tag_name).replace(/^v/i, ''); }
+      } catch (e) { /* offline */ }
     }
-    if (!latest || !newerVersion(latest, DESKTOP)) return;
-    if (now - (+lsGet('bc_update_shown') || 0) < DAY) return;                     // "Later": not again today
-    var b = $('#ws-update'); if (!b) return;
-    b.innerHTML = '<span>A new version of Book Compare is available: <b>' + esc(latest) + '</b> (you have ' + esc(DESKTOP) + ').</span>' +
-      '<button class="ws-tb primary" data-act="upd-now">Update now</button><button class="ws-tb" data-act="upd-dl">What is new</button><button class="ws-tb" data-act="upd-later">Later</button>';
-    b.hidden = false;
+    if (!latest) latest = lsGet('bc_latest_version');                       // (the last answer, when offline)
+    else lsSet('bc_latest_version', latest);
+    updInfo.latest = latest;
+    updInfo.state = !latest ? 'failed' : newerVersion(latest, DESKTOP) ? 'newer' : 'newest';
+    return updInfo;
   }
-  function hideUpdate() { var b = $('#ws-update'); if (b) b.hidden = true; lsSet('bc_update_shown', String(Date.now())); }
+  function updCard() {
+    var c = document.getElementById('bc-update');
+    if (!c) {
+      c = document.createElement('div'); c.id = 'bc-update'; c.className = 'bc-update'; c.setAttribute('role', 'status'); c.hidden = true;
+      document.body.appendChild(c);
+      c.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-act]'); if (!t) return;
+        var a = t.dataset.act;
+        if (a === 'upd-dl') { hideUpdate(); openDownloadPage(); } else if (a === 'upd-now') updateNow(); else if (a === 'upd-install') installUpdate(); else if (a === 'upd-later') hideUpdate(); else if (a === 'upd-close') c.hidden = true;
+      });
+    }
+    return c;
+  }
+  function showUpdateCard(force) {
+    if (updInfo.state !== 'newer') return false;
+    if (!force && Date.now() - (+lsGet('bc_update_shown') || 0) < 20 * 3600 * 1000) return false;      // "Later": not again today
+    var c = updCard();
+    c.innerHTML = '<p><b>Book Compare ' + esc(updInfo.latest) + ' is available.</b> You have ' + esc(DESKTOP) + '. The update is downloaded and installed by Book Compare itself; your projects stay as they are.</p>' +
+      '<div class="acts"><button class="bc-ub pri" data-act="upd-now">Update now</button><button class="bc-ub" data-act="upd-dl">What is new</button><button class="bc-ub" data-act="upd-later">Later</button></div>';
+    c.hidden = false;
+    return true;
+  }
+  async function checkForUpdate() {
+    if (!DESKTOP) return;
+    await lookForUpdate();
+    showUpdateCard(false);
+  }
+  // ⋮ → Check for updates (and the button in About)
+  async function checkUpdatesNow() {
+    if (!DESKTOP) return;
+    var say = function (msg) {                                                   // (on the start screen there is no toast: the card says it)
+      if (root) return toast(msg);
+      var c = updCard(); c.innerHTML = '<p>' + esc(msg) + '</p><div class="acts"><button class="bc-ub" data-act="upd-close">OK</button></div>'; c.hidden = false;
+      clearTimeout(c.t); c.t = setTimeout(function () { if (c.querySelector('[data-act=upd-close]')) c.hidden = true; }, 6000);
+    };
+    say('Looking for a new version …');
+    await lookForUpdate();
+    if (updInfo.state === 'newer') showUpdateCard(true);
+    else if (updInfo.state === 'newest') say('You have the newest version of Book Compare (' + DESKTOP + ').');
+    else say('Book Compare could not find out which version is the newest (no internet connection?).');
+  }
+  function hideUpdate() { var c = document.getElementById('bc-update'); if (c) c.hidden = true; lsSet('bc_update_shown', String(Date.now())); }
   // One-click update (item 35, desktop program): download the new version, then close, install it and start again (desktop/main.js)
   async function updateNow() {
-    var b = $('#ws-update'), call = function (cmd) { return hjson('/api/update', { cmd: cmd }); }, st;
+    var b = updCard(), call = function (cmd) { return hjson('/api/update', { cmd: cmd }); }, st;
     var show = function (html) { b.innerHTML = html; b.hidden = false; };
     var fallback = function (why) {
-      show('<span>The new version could not be downloaded here' + (why ? ' (' + esc(why) + ')' : '') + '. Please download it from the Releases page.</span><button class="ws-tb primary" data-act="upd-dl">Go to the download page</button><button class="ws-tb" data-act="upd-later">Later</button>');
+      show('<p>The new version could not be downloaded here' + (why ? ' (' + esc(why) + ')' : '') + '. Please download it from the Releases page.</p><div class="acts"><button class="bc-ub pri" data-act="upd-dl">Go to the download page</button><button class="bc-ub" data-act="upd-later">Later</button></div>');
     };
-    show('<span>Looking for the new version …</span>');
+    show('<p>Looking for the new version …</p>');
     try { st = await call('check'); } catch (e) { return fallback(niceError(e)); }
     if (st.state !== 'available' && st.state !== 'downloading' && st.state !== 'ready') return fallback(st.error || '');
     if (st.state === 'available') { try { st = await call('download'); } catch (e) { return fallback(niceError(e)); } }
     while (st.state === 'downloading') {
-      show('<span>Downloading Book Compare ' + esc(st.version || '') + ' … ' + (st.percent || 0) + ' %</span><span class="ws-bgbar"><i style="width:' + (st.percent || 0) + '%"></i></span>');
+      show('<p>Downloading Book Compare ' + esc(st.version || '') + ' … ' + (st.percent || 0) + ' %</p><span class="bc-ubar"><i style="width:' + (st.percent || 0) + '%"></i></span>');
       await new Promise(function (r) { setTimeout(r, 700); });
       try { st = await call('state'); } catch (e) { return fallback(niceError(e)); }
     }
     if (st.state !== 'ready') return fallback(st.error || '');
-    show('<span><b>Book Compare ' + esc(st.version || '') + ' is ready.</b> Book Compare closes, installs it and starts again (Windows may ask once whether it may run).</span>' +
-      '<button class="ws-tb primary" data-act="upd-install">Install and restart</button><button class="ws-tb" data-act="upd-later">Later</button>');
+    show('<p><b>Book Compare ' + esc(st.version || '') + ' is ready.</b> Book Compare closes, installs it and starts again (Windows may ask once whether it may run).</p>' +
+      '<div class="acts"><button class="bc-ub pri" data-act="upd-install">Install and restart</button><button class="bc-ub" data-act="upd-later">Later</button></div>');
   }
   async function installUpdate() {
-    var r = await beforeClose();                                                           // the project is saved first
+    var r = (S && root) ? await beforeClose() : { ok: true };                               // the project is saved first
     if (!r.ok) {
       var go = await confirmDialog('The project is not saved', 'The project has changes that are not saved in a project file. Install the new version anyway? The changes are lost.', 'Install anyway');
       if (!go) return;
     }
     try { await hjson('/api/update', { cmd: 'install' }); } catch (e) { toast(niceError(e)); }
   }
+  if (DESKTOP) setTimeout(function () { checkForUpdate().catch(function () { }); }, 3000);     // at every start, on the start screen already
 
   /* ---------------------------------------------------------------- desktop mode (folders read by the desktop program itself, see desktop/server.js) */
   // (Called "helper" in the code for historical reasons: until 21 Nov 2026 a separate helper program, launcher/serve.ps1, did this
@@ -193,9 +239,9 @@
     return e;
   }
   function helperLost() { var e = new Error('Book Compare cannot read the scan folders right now. Please close Book Compare and open it again.'); e.name = 'Lost'; e.net = true; return e; }
-  async function hrequest(method, url, body) {
+  async function hrequest(method, url, body, headers) {
     var resp;
-    try { resp = await fetch(url, { method: method, headers: { 'X-BookCompare': '1' }, body: body, cache: 'no-store' }); }
+    try { resp = await fetch(url, { method: method, headers: Object.assign({ 'X-BookCompare': '1' }, headers || {}), body: body, cache: 'no-store' }); }
     catch (e) { throw helperLost(); }
     return resp;
   }
@@ -206,9 +252,9 @@
     return j;
   }
   // a request about a folder that was registered before; if the helper was restarted meanwhile, the folder is registered again
-  async function hcall(ref, method, endpoint, rel, body) {
+  async function hcall(ref, method, endpoint, rel, body, query, headers) {
     for (var attempt = 0; attempt < 2; attempt++) {
-      var resp = await hrequest(method, endpoint + '?root=' + encodeURIComponent(ref.id) + '&path=' + encodeURIComponent(rel), body);
+      var resp = await hrequest(method, endpoint + '?root=' + encodeURIComponent(ref.id) + '&path=' + encodeURIComponent(rel) + (query || ''), body, headers);
       if (resp.ok) return resp;
       var j = null; try { j = await resp.json(); } catch (e) { j = null; }
       if (j && j.error === 'unknown-root' && attempt === 0) { var again = await hjson('/api/register', { path: ref.path, kind: ref.kind }); ref.id = again.id; continue; }
@@ -223,7 +269,8 @@
   function hsame(a, b) { return HELPER && HELPER.os === 'windows' ? a.toLowerCase() === b.toLowerCase() : a === b; }
   function HDir(ref, rel, name) { this.kind = 'directory'; this.isHelper = true; this.ref = ref; this.rel = rel; this.name = name; }
   Object.defineProperty(HDir.prototype, 'rootPath', { get: function () { return this.ref.path; } });
-  HDir.prototype.removeEntry = function (name) { return hcall(this.ref, 'POST', '/api/remove', joinPath(this.rel, name)).then(function () { }); };   // (stored alignments only, item 28)
+  HDir.prototype.removeEntry = function (name) { return hcall(this.ref, 'POST', '/api/remove', joinPath(this.rel, name)).then(function () { }); };
+  HDir.prototype.dir_remove = HDir.prototype.removeEntry;   // (stored alignments only, item 28)
   HDir.prototype._stat = function (rel) { return hcall(this.ref, 'GET', '/api/stat', joinPath(this.rel, rel)).then(function (r) { return r.json(); }); };
   HDir.prototype.getDirectoryHandle = async function (name) {
     var st = await this._stat(name);
@@ -766,20 +813,41 @@
       copies: S.copies.map(function (c) { var o = { id: c.id, name: c.name, folder: c.folder, locs: c.locs, keys: c.keys, cells: c.cells }; if (c.w) o.w = c.w; return o; })
     };
   }
-  function touch() { dirty = true; if (proj.target) { proj.state = 'dirty'; clearTimeout(proj.timer); proj.timer = setTimeout(saveNow, 700); } renderSave(); }
+  function touch() { dirty = true; if (proj.target) { proj.state = 'dirty'; clearTimeout(proj.timer); proj.timer = setTimeout(saveNow, saveDelay()); } renderSave(); }
+  // (0.12.0: on the website a browser writes a file by copying it whole first: a project file that holds many stored alignments is saved
+  //  a little less often there, up to every 10 s; in the desktop program a save only adds the project at the end of the file)
+  function saveDelay() { var mbs = !HELPER && proj.pack ? proj.pack.end / 1048576 : 0; return Math.round(700 + Math.min(9300, mbs * 90)); }
   function targetFile(t) { return t.fh ? t.fh.name : t.file; }
   function targetName(t) { return targetFile(t).replace(/\.bookcompare$/i, ''); }
   function isLegacy(t) { return targetFile(t) === LEGACY_FILE; }
   function abortError() { var e = new Error('cancelled'); e.name = 'AbortError'; return e; }
-  async function targetWrite(t, text) {                                   // the ONLY place that writes: the project file
-    var fh = t.fh || await t.dir.getFileHandle(t.file, { create: true });
-    var w = await fh.createWritable();
-    await w.write(text);
-    await w.close();
+  // 0.12.0: the project file holds the project and its stored alignments (app/js/project-pack.js). The ONLY file ever written.
+  function ioFor(t) {
+    if (t.dir && t.dir.isHelper) {
+      var ref = t.dir.ref, rel = joinPath(t.dir.rel, t.file);
+      return {
+        size: async function () { var r = await hcall(ref, 'POST', '/api/stat', rel); var j = await r.json(); if (!j.exists) { var e = new Error('The project file was not found.'); e.name = 'NotFoundError'; throw e; } return j.size; },
+        read: async function (at, len) { if (len <= 0) return new ArrayBuffer(0); var r = await hcall(ref, 'GET', '/api/file', rel, undefined, '', { Range: 'bytes=' + at + '-' + (at + len - 1) }); return r.arrayBuffer(); },
+        append: async function (at, blob) {
+          try { await hcall(ref, 'POST', '/api/append', rel, blob, '&at=' + at); }
+          catch (e) { if (e && e.code === 'changed') e.changed = true; throw e; }
+        },
+        replace: async function (blob) { await hcall(ref, 'PUT', '/api/write', rel, blob); },
+        compact: async function (ranges, prefix) { await hcall(ref, 'POST', '/api/compact', rel, JSON.stringify({ ranges: ranges, prefix: prefix })); }
+      };
+    }
+    return BCPack.fsaIO(function () { return t.fh ? Promise.resolve(t.fh) : t.dir.getFileHandle(t.file, { create: true }); });
   }
+  // the project in a file: { json, pack } (pack: null for a file of an older version, which was JSON text)
   async function targetRead(t) {
-    var fh = t.fh || await t.dir.getFileHandle(t.file);
-    return JSON.parse((await (await fh.getFile()).text()).replace(/^\uFEFF/, ''));
+    var io = ioFor(t), size = await io.size();
+    if (BCPack.isPack(await io.read(0, Math.min(size, 8)))) { var pk = await BCPack.open(io); pk.target = t; return { json: pk.project(), pack: pk }; }
+    return { json: JSON.parse(new TextDecoder().decode(await io.read(0, size)).replace(/^\uFEFF/, '')), pack: null };
+  }
+  async function targetWrite(t, text) {
+    if (proj.pack && proj.pack.target === t) return proj.pack.writeProject(text);
+    var pk = await BCPack.create(ioFor(t), text, proj.carry || []);                          // a new file (or one of an older version, brought up to date)
+    pk.target = t; proj.pack = pk; proj.carry = null;
   }
   async function saveNow() {
     if (!proj.target) return;
@@ -787,7 +855,7 @@
     if (proj.saving) { proj.again = true; return; }
     proj.saving = true; proj.state = 'saving'; renderSave();
     try {
-      await targetWrite(proj.target, JSON.stringify(serialize(), null, 1));
+      await targetWrite(proj.target, JSON.stringify(serialize()));
       proj.state = 'saved'; dirty = false; proj.savedAt = new Date();
     } catch (e) { proj.state = 'error'; proj.err = niceError(e); }
     proj.saving = false;
@@ -894,14 +962,14 @@
       if (t.fh && t.fh.remove) { try { if ((await t.fh.getFile()).size === 0) await t.fh.remove(); } catch (e2) { /* nothing to remove */ } }   // (the browser may have made an empty file already)
       return toast(niceError(e));
     }
-    var before = { target: proj.target, legacy: proj.legacy, name: proj.name };
-    if (window.BCBackground) window.BCBackground.stop(true);        // (the results belong next to the project file: a new place, new results)
+    var before = { target: proj.target, legacy: proj.legacy, name: proj.name, pack: proj.pack };
+    if (window.BCBackground) window.BCBackground.stop(true);        // (the stored alignments stay in the old file: the new file starts afresh)
     if (window.BCResults) window.BCResults.reset();
-    proj.target = t; proj.legacy = null; proj.name = targetName(t);
+    proj.target = t; proj.legacy = null; proj.name = targetName(t); proj.pack = null;
     await saveNow();
     if (proj.state === 'error') {
       var why = proj.err;
-      proj.target = before.target; proj.legacy = before.legacy; proj.name = before.name; proj.state = proj.target ? 'saved' : 'none'; renderSave();
+      proj.target = before.target; proj.legacy = before.legacy; proj.name = before.name; proj.pack = before.pack; proj.state = proj.target ? 'saved' : 'none'; renderSave();
       return toast('The project could not be saved there: ' + why);
     }
     await rememberProject();
@@ -909,7 +977,7 @@
     toast('Project saved as “' + proj.name + '”. From now on changes are saved automatically.');
   }
   function downloadProject() {
-    var blob = new Blob([JSON.stringify(serialize(), null, 1)], { type: 'application/json' });
+    var blob = BCPack.blobOf(JSON.stringify(serialize()));
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = suggestedName();
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
     dirty = false; renderSave(); toast('Project file downloaded.');
@@ -935,14 +1003,46 @@
     return lp;
   }
   async function readProject(t) {
-    var json;
-    try { json = await targetRead(t); }
+    var got;
+    try { got = await targetRead(t); }
     catch (e) {
       if (e && e.name === 'NotFoundError') toast(isLegacy(t) && t.dir ? 'There is no Book Compare project in the folder “' + t.dir.name + '”.' : 'The project file “' + targetFile(t) + '” was not found.');
-      else toast('The project file “' + targetFile(t) + '” could not be read.');
+      else toast('The project file “' + targetFile(t) + '” could not be read' + (e && /damaged|not a Book Compare/.test(e.message) ? ': ' + e.message : '.'));
       return false;
     }
-    return adopt(json, t);
+    if (!(await adopt(got.json, t))) return false;
+    if (proj.target === t) {
+      proj.pack = got.pack;
+      if (!got.pack) await upgradeFile(t);                                                   // a project file of version 0.11.0 or older
+      else if (got.pack.needsTidy()) got.pack.tidy().catch(function () { });
+    }
+    return true;
+  }
+  // 0.12.0: a project file of an older version (JSON text) becomes a project file of this version at once; in the desktop program the
+  // stored alignments of its results folder ("<name>.bookcompare results") move into it and the folder is removed. (On the website the
+  // file is brought up to date with the next save, which may need the browser's permission.)
+  async function upgradeFile(t) {
+    if (!(t.dir && t.dir.isHelper)) return;
+    var carry = [], rd = null, names = [];
+    try {
+      rd = new HDir(t.dir.ref, joinPath(t.dir.rel, t.file + ' results'), t.file + ' results');
+      var idx = JSON.parse(await (await (await rd.getFileHandle('index.json')).getFile()).text());
+      var es = idx && idx.entries || {};
+      names = Object.keys(es);
+      for (var i = 0; i < names.length; i++) {
+        var e = es[names[i]];
+        if (!(window.BCResults && BCResults.current(e))) continue;                              // (made by an older alignment: not kept)
+        try { carry.push({ name: names[i], meta: e, bin: await (await (await rd.getFileHandle(names[i])).getFile()).arrayBuffer() }); } catch (x) { /* missing: aligned again */ }
+      }
+    } catch (e) { rd = null; }                                                                 // no results folder
+    try {
+      proj.carry = carry; await targetWrite(t, JSON.stringify(serialize())); proj.state = 'saved'; renderSave();
+    } catch (e) { proj.carry = null; proj.pack = null; return; }                                // (not writable now: brought up to date with the next save)
+    if (rd) {
+      for (var j = 0; j < names.length; j++) { try { await rd.dir_remove(names[j]); } catch (x) { /* left */ } }
+      try { await hcall(t.dir.ref, 'POST', '/api/remove', joinPath(rd.rel, 'index.json')); await hcall(t.dir.ref, 'POST', '/api/remove', rd.rel); } catch (x) { /* left */ }
+    }
+    toast('This project file was brought up to date for version 0.12' + (carry.length ? ': its ' + carry.length + ' stored alignment' + (carry.length === 1 ? ' is' : 's are') + ' now inside it.' : '.'));
   }
   async function openProject() {
     if (!HAS_FSA || (!HELPER && typeof window.showOpenFilePicker !== 'function')) { $('#ws-jsoninput').value = ''; $('#ws-jsoninput').click(); return; }
@@ -1003,7 +1103,7 @@
     hist = { undo: [], redo: [] };
     thumbMem.clear();
     var oldFormat = !!(t && isLegacy(t));                      // (a project folder of an older version)
-    proj.target = t && !oldFormat ? t : null; proj.legacy = oldFormat ? t : null; proj.name = !t ? '' : oldFormat ? (t.dir ? t.dir.name : '') : targetName(t);
+    proj.pack = null; proj.target = t && !oldFormat ? t : null; proj.legacy = oldFormat ? t : null; proj.name = !t ? '' : oldFormat ? (t.dir ? t.dir.name : '') : targetName(t);
     proj.state = proj.target ? 'saved' : 'none'; dirty = false;
     // folders this browser remembers for the project
     for (var k = 0; k < S.roots.length; k++) {
@@ -1034,7 +1134,7 @@
       // safety: a project file that lies in (or inside) a folder that holds scans of this project is never written to
       try { unsafe = !!(await projectConflict(proj.target)); }
       catch (e) { unsafe = true; }
-      if (unsafe) { proj.target = null; proj.state = 'none'; }
+      if (unsafe) { proj.target = null; proj.pack = null; proj.state = 'none'; }
     }
     if (proj.target) await rememberProject();
     renderAll(); renderSave();
@@ -1155,11 +1255,11 @@
     return '<div class="ws-mhead">This cell</div>' +
       it('gap', 'Insert gap above …') + it('closegap', 'Close gap', !!s.key) + it('del', 'Delete file', !s.key) +
       it('cmpref', 'Compare with the reference copy', !s.key || !other, 'The same as a double-click on the cell' + (other ? '' : ': needs a reference copy (menu ⋮) with a page in this row')) +
-      '<hr><div class="ws-mhead">This copy (' + esc(s.c.name) + ')</div>' +
+      '<hr><div class="ws-mhead">This copy · <span>' + esc(s.c.name) + '</span></div>' +
       it('addfiles', 'Add files to this copy …') +
       it('mvl', '&#9664; Move copy to the left', s.ci <= 0) + it('mvr', 'Move copy to the right &#9654;', s.ci >= S.copies.length - 1) +
       it('renamecopy', 'Rename copy …') + it('setref', S.ref === s.c.id ? '★ Is the reference copy' : 'Make it the reference copy', S.ref === s.c.id) +
-      '<hr><div class="ws-mhead">This row (' + esc(rowLabel(s.row)) + ')</div>' +
+      '<hr><div class="ws-mhead">This row · <span>' + esc(rowLabel(s.row)) + '</span></div>' +
       it('startnum', 'Start numbering at this row …') + it('renamerow', 'Rename this row …') +
       it('skiprow', S.skip[s.row] ? 'Compare this row again' : 'Don’t compare this row');
   }
@@ -1257,10 +1357,8 @@
   // Stored alignments (item 21, desktop program): a small dot in a cell whose page is aligned onto the reference copy and stored
   var stLoad = null;
   function storedEntries() {
-    if (!HELPER || !proj.target || !window.BCResults || !BCResults.available()) return null;
-    var e = BCResults.storedSync();
-    if (!e && stLoad !== tabApi.resultsId()) { stLoad = tabApi.resultsId(); BCResults.load().then(function (ok) { if (ok) renderAllSoon(); }); }
-    return e;
+    if (!proj.target || !window.BCResults || !BCResults.available()) return null;
+    return BCResults.storedSync();
   }
   function isStored(st, c, row, key) {
     if (!st || !key) return false;
@@ -1698,10 +1796,9 @@
       (lost ? item('reconnect', 'Choose scan folder again …') : '') +
       item('ref', 'Reference copy …', !two) +
       (HELPER ? item('bg', window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …', !two || !!S.examples) : '') +
-      (HELPER ? item('stored', 'Stored alignments …', !proj.target) : '') +
       // the website (0.11.0): shown, greyed, so that it is known that the desktop program can do it
-      (HELPER ? '' : item('bg', '<span>Align copies in the background …<small class="ws-mdesk">only in the desktop program</small></span>', true, 'Only in the desktop program: aligns the other copies onto the reference copy page by page and keeps the results') +
-        item('stored', '<span>Stored alignments …<small class="ws-mdesk">only in the desktop program</small></span>', true, 'Only in the desktop program')) +
+      (HELPER ? '' : item('bg', '<span>Align copies in the background …<small class="ws-mdesk">only in the desktop program</small></span>', true, 'Only in the desktop program: aligns the other copies onto the reference copy page by page and keeps the results')) +
+      item('stored', 'Stored alignments …', !proj.target || !!S.examples, proj.target ? '' : 'Save the project as a file first: the stored alignments are kept inside it') +
       item('start', 'Back to the start screen');
     if (!cmp) h += '<hr><div class="ws-mhead">Grid</div>' +
       item('folio', S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') +
@@ -1714,6 +1811,7 @@
       item('help', cmp ? 'How the Compare tab works (keys) …' : 'How this screen works …') +
       item('speed', 'Measure speed on this computer …') +
       (DESKTOP ? '' : item('download', 'Desktop program for Windows …')) +
+      (DESKTOP ? item('updates', updInfo.state === 'newer' ? '<span>Update to version ' + esc(updInfo.latest) + ' …<small class="ws-mdesk">you have ' + esc(DESKTOP) + '</small></span>' : 'Check for updates …') : '') +
       item('licenses', 'Licenses') + item('about', 'About Book Compare …');
     return h;
   }
@@ -1751,11 +1849,12 @@
     else if (m === 'download') openDownloadPage();
     else if (m === 'licenses') { var a = document.createElement('a'); a.href = 'licenses.txt'; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
     else if (m === 'about') aboutDialog();
+    else if (m === 'updates') { if (updInfo.state === 'newer') { showUpdateCard(true); updateNow(); } else checkUpdatesNow(); }
   }
   // item 28: how much room the stored alignments take, and removing those that are no longer needed (pages that left the grid, an older
   // alignment). A pair that is still in the grid stays, even when its scans changed: it is replaced the next time it is aligned.
   async function storedDialog() {
-    if (!window.BCResults || !BCResults.available()) return toast('Save the project as a file first: the stored alignments lie next to it.');
+    if (!window.BCResults || !BCResults.available()) return toast('Save the project as a file first: the stored alignments are kept inside it.');
     var st = await BCResults.stats(); if (!st) return toast('The stored alignments could not be read.');
     var inGrid = {};
     S.copies.forEach(function (c) { c.cells.forEach(function (k) { if (k) inGrid[c.id + '|' + k] = true; }); });
@@ -1763,7 +1862,7 @@
     var idx = BCResults.storedSync() || {}, old = 0, oldB = 0;
     Object.keys(idx).forEach(function (k) { if (!keep(idx[k])) { old++; oldB += idx[k].bytes || 200000; } });
     var mb = function (b) { return (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace('.0', '') + ' MB'; };
-    var sc = modal('<h3>Stored alignments</h3><p><b>' + st.count + '</b> page' + (st.count === 1 ? '' : 's') + ' stored, about <b>' + mb(st.bytes) + '</b>, in the folder “' + esc(st.folder) + '” next to the project file.</p>' +
+    var sc = modal('<h3>Stored alignments</h3><p><b>' + st.count + '</b> page' + (st.count === 1 ? '' : 's') + ' stored, about <b>' + mb(st.bytes) + '</b>, inside the project file “' + esc(st.file) + '” (' + mb(st.size) + ' in all).</p>' +
       (old ? '<p>' + old + ' of them ' + (old === 1 ? 'is' : 'are') + ' no longer needed (' + mb(oldB) + '): their pages left the grid, or they were made by an older version.</p>' : '<p>All of them are still needed.</p>') +
       '<div class="acts"><button class="ws-tb" data-close>Close</button>' + (old ? '<button class="ws-tb primary" id="st-prune">Remove those ' + old + '</button>' : '') + '</div>');
     var b = sc.querySelector('#st-prune');
@@ -1773,9 +1872,19 @@
     modal('<h3>About Book Compare</h3>' +
       '<p>Book Compare finds the differences between copies of the same early printed book: it aligns the scans of two copies page by page and shows them on top of each other.</p>' +
       '<p><b>Version:</b> ' + (DESKTOP ? esc(DESKTOP) + ' (desktop program for Windows)' : 'website (always the newest version)') + '</p>' +
+      (!DESKTOP ? '' : updInfo.state === 'newer'
+        ? '<div class="ws-aboutupd new"><span><b>A newer version is available: ' + esc(updInfo.latest) + '.</b> Book Compare downloads and installs it itself.</span><button class="ws-tb primary" data-about="upd">Update now</button></div>'
+        : '<div class="ws-aboutupd"><span>' + (updInfo.state === 'newest' ? 'This is the newest version.' : updInfo.state === 'checking' ? 'Looking for a newer version …' : 'Whether a newer version exists is not known yet.') + '</span><button class="ws-tb" data-about="check">Check for updates</button></div>') +
       '<p>Made by Torge Schiefelbein. Book Compare grew out of <a href="https://www.robots.ox.ac.uk/~vgg/software/image-compare/" target="_blank" rel="noopener">Image Compare</a> by the Visual Geometry Group (VGG), University of Oxford.</p>' +
       '<p>Source code and downloads: <a href="https://github.com/PeerPioneer/Book-Compare" target="_blank" rel="noopener">github.com/PeerPioneer/Book-Compare</a>. The licences of the parts it uses are listed under Help › Licenses.</p>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Close</button></div>');
+    var sc = $('#ws-scrim');
+    if (sc) sc.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-about]'); if (!b) return;
+      closeModal();
+      if (b.dataset.about === 'upd') { showUpdateCard(true); updateNow(); }
+      else checkUpdatesNow().then(function () { });
+    });
   }
 
   /* ---------------------------------------------------------------- hand a pair of pages to the Compare tab */
@@ -1975,6 +2084,8 @@
     rowCount: rows,
     copyList: function () { return S.copies.map(function (c) { return { id: c.id, name: c.name, pages: c.cells.filter(Boolean).length }; }); },
     resultsDir: resultsDir,
+    pack: function () { return proj.target && proj.pack && proj.pack.target === proj.target ? proj.pack : null; },
+    projectFile: function () { return proj.target ? targetFile(proj.target) : ''; },
     resultsId: function () { var t = proj.target; return t && t.dir ? (t.dir.rootPath || t.dir.name) + '|' + t.file : ''; },
     isDesktop: function () { return !!HELPER; },
     hasProjectFile: function () { return !!proj.target; },
@@ -2146,10 +2257,6 @@
       case 'savechip': return chipClick();
       case 'openproj': return openProject();
       case 'continue': return continueLast();
-      case 'upd-dl': hideUpdate(); return openDownloadPage();
-      case 'upd-now': return updateNow();
-      case 'upd-install': return installUpdate();
-      case 'upd-later': return hideUpdate();
       case 'allow': return allowAccess(false);
       case 'reconnect': return reconnectScans();
       case 'swap': S.pair = [S.pair[1], S.pair[0]]; touch(); renderAll(); return;
@@ -2284,7 +2391,7 @@
   async function newProject() {
     if (S.copies.length && dirty && !S.examples && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
     projectChanging();
-    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.target = null; proj.legacy = null; proj.state = 'none'; proj.name = ''; dirty = false;
+    S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.target = null; proj.pack = null; proj.legacy = null; proj.state = 'none'; proj.name = ''; dirty = false;
     renderAll();
   }
 
@@ -2314,7 +2421,7 @@
     }
     S.nextCopy = 3; X.list.forEach(function (e, j) { S.labels[String(j)] = e.label; });
     S.pair = [1, 2]; S.sel = { ci: 0, row: 0 };
-    proj.target = null; proj.legacy = null; proj.state = 'none'; proj.name = 'Examples'; dirty = false;
+    proj.target = null; proj.pack = null; proj.legacy = null; proj.state = 'none'; proj.name = 'Examples'; dirty = false;
     renderAll(); renderSave();
     await compareNow();
     return true;
@@ -2333,7 +2440,7 @@
       '<button class="ws-icon" data-act="help" aria-label="Help: how this screen works" title="How this screen works">?</button>' +
       '<button class="ws-icon ws-dots" id="ws-more" data-act="more" aria-label="Menu" aria-haspopup="true" title="Menu: project, export, help">&#8942;</button>' +
       '<div class="ws-menu" id="ws-menu" role="menu" hidden></div></div>' +
-      '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-update" id="ws-update" hidden></div><div class="ws-banner ws-bg" id="ws-bg" hidden></div>' +
+      '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-bg" id="ws-bg" hidden></div>' +
       '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-summary" id="ws-summary"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
       '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div>' +
       '<div class="ws-pvacts"><button class="ws-cmpbtn" id="ws-cmpbtn" data-act="compare">Compare 1 and 2</button></div></aside></div>' +
@@ -2366,14 +2473,13 @@
     ti.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ti.blur(); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); } });
     $('#ws-jsoninput').onchange = function () {
       var f = this.files && this.files[0]; if (!f) return;
-      mayReplace().then(function (ok) { if (ok) return f.text().then(function (t) { adopt(JSON.parse(t), null); }); }).catch(function () { toast('That file could not be read as a project.'); });
+      mayReplace().then(function (ok) { if (ok) return BCPack.projectFromBlob(f).then(function (j) { adopt(j, null); }); }).catch(function () { toast('That file could not be read as a project.'); });
     };
     window.addEventListener('resize', function () { if (root && !root.hidden) renderRows(); });
     window.addEventListener('beforeunload', function (e) {
       if (window.BCResults) BCResults.flush();                                              // (item 32: what is stored is listed in the index)
       if (S && S.copies.length && dirty) { if (proj.target) saveNow(); e.preventDefault(); e.returnValue = ''; }
     });
-    setTimeout(function () { checkForUpdate().catch(function () { }); }, 2500);
   }
   function show() {
     if (!S) S = blank();
@@ -2409,6 +2515,8 @@
     saveForClose: saveForClose,
     startAction: startAction,
     openExamples: openExamples,
+    checkUpdates: checkUpdatesNow,
+    version: function () { return DESKTOP; },
     tab: tabApi
   };
   // desktop program: a project file that was double-clicked opens at once

@@ -1094,6 +1094,24 @@ Built 23 Nov 2026 as **version 0.11.0** (details in CHANGELOG.txt).
 | N10 | Melopoiae p. 6 (A-Wn1 / D-W, a photo taken at a slant): perspective correction in the first step (B1) | **done 0.11.0**; the staff lines still lie apart in places (separate impression of the staves, or page curl) |
 | N11 | Continue opens the Compare tab at the last pair and page; auto-save made visible (chip with time, tooltip, toast, help, Ctrl+S); "directly in the folder" ticked in Add copy | **done 0.11.0** |
 
+### 11.1e The owner's requests of 25 November 2026
+
+Built 25 Nov 2026 as **version 0.12.0** (details in CHANGELOG.txt).
+
+| ID | Item | Status |
+|----|------|--------|
+| U1 | Update notice not seen (0.10.0): looked up at every start, card on every screen; ⋮ → Check for updates; About shows the state and can update | **done 0.12.0** |
+| U2 | What the release files .blockmap and latest.yml are for (answered; a line in the release notes) | answered |
+| R36b | Everything in ONE project file (stored alignments inside; log with CRC, tidy-up; old results folders brought in; the website stores too) | **done 0.12.0** |
+| N12 | View bubble grows smoothly to the right, no darker bar | **done 0.12.0** |
+| N13 | Notes that unfold can be folded again | **done 0.12.0** |
+| N14 | Aligned / Original scan switch of the Copy 2 view in the teal bar | **done 0.12.0** |
+| N15 | Menu section headings more pronounced | **done 0.12.0** |
+| N16 | Orange dot on the pen button removed | **done 0.12.0** |
+| N17 | Grid marks: copy 1 green, copy 2 red? Since 0.11.0 they follow the Superimposed colours (blue / red by default) | **asked the owner** |
+| D1 | Redesign of the bottom bar: seven ideas (A-G), link button (four places), colours/Paper into the bar | **mock-ups made; waiting for the owner's choice** |
+| D2 | Examples: card covers the picture; show more of what Book Compare can do (views, grid, tile alignment) | **proposals given; waiting for the owner** |
+
 ### 11.2 After version 1
 
 | ID | Item | Status |

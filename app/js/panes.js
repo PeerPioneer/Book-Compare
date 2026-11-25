@@ -512,6 +512,11 @@
         copy2.set_label(label(1, showing_original() ? 'Copy 2, original scan' : 'Copy 2, aligned'));
     };
     const o2_switch = el('o2_switch');
+    // 0.12.0 (owner): the switch stands in the teal bar, where the options of the other views are (#onlyimage2 is shown only in the Copy 2 view);
+    // the short note of the Copy 1 view likewise
+    { const slot2 = el('onlyimage2'), slot1 = el('onlyimage1'), n1 = el('o1_note');
+      if (slot2) slot2.appendChild(o2_switch);
+      if (slot1 && n1) slot1.appendChild(n1); }
     const render_o2_switch = () => {
         o2_switch.querySelectorAll('button').forEach((b) => {
             const on = (b.dataset.o2 === 'original') === o2_original;

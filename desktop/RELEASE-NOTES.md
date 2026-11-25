@@ -2,6 +2,8 @@
 
 **Download:** `Book-Compare-Setup-VERSION.exe` below (Windows 10 and 11, about 130 MB).
 
+(The two other files below, `.blockmap` and `latest.yml`, are not for you to download: Book Compare's own update uses them.)
+
 **Install:** run the file and follow the steps. You choose the folder and whether Book Compare appears in the Start menu and on the Desktop. No administrator password is needed when you install it for yourself.
 
 Windows may say "Windows protected your PC" (unknown publisher), because the installer is not signed yet. Click "More info", then "Run anyway".

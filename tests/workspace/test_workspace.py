@@ -71,6 +71,14 @@ with sync_playwright() as p:
     import re as _re; assert _re.search(r'\d\d:\d\d', pg.inner_text('#ws-save')), pg.inner_text('#ws-save')
     pg.locator('#ws-vp').focus(); pg.keyboard.press('Control+s'); pg.wait_for_timeout(600)
     assert 'Saved in' in pg.inner_text('#ws-toast') and 'saved automatically' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
+    # 0.12.0: the website keeps stored alignments inside the project file too (a real file of the browser's own storage here)
+    got = pg.evaluate("""async () => { const p = { c0: 1, k0: 'a.jpg', c1: 2, k1: 'b.jpg', i0: { size: 10, fp: 'x' }, i1: { size: 20, fp: 'y' } };
+      const bin = new Uint8Array(30000).map((v, i) => i % 251).buffer;
+      if (!BCResults.available()) return 'not available';
+      await BCResults.save(p, bin, { u: 0.1 }); const back = await BCResults.read(p);
+      return [back && back.byteLength, await BCResults.count(2), Object.keys(BCResults.storedSync()).length]; }""")
+    assert got == [30000, 1, 1], got
+    pg.wait_for_timeout(1200); assert read_project(pg)['format'] == 'book-compare-project', 'the project still reads after a stored page was added'
     # 0.11.0: pictures in the grid (off at first, kept in the project; taller rows)
     assert pg.get_attribute('#ws-pics', 'aria-pressed') == 'false' and pg.locator('#ws .ws-cell .tn').count() == 0 and read_project(pg).get('thumbs') is False
     h40 = pg.locator('#ws .ws-row').first.bounding_box()['height']
@@ -101,7 +109,7 @@ with sync_playwright() as p:
     assert 'above' in pg.inner_text('#ws-scrim') and pg.input_value('#gapN') == '1'; pg.click('#ws-scrim [data-close]')
     # item 17: the right mouse button on a cell opens the menu of the cell, its copy and its row
     cell(1, 2).click(button='right'); pg.wait_for_timeout(150)
-    assert pg.is_visible('#ws-ctx') and [t.strip().split(' (')[0].upper() for t in pg.locator('#ws-ctx .ws-mhead').all_inner_texts()] == ['THIS CELL', 'THIS COPY', 'THIS ROW']
+    assert pg.is_visible('#ws-ctx') and [t.strip().split(' (')[0].split(' · ')[0].upper() for t in pg.locator('#ws-ctx .ws-mhead').all_inner_texts()] == ['THIS CELL', 'THIS COPY', 'THIS ROW']
     pg.keyboard.press('Escape'); pg.wait_for_timeout(100); assert pg.locator('#ws-ctx').count() == 0
     # the one menu: Project, Grid, Export (only in the Compare tab) and Help
     pg.click('#ws-more'); heads = [t.strip().upper() for t in pg.locator('#ws-menu .ws-mhead').all_inner_texts()]

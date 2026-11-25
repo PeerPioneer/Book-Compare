@@ -1,7 +1,7 @@
 /* Book Compare: aligning copies onto the reference copy in the background (V8, V9; desktop program only).
    Pages view → More → "Align copies in the background …": the chosen copies are aligned page by page onto the reference copy
    (V7; where it has no page, the copy standing in for it), by several helpers at the same time (Web Workers, js/align-engine.js).
-   Only the movement of each page is kept, in the results folder next to the project file (js/results-store.js, V10); pages that are
+   Only the movement of each page is kept, inside the project file (0.12.0; js/results-store.js, js/project-pack.js, V10); pages that are
    already stored and still fit are skipped, so a stopped run can simply be started again. Afterwards a comparison with the reference
    opens at once in the Compare tab.
    A strip in the Pages view shows how far it is and about how long it will still take, with Pause and Stop. A page where more than
@@ -26,10 +26,10 @@
   /* ---------------------------------------------------------------- starting */
   function open() {
     var t = T();
-    if (!t.isDesktop()) return t.toast('Aligning in the background needs the desktop program: it keeps the results next to the project file.');
+    if (!t.isDesktop()) return t.toast('Aligning in the background needs the desktop program.');
     if (R && !R.finished) return render(true);
     if (!t.hasProjectFile()) {
-      var s1 = t.modal('<h3>Save the project first</h3><p>The background alignment keeps its results in a folder next to the project file. Save the project as a file first (not in one of your scan folders).</p>' +
+      var s1 = t.modal('<h3>Save the project first</h3><p>The background alignment keeps its results inside the project file. Save the project as a file first (not in one of your scan folders).</p>' +
         '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="bg-save">Save project …</button></div>');
       s1.querySelector('#bg-save').onclick = function () { t.closeModal(); Promise.resolve(t.saveAs()).then(function () { if (t.hasProjectFile()) open(); }); };
       return;
@@ -42,7 +42,7 @@
     }
     var ref = t.refCopy(), list = t.copyList().filter(function (c) { return c.id !== ref; });
     var h = '<h3>Align copies in the background</h3><p>The chosen copies are aligned page by page onto the reference copy <b>' + esc(copyName(ref)) + '</b> ★. ' +
-      'Only how each page had to be moved is kept, in the folder “' + esc(t.resultsDir().name) + '” next to the project file (about 0.2 MB a page). ' +
+      'Only how each page had to be moved is kept, inside the project file (about 0.2 MB a page). ' +
       'Afterwards, comparing a page with the reference opens at once. Pages that are already stored are skipped. You can go on working meanwhile.</p><div class="ws-bgopts">';
     list.forEach(function (c) { h += '<label><input type="checkbox" class="bg-copy" value="' + c.id + '" checked> <b>' + esc(c.name) + '</b> · ' + c.pages + ' page' + (c.pages === 1 ? '' : 's') + '</label>'; });
     h += '</div><div class="ws-bgopts"><label><input type="radio" name="bg-n" value="' + half() + '" checked> ' + half() + ' helper' + (half() === 1 ? '' : 's') + ' at the same time (half of this computer; recommended)</label>';

@@ -3,7 +3,7 @@
 Two copies of PAGES pages each are made from the app's sample pages (every page a little shifted, turned and darker or lighter,
 so that no two pages are the same file). The copy B is aligned onto the reference A in the background with two helpers, the way the
 owner would do it for a real book. Checked:
- * every page is aligned and stored (index.json lists one entry per page, every .bin file is there), nothing fails;
+ * every page is aligned and stored (0.12.0: inside the project file, one record per page), nothing fails;
  * the helpers are replaced after 40 pages each (MAX_JOBS, they give their memory back), and the run still finishes;
  * the time per page does not grow during the run (the last pages are not much slower than the first ones);
  * the scan folders are unchanged afterwards (read only).
@@ -11,6 +11,7 @@ It takes several minutes (about PAGES x 4 s on two cores). Run:  python3 tests/w
 """
 import hashlib, json, os, random, shutil, subprocess, sys, tempfile, time, urllib.request
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import common
 try:
     from PIL import Image, ImageEnhance
 except ImportError:
@@ -88,12 +89,13 @@ try:
             if time.time() - t0 > PAGES * 30: raise AssertionError('the run did not finish: %r | %s' % (st, strip(pg)))
         took = time.time() - t0
         assert st['done'] == PAGES and st['failed'] == 0, st
-        idx = json.load(open(os.path.join(RES, 'index.json'), encoding='utf-8')) if os.path.exists(os.path.join(RES, 'index.json')) else None
+        # 0.12.0: every page is stored INSIDE the project file (common.read_pack), and there is no results folder
+        pk = common.read_pack(os.path.join(PROJ, 'Long book.bookcompare'))
         for _ in range(40):
-            if idx and len(idx['entries']) == PAGES: break
-            time.sleep(0.25); idx = json.load(open(os.path.join(RES, 'index.json'), encoding='utf-8'))
-        bins = [f for f in os.listdir(RES) if f.endswith('.bin')]
-        assert len(idx['entries']) == PAGES and len(bins) == PAGES and sorted(bins) == sorted(idx['entries']), (len(idx['entries']), len(bins))
+            if len(pk['moves']) == PAGES: break
+            time.sleep(0.25); pk = common.read_pack(os.path.join(PROJ, 'Long book.bookcompare'))
+        assert len(pk['moves']) == PAGES and len(pk['bins']) == PAGES and not os.path.exists(RES), (len(pk['moves']), len(pk['bins']))
+        print('  project file: %.1f MB for %d stored pages' % (pk['size'] / 1048576, PAGES))
         # the speed does not fall off: pages per second in the last third against the first third (after the start)
         def rate(lo, hi):
             pts = [m for m in marks if lo <= m[1] <= hi]

@@ -154,7 +154,11 @@
 .ws-menu button:disabled { opacity: .45; cursor: default; }
 .ws-menu hr { border: 0; border-top: 1px solid var(--ws-line-soft); margin: 4px 0; }
 .ws-menu .tick { width: 16px; color: var(--ws-teal); }
-.ws-menu .ws-mhead { padding: 6px 16px 2px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ws-muted); }
+/* section headings of the menus (0.12.0: more pronounced, so that the sections are seen at once) */
+.ws-menu .ws-mhead { margin: 4px 8px 3px; padding: 5px 10px; border-radius: 4px; background: #e2f0f0; color: #00504c; font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.ws-menu .ws-mhead span { font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+.ws-menu .ws-mhead ~ button, .ws-menu .ws-mhead + button { padding-left: 26px; }
+.ws-menu hr { margin: 6px 0 2px; }
 .ws-fmenuwrap { position: fixed; inset: 0 auto auto 0; z-index: 1200; font-size: 14px; line-height: 1.4; color: var(--ws-fg); }
 .ws-fmenuwrap .ws-menu { position: fixed; }
 .ws-fmenuwrap .ws-menu button { font: inherit; color: inherit; }
@@ -250,3 +254,18 @@
 .ws-cell .tn img { max-width: 60px; max-height: 84px; display: block; box-shadow: 0 0 0 1px rgba(0, 0, 0, .12); }
 .ws.ws-pics .ws-cell .fn { white-space: normal; word-break: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; line-height: 1.25; font-size: 12px; }
 .ws-menu button .ws-mdesk { display: block; font-size: 11.5px; color: var(--ws-muted); margin-top: 1px; }
+
+/* the update card (0.12.0): bottom right, on every screen */
+.bc-update { position: fixed; right: 16px; bottom: 72px; z-index: 1200; box-sizing: border-box; width: min(420px, calc(100vw - 32px)); padding: 12px 14px 12px 16px; background: #fff; color: #1b2a2a; border: 1px solid #bcd6d6; border-left: 4px solid #00807a; border-radius: 8px; box-shadow: 0 6px 22px rgba(0, 40, 40, .25); font: 13.5px/1.45 Roboto, system-ui, sans-serif; }
+.bc-update[hidden] { display: none; }
+.bc-update p { margin: 0 0 8px; }
+.bc-update .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.bc-ub { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 6px; border: 1px solid #9cc5c5; background: #fff; color: #00605c; cursor: pointer; }
+.bc-ub:hover { background: #eef7f7; }
+.bc-ub.pri { background: #008080; border-color: #008080; color: #fff; }
+.bc-ub.pri:hover { background: #006a6a; }
+.bc-ubar { display: block; height: 6px; border-radius: 3px; background: #e2eeee; overflow: hidden; }
+.bc-ubar i { display: block; height: 100%; background: #008080; }
+.ws-aboutupd { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--ws-line); border-radius: 6px; margin: -4px 0 12px; font-size: 13px; }
+.ws-aboutupd span { flex: 1; min-width: 200px; }
+.ws-aboutupd.new { border-color: var(--ws-note-line); background: var(--ws-note-bg); }

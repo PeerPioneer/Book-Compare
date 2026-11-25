@@ -15,6 +15,7 @@ Run:  python3 tests/workspace/test_desktop_server.py
 """
 import hashlib, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import common
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -159,6 +160,18 @@ def api_tests():
     assert sorted(os.listdir(os.path.join(BOOKS, 'Project'))) == ['Test ä.bookcompare', 'Test ä.bookcompare results']
     assert call('GET', '/api/file' + q(pr, 'Test ä.bookcompare results/c2/r0001.bin'))[1] == b'\x00\x01\x02'
     st, j = jcall('GET', '/api/list' + q(pr, 'Test ä.bookcompare results')); assert st == 200 and sorted(e['n'] for e in j['entries']) == ['c2', 'index.json'], (st, j)
+    # 0.12.0: the project file is a log (app/js/project-pack.js): a part of it is read, something is added at its end (a longer file is cut
+    # at "at" first: a record cut off by a crash; a shorter one was changed elsewhere: refused), and it is tidied up (parts copied, replaced)
+    pf = os.path.join(BOOKS, 'Project', 'Pack.bookcompare'); open(pf, 'wb').write(b'\x89BCP\r\n\x1a\n' + b'A' * 20)
+    st, body, _ = call('GET', '/api/file' + q(pr, 'Pack.bookcompare'), headers={'Range': 'bytes=8-11'}); assert st == 206 and body == b'AAAA', (st, body)
+    assert call('POST', '/api/append' + q(pr, 'Pack.bookcompare') + '&at=28', data=b'BBBB')[0] == 200 and os.path.getsize(pf) == 32 and open(pf, 'rb').read()[-4:] == b'BBBB'
+    assert call('POST', '/api/append' + q(pr, 'Pack.bookcompare') + '&at=20', data=b'CC')[0] == 200 and os.path.getsize(pf) == 22
+    assert call('POST', '/api/append' + q(pr, 'Pack.bookcompare') + '&at=99', data=b'D')[0] == 409 and os.path.getsize(pf) == 22
+    assert call('POST', '/api/append' + q(pr, 'Test ä.bookcompare results/index.json') + '&at=8', data=b'D')[0] == 403
+    st, body, _ = call('POST', '/api/compact' + q(pr, 'Pack.bookcompare'), data=json.dumps({'ranges': [[20, 2], [8, 3]], 'prefix': 8}).encode())
+    assert st == 200 and open(pf, 'rb').read() == b'\x89BCP\r\n\x1a\nCCAAA', (st, body, open(pf, 'rb').read())
+    assert call('POST', '/api/compact' + q(pr, 'Pack.bookcompare'), data=json.dumps({'ranges': [[0, 999]], 'prefix': 8}).encode())[0] == 400
+    os.remove(pf)
     # the project file of an older version can be read
     open(os.path.join(BOOKS, 'Project', 'book-compare-project.json'), 'w').write('{"old":1}')
     assert call('GET', '/api/file' + q(pr, 'book-compare-project.json'))[1] == b'{"old":1}'
@@ -207,7 +220,7 @@ def add_copy(pg, folder, name, ticks=(), start=None):
     for i in ticks: pg.check('#ac-groups input[data-g="%d"]' % i)
     pg.click('#ac-ok'); pg.wait_for_timeout(800)
 def project_json(name='Book project.bookcompare'):
-    return json.load(open(os.path.join(BOOKS, 'Project', name), encoding='utf-8'))
+    return common.read_pack(os.path.join(BOOKS, 'Project', name))['project']      # (0.12.0: the project file is a log, see common.read_pack)
 def clear_project_folder():
     for f in os.listdir(os.path.join(BOOKS, 'Project')):
         f = os.path.join(BOOKS, 'Project', f); shutil.rmtree(f) if os.path.isdir(f) else os.remove(f)
@@ -363,8 +376,27 @@ def scenario(p, kind):
     assert open(os.path.join(old, 'book-compare-project.json'), 'rb').read() == oldtext and os.listdir(old) == ['book-compare-project.json'], 'not saved by itself'
     push_pick(os.path.join(old, 'Old project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
     assert sorted(os.listdir(old)) == ['Old project.bookcompare', 'book-compare-project.json'] and open(os.path.join(old, 'book-compare-project.json'), 'rb').read() == oldtext
-    assert json.load(open(os.path.join(old, 'Old project.bookcompare'), encoding='utf-8'))['copies'][0]['name'] == 'Old-A'
+    assert common.read_pack(os.path.join(old, 'Old project.bookcompare'))['project']['copies'][0]['name'] == 'Old-A'
     assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Old project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
+    # --- 0.12.0: a project file of version 0.11.0 (JSON text) with its results folder: opened, it becomes one file with the stored
+    #     alignments inside (only those of the current alignment engine), and the results folder is removed ----
+    o11 = os.path.join(BOOKS, 'Project', 'V11'); os.makedirs(os.path.join(o11, 'Book 11.bookcompare results'))
+    open(os.path.join(o11, 'Book 11.bookcompare'), 'wb').write(json.dumps(dict(project_json(), projectId='v11'), indent=1).encode('utf-8'))
+    eng = pg.evaluate("BCResults.ENGINE")
+    idx = {'format': 'book-compare-results', 'version': 1, 'entries': {
+        'm-0123456789abcdef.bin': {'valid': eng + '|1:x|2:y|auto|std', 'c0': 1, 'k0': 'a', 'c1': 2, 'k1': 'b', 'at': 1, 'bytes': 5000},
+        'm-fedcba9876543210.bin': {'valid': 'tiles-2026-11|1:x|2:y|auto|std', 'c0': 1, 'k0': 'c', 'c1': 2, 'k1': 'd', 'at': 1, 'bytes': 5000}}}
+    open(os.path.join(o11, 'Book 11.bookcompare results', 'index.json'), 'w').write(json.dumps(idx))
+    for n in idx['entries']: open(os.path.join(o11, 'Book 11.bookcompare results', n), 'wb').write(os.urandom(5000))
+    push_pick(os.path.join(o11, 'Book 11.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=open]'); pg.wait_for_timeout(3000)
+    pk = common.read_pack(os.path.join(o11, 'Book 11.bookcompare'))
+    assert pk['pack'] and list(pk['moves']) == ['m-0123456789abcdef.bin'] and pk['bins']['m-0123456789abcdef.bin'] == 5000 and pk['project']['projectId'] == 'v11', (pk['pack'], pk['moves'])
+    assert os.listdir(o11) == ['Book 11.bookcompare'], ('the results folder is gone', os.listdir(o11))
+    assert 'brought up to date' in pg.inner_text('#ws-toast') and '1 stored alignment is now inside it' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
+    # the next change is added at the end of the file; the stored alignment stays
+    sz = pk['size']; pg.locator('#ws .ws-hname').first.click(); pg.keyboard.type('V11-A'); pg.keyboard.press('Enter'); pg.wait_for_timeout(1500)
+    pk = common.read_pack(os.path.join(o11, 'Book 11.bookcompare'))
+    assert pk['size'] > sz and pk['project']['copies'][0]['name'] == 'V11-A' and list(pk['moves']) == ['m-0123456789abcdef.bin'], (pk['size'], sz)
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

@@ -1,6 +1,6 @@
 // Book Compare's service worker: keeps the website's files so that it also opens without a connection.
 // Change CACHE_NAME whenever a file listed here changes, so that the browsers load the new files.
-const CACHE_NAME = "imcomp-mdc-pwa-v32";
+const CACHE_NAME = "imcomp-mdc-pwa-v33";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -25,6 +25,7 @@ const staticAssets = [
     './js/speedtest.js',
     './js/align-engine.js',
     './js/align-worker.js',
+    './js/project-pack.js',
     './js/results-store.js',
     './js/background-align.js',
     './js/compare-tab.js',

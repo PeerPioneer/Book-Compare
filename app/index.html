@@ -154,6 +154,9 @@
       .desktop-dl { margin: 1.5rem auto 0; max-width: 34rem; text-align: center; font-size: 0.85rem; color: #4a5a5a; line-height: 1.4; }
       .desktop-dl a { font-weight: 500; color: #00807a; }
       .desktop-dl[hidden], .desktop-dl [hidden] { display: none; }
+      .start-version { margin: 1rem auto 0; text-align: center; font-size: 0.85rem; color: #4a5a5a; }
+      .start-version[hidden] { display: none; }
+      .start-version .start-link { font-size: inherit; }
       /* Info dialog */
       .mdc-dialog .mdc-dialog__close {
         align-self: flex-end;
@@ -405,7 +408,7 @@
       }
       #action > * {
         grid-area: 1 / 1;
-        place-self: center center;
+        place-self: center start; /* (0.12.0: next to the view bubble, whatever their width) */
       }
       #toggle {
         width: auto;
@@ -652,6 +655,33 @@
       #o2_switch,
       #o1_note {
         display: none;
+      }
+      /* 0.12.0: both stand in the teal bar (moved there by panes.js), like the options of the other views */
+      #onlyimage2 #o2_switch {
+        display: flex;
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      #onlyimage2 #o2_switch button {
+        color: #fff;
+        padding: 7px 14px;
+      }
+      #onlyimage2 #o2_switch button + button {
+        border-left: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      #onlyimage2 #o2_switch button.on {
+        background: #fff;
+        color: #006a6a;
+      }
+      #onlyimage2 #o2_switch button:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: -3px;
+      }
+      #onlyimage1 #o1_note {
+        display: block;
+        color: rgba(255, 255, 255, 0.92);
+        font: 13px/1.3 Roboto, Arial, sans-serif;
       }
       #workspace.ws-single2 #o2_switch {
         grid-area: o2;
@@ -1046,6 +1076,7 @@
     <script defer src="js/compare-annot.js"></script>
     <script defer src="js/compare-box.js"></script>
     <script defer src="js/align-engine.js"></script>
+    <script defer src="js/project-pack.js"></script>
     <script defer src="js/results-store.js"></script>
     <script defer src="js/background-align.js"></script>
     <script defer src="js/speedtest.js"></script>
@@ -1289,6 +1320,11 @@
         <!-- 0.11.0: the examples are a small project (js/examples.js); comparing two single pictures is gone -->
         <p class="start-small">
           <button type="button" id="start_examples" class="start-link">Try the examples</button>
+        </p>
+        <!-- desktop program only (0.12.0): the version, and a way to look for a newer one -->
+        <p id="start_version" class="start-version" hidden>
+          Version <span id="start_version_nr"></span> ·
+          <button type="button" id="start_updates" class="start-link">Check for updates</button>
         </p>
         <!-- website only: where to get the desktop program (hidden inside the desktop program itself, see the script below) -->
         <p id="desktop_dl" class="desktop-dl" hidden>
@@ -2012,6 +2048,12 @@
 
         // The desktop program says "BookCompareDesktop/<version>" in the name of its browser engine (desktop/main.js):
         // the website shows where to download it, the program itself does not.
+        const dv = /BookCompareDesktop\/([0-9][0-9.]*)/.exec(navigator.userAgent);
+        if (dv) {                                                     // the version and "Check for updates" (0.12.0)
+          document.getElementById("start_version_nr").textContent = dv[1];
+          document.getElementById("start_version").hidden = false;
+          document.getElementById("start_updates").onclick = () => BookWorkspace.checkUpdates();
+        }
         if (!/BookCompareDesktop/.test(navigator.userAgent)) {
           const dl = document.getElementById("desktop_dl");
           if (dl) dl.hidden = false;
