@@ -251,7 +251,7 @@ def scenario(p, kind):
     assert 'scan folder' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
     assert not [f for f in os.listdir(os.path.join(BOOKS, 'Copy-B ä')) if 'bookcompare' in f]
     push_pick(os.path.join(BOOKS, 'Project', 'Book project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
-    assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Book project' in (pg.get_attribute('#ws-save', 'title') or ''), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
+    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Book project' in (pg.get_attribute('#ws-save', 'title') or ''), (pg.inner_text('#ws-save'), pg.inner_text('#ws-toast') if pg.locator('#ws-toast').count() else '', open(PICKS).read(), errs)
     assert os.listdir(os.path.join(BOOKS, 'Project')) == ['Book project.bookcompare'], os.listdir(os.path.join(BOOKS, 'Project'))
     d = project_json()
     assert d['version'] == 2 and len(d['roots']) == 3 and all(os.path.normcase(r['path']).startswith(os.path.normcase(BOOKS)) for r in d['roots']), d['roots']
@@ -377,7 +377,7 @@ def scenario(p, kind):
     push_pick(os.path.join(old, 'Old project.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
     assert sorted(os.listdir(old)) == ['Old project.bookcompare', 'book-compare-project.json'] and open(os.path.join(old, 'book-compare-project.json'), 'rb').read() == oldtext
     assert common.read_pack(os.path.join(old, 'Old project.bookcompare'))['project']['copies'][0]['name'] == 'Old-A'
-    assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Old project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
+    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Old project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
     # --- 0.12.0: a project file of version 0.11.0 (JSON text) with its results folder: opened, it becomes one file with the stored
     #     alignments inside (only those of the current alignment engine), and the results folder is removed ----
     o11 = os.path.join(BOOKS, 'Project', 'V11'); os.makedirs(os.path.join(o11, 'Book 11.bookcompare results'))

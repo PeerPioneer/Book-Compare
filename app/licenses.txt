@@ -536,7 +536,61 @@ Licence: Apache License 2.0 - the full text is in deps/opencv/LICENSE.txt.
 Built from OpenCV (https://opencv.org); packaged by the npm package @techstark/opencv-js.
 
 ====================================================================
-EB Garamond (fonts/eb-garamond.woff2, fonts/eb-garamond-italic.woff2), the font of Book Compare since 0.15.0
+EB Garamond (fonts/eb-garamond.woff2, fonts/eb-garamond-italic.woff2), one of the fonts to choose from in ⋮ → Font …
 Copyright 2017 The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12).
 Licence: SIL Open Font License 1.1 - the full text is in fonts/EB-Garamond-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/ebgaramond) and reduced to the Latin characters (woff2).
+
+====================================================================
+Source Sans 3 (fonts/sourcesans3.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Source-Sans-3-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/sourcesans3): the unchanged font, only packed as woff2 (the name 'Source' is reserved, so the font is not reduced).
+
+====================================================================
+Fira Sans (fonts/firasans-regular.woff2, -medium, -semibold, -bold), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright (c) 2012-2015, The Mozilla Foundation and Telefonica S.A.
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Fira-Sans-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/firasans): reduced to the Latin characters (woff2).
+
+====================================================================
+Alegreya Sans (fonts/alegreyasans-regular.woff2, -medium, -bold), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2013 The Alegreya Sans Project Authors (https://github.com/huertatipografica/Alegreya-Sans).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Alegreya-Sans-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/alegreyasans): reduced to the Latin characters (woff2).
+
+====================================================================
+Figtree (fonts/figtree.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Figtree-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/figtree): reduced to the Latin characters (woff2).
+
+====================================================================
+DM Sans (fonts/dmsans.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/DM-Sans-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/dmsans): reduced to the Latin characters (woff2).
+
+====================================================================
+Jost (fonts/jost.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2020 The Jost Project Authors (https://github.com/indestructible-type).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Jost-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/jost): reduced to the Latin characters (woff2).
+
+====================================================================
+Inter (fonts/inter.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Inter-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/inter): reduced to the Latin characters (woff2).
+
+====================================================================
+Public Sans (fonts/publicsans.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2015 The Public Sans Project Authors (https://github.com/uswds/public-sans).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Public-Sans-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/publicsans): reduced to the Latin characters (woff2).
+
+====================================================================
+IBM Plex Sans (fonts/ibmplexsans.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Copyright 2017 IBM Corp. with Reserved Font Name "Plex".
+Licence: SIL Open Font License 1.1 - the full text is in fonts/IBM-Plex-Sans-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/ibmplexsans): the unchanged font, only packed as woff2 (the name 'Plex' is reserved, so the font is not reduced).

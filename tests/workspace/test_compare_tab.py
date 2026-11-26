@@ -6,7 +6,7 @@ Checked, in Chromium and Firefox:
   COMPARE opens the Compare tab and aligns the pair by itself; next/previous page, keys, copy menus, swap, the page list and its
   search, skipping pages that a copy lacks, PAGES tab and back, flags (button, colours, key F, list filter, shown in the Pages grid,
   undo), the book map (opens near the pointer, picture of the page, click to jump, grey ticks, pin), focus mode (hides everything but the pictures, keys work, Esc/Leave button),
-  the speed test (More > Measure speed on this computer: times each copy, copes with a scan that cannot be opened, Stop, closing the window, changes nothing in the project), and that the scan folders are never changed.
+  and that the scan folders are never changed.
 
 Run:  python3 tests/workspace/test_compare_tab.py   (needs Node)
 """
@@ -34,8 +34,6 @@ for ci, name in ((0, 'Copy-A'), (1, 'Copy-B')):
     for i, pr in enumerate(PAIRS): shutil.copy(os.path.join(U, pr[ci]), os.path.join(BOOKS, name, 'p%d.jpg' % (i + 1)))
 os.makedirs(os.path.join(BOOKS, 'Copy-C'))
 for i in (0, 1): shutil.copy(os.path.join(U, PAIRS[i][1]), os.path.join(BOOKS, 'Copy-C', 'p%d.jpg' % (i + 1)))
-os.makedirs(os.path.join(BOOKS, 'Copy-D'))                                                        # a "scan" the browser cannot open (for the speed test)
-open(os.path.join(BOOKS, 'Copy-D', 'p1.jpg'), 'wb').write(b'this is not a picture' * 50)
 errs = []
 SHOTS = os.environ.get('BOOKCOMPARE_SHOTS', '')
 
@@ -202,10 +200,7 @@ def scenario(p, kind):
     assert pg.locator('#ct_list li.miss').count() == 2, pg.locator('#ct_list li.miss').count()
     pg.click('#ct_list li[data-i="0"]'); wait_aligned(pg, 'row 1 with C'); pg.click('#ct_next'); wait_aligned(pg, 'row 2 with C'); assert 'Page 2' in where(pg), where(pg)
     pg.click('#ct_next'); assert 'last page to compare' in pg.inner_text('.ct-toast'), 'rows 3 and 4 lack a page in C: skipped'
-    pg.evaluate("document.getElementById('ct_skip').click()")                       # no skipping: the next row is shown even if C lacks it
-    pg.click('#ct_next'); pg.wait_for_timeout(400)
-    assert pg.locator('.ct-busy.bad:visible').count() == 1 and 'no page' in pg.inner_text('.ct-busy').lower(), pg.inner_text('.ct-busy')
-    pg.evaluate("document.getElementById('ct_skip').click()")
+    assert pg.locator('#ct_skip').count() == 0, '0.16.0: no tick box - pages one copy lacks are always skipped'
     # copy 2: the up arrow button of the panel goes back to B (there are no keys for switching copies any more)
     pg.click('#ct_list li[data-i="0"]'); wait_aligned(pg, 'row 1 again')
     pg.select_option('#ct_c2', label='B-Test'); wait_aligned(pg, 'copy 2 back to B'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test' and pg.inner_text('#ct_c2n') == 'B-Test'
@@ -232,30 +227,39 @@ def scenario(p, kind):
     sq = pg.evaluate("[...document.querySelectorAll('#ct_colors rect')].map(r => r.getAttribute('fill').toLowerCase())"); assert sq == ['#e60000', '#0046c8'], ('the colour squares: copy 2 behind, copy 1 in front', sq)
     pg.click('#ct_v_toggle'); pg.wait_for_timeout(450)
     assert pg.inner_text('#ct_vval') == 'Toggle' and pg.get_attribute('#ct_v_toggle', 'aria-checked') == 'true' and optH('diff') < 1 and optH('toggle') > 20, 'Toggle chosen: its speed unfolds, the Superimposed options fold away'
+    # 0.16.0 (owner): no label over the toggling picture; the name of the copy on screen lights up in the left panel, in turn
+    assert not pg.is_visible('#pane_main .pane__label'), 'no "Toggle" label over the picture'
+    seen = set()
+    for _ in range(16):
+        pg.wait_for_timeout(110)
+        lit = pg.evaluate("[...document.querySelectorAll('.ct-side.ct-toggling .ct-copy.lit')].map(e => e.classList.contains('c1') ? 1 : 2)")
+        assert len(lit) == 1, lit; seen.add(lit[0])
+    assert seen == {1, 2}, ('copy 1 and copy 2 light up in turn', seen)
     assert pg.get_attribute('#ct_speed button[data-sp="2"]', 'aria-pressed') == 'true'
     pg.click('#ct_speed button[data-sp="4"]'); pg.wait_for_timeout(150)
     assert pg.evaluate("document.querySelector('#toggle button.mdc-tab.active').dataset.speed") == '4' and pg.get_attribute('#ct_speed button[data-sp="4"]', 'aria-pressed') == 'true', 'Fast'
     pg.click('#ct_speed button[data-sp="2"]'); pg.wait_for_timeout(100)
     pg.keyboard.press('3'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vval') == 'Top and bottom', 'key 3 = Top and bottom'
+    assert pg.locator('.ct-side.ct-toggling').count() == 0 and pg.locator('.ct-copy.lit').count() == 0, 'the names are lit only while toggling'
+    assert not pg.is_visible('#pane_o1 .pane__label') and not pg.is_visible('#pane_o2 .pane__label'), '0.16.0: no labels over the two pictures'
     pg.keyboard.press('5'); pg.wait_for_timeout(450); assert pg.inner_text('#ct_vval') == 'Copy 1', 'key 5 = only copy 1'
     assert vis('#o1_note') and optH('onlyimage2') < 1, 'copy 1 is never changed: a note instead of the switch'
-    assert 'A-Test' in pg.inner_text('#pane_o1 .pane__label'), 'the label names the copy as the grid does'
+    assert not pg.is_visible('#pane_o1 .pane__label'), '0.16.0: no label over the picture'
     # N1: in the Copy 2 view, Aligned | Original scan (under its name in the panel)
     pg.keyboard.press('6'); pg.wait_for_timeout(450); assert pg.inner_text('#ct_vval') == 'Copy 2' and vis('#o2_switch') and optH('onlyimage1') < 1
-    lab = pg.inner_text('#pane_o2 .pane__label'); assert lab.startswith('Copy 2, aligned') and 'B-Test' in lab, lab
-    assert pg.get_attribute('#o2_switch button[data-o2=aligned]', 'aria-pressed') == 'true'
+    assert not pg.is_visible('#pane_o2 .pane__label') and pg.get_attribute('#o2_switch button[data-o2=aligned]', 'aria-pressed') == 'true'
     px_al = pg.evaluate("(() => { const c = document.querySelector('#pane_o2 canvas'); return [c.width, c.height, c.toDataURL().length]; })()")
     pg.click('#o2_switch button[data-o2=original]'); pg.wait_for_timeout(400)
     px_or = pg.evaluate("(() => { const c = document.querySelector('#pane_o2 canvas'); return [c.width, c.height, c.toDataURL().length]; })()")
-    lab = pg.inner_text('#pane_o2 .pane__label'); assert lab.startswith('Copy 2, original scan') and 'B-Test' in lab, lab
     assert px_or[:2] == px_al[:2] and px_or[2] != px_al[2] and pg.evaluate("BCCopy2View.original()"), ('the original scan is drawn into the same frame', px_al, px_or)
-    pg.keyboard.press('3'); pg.wait_for_timeout(400); assert not pg.evaluate("BCCopy2View.original()") and pg.inner_text('#pane_o2 .pane__label').startswith('Copy 2, aligned'), 'other views always show copy 2 aligned'
+    pg.keyboard.press('3'); pg.wait_for_timeout(400); assert not pg.evaluate("BCCopy2View.original()"), 'other views always show copy 2 aligned'
     pg.keyboard.press('6'); pg.wait_for_timeout(400); assert pg.evaluate("BCCopy2View.original()"), 'the choice is kept for the Copy 2 view'
     pg.click('#o2_switch button[data-o2=aligned]'); pg.wait_for_timeout(300)
     pg.click('#ct_v_diff'); pg.wait_for_timeout(300); assert pg.inner_text('#ct_vval') == 'Superimposed'
     # the link of the panels: a button with the link symbol, crossed out when the panels move on their own
     assert pg.get_attribute('#ct_link', 'aria-pressed') == 'true' and 'Zoom and move all panels together' in pg.inner_text('#ct_link') and pg.evaluate("BCLink.linked()")
     assert pg.evaluate("getComputedStyle(document.querySelector('#ct_link .ct-linkx')).opacity") == '0'
+    assert pg.evaluate("getComputedStyle(document.querySelector('#ct_link')).backgroundColor") in ('rgba(0, 0, 0, 0)', 'transparent'), '0.16.0: no coloured background, the symbol says it'
     pg.click('#ct_link'); pg.wait_for_timeout(300)
     assert pg.get_attribute('#ct_link', 'aria-pressed') == 'false' and not pg.evaluate("BCLink.linked()") and pg.evaluate("getComputedStyle(document.querySelector('#ct_link .ct-linkx')).opacity") == '1', 'unlinked: the symbol is crossed out'
     pg.click('#ct_link'); pg.wait_for_timeout(250); assert pg.evaluate("BCLink.linked()")
@@ -277,6 +281,7 @@ def scenario(p, kind):
     pg.click('#ct_more'); pg.wait_for_timeout(300)
     heads = [t.strip().upper() for t in pg.locator('#ws-fmenu .ws-mhead').all_inner_texts()]
     assert heads == ['PROJECT', 'EXPORT', 'FONT', 'HELP'], heads
+    assert all(pg.locator('#ws-fmenu [data-m=%s]' % m_).count() == 0 for m_ in ('ref', 'bg', 'help', 'speed')), '0.16.0: no reference copy, background, "How … works" or speed test entries'
     assert pg.locator('#ws-fmenu [data-m=x-view]').is_enabled() and pg.locator('#ws-fmenu [data-m=save]').count() == 1 and pg.locator('#ws-fmenu [data-m=about]').count() == 1
     mb = pg.locator('#ws-fmenu .ws-menu').bounding_box()
     top_el = pg.evaluate("(p) => { const e = document.elementFromPoint(p[0], p[1]); return e ? (e.closest('#ws-fmenu') ? 'menu' : e.className) : 'none'; }", [mb['x'] + mb['width'] / 2, mb['y'] + mb['height'] - 6])
@@ -287,16 +292,30 @@ def scenario(p, kind):
     pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200); assert pg.locator('#ws-float').count() == 0
     pg.click('#ct_helpbtn'); pg.wait_for_timeout(300); assert 'Page Down' in pg.inner_text('#ws-float .ws-dlg'), 'the keys are in the help'
     pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200)
-    # 0.15.0 (owner): EB Garamond for all text; the old font (Roboto) one click away in the menu, remembered on this computer
+    # 0.16.0 (owner): Roboto again by default; ⋮ → Font … offers three humanist, three geometric and three grotesque fonts (and Roboto and
+    # EB Garamond), each shown in itself; the choice applies at once and is remembered on this computer
     ff = lambda sel: pg.evaluate("(s) => getComputedStyle(document.querySelector(s)).fontFamily", sel)
-    assert pg.evaluate("document.documentElement.classList.contains('bc-garamond')") and 'EB Garamond' in ff('#ct_where b') and 'EB Garamond' in ff('#ct_list li'), 'EB Garamond everywhere'
-    assert pg.evaluate("document.fonts.check('16px \"EB Garamond\"')"), 'the font file is loaded'
-    pg.click('#ct_more'); pg.wait_for_timeout(200); assert 'Back to the old font' in pg.inner_text('#ws-fmenu [data-m=font]')
-    pg.click('#ws-fmenu [data-m=font]'); pg.wait_for_timeout(300)
-    assert not pg.evaluate("document.documentElement.classList.contains('bc-garamond')") and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'roboto' and 'EB Garamond' not in ff('#ct_where b'), 'back to Roboto'
-    pg.click('#ct_more'); pg.wait_for_timeout(200); assert 'Try EB Garamond' in pg.inner_text('#ws-fmenu [data-m=font]'); pg.click('#ws-fmenu [data-m=font]'); pg.wait_for_timeout(300)
-    assert pg.evaluate("document.documentElement.classList.contains('bc-garamond')") and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'garamond'
+    assert not pg.evaluate("document.documentElement.hasAttribute('data-bcfont')") and 'Roboto' in ff('#ct_where b') and 'Garamond' not in ff('#ct_where b'), 'Roboto at first'
+    pg.click('#ct_more'); pg.wait_for_timeout(200); assert 'now: Roboto' in pg.inner_text('#ws-fmenu [data-m=font]')
+    pg.click('#ws-fmenu [data-m=font]'); pg.wait_for_selector('#ws-float .ws-fonts')
+    opts = pg.evaluate("[...document.querySelectorAll('#ws-float input[name=ws-font]')].map(i => i.value)")
+    assert opts == ['source-sans', 'fira-sans', 'alegreya-sans', 'figtree', 'dm-sans', 'jost', 'inter', 'public-sans', 'ibm-plex-sans', 'roboto', 'garamond'], opts
+    assert pg.is_checked('#ws-float input[value=roboto]') and [t.strip().split(' · ')[0].upper() for t in pg.locator('#ws-float .ws-fghead').all_inner_texts()] == ['HUMANIST', 'GEOMETRIC', 'GROTESQUE', 'USED BEFORE IN BOOK COMPARE']
+    fams = pg.evaluate("[...document.querySelectorAll('#ws-float .ws-fname')].map(e => getComputedStyle(e).fontFamily)")
+    assert 'BC Jost' in fams[5] and 'BC Inter' in fams[6] and 'EB Garamond' in fams[10] and fams[9].startswith('Roboto'), fams
+    pg.click('#ws-float input[value=inter]'); pg.wait_for_timeout(400)
+    assert pg.evaluate("document.documentElement.getAttribute('data-bcfont')") == 'inter' and 'BC Inter' in ff('#ct_where b') and 'BC Inter' in ff('#ct_list li') and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'inter'
+    assert 'BC Jost' in pg.evaluate("getComputedStyle(document.querySelectorAll('#ws-float .ws-fname')[5]).fontFamily"), 'the names keep their own fonts'
+    pg.wait_for_function("document.fonts.check('16px \"BC Inter\"')", timeout=10000)
+    pg.click('#ws-float input[value=garamond]'); pg.wait_for_timeout(300); assert 'EB Garamond' in ff('#ct_where b')
+    pg.click('#ws-float input[value=roboto]'); pg.wait_for_timeout(300)
+    assert not pg.evaluate("document.documentElement.hasAttribute('data-bcfont')") and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'roboto' and 'Roboto' in ff('#ct_where b')
+    pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200)
+    pg.evaluate("document.documentElement.setAttribute('data-bcfont', 'figtree')")
     assert pg.evaluate("[...document.querySelectorAll('.material-icons')].every(e => getComputedStyle(e).fontFamily.indexOf('Material Icons') >= 0)"), 'the icons keep their font'
+    pg.evaluate("document.documentElement.removeAttribute('data-bcfont')")
+    # 0.16.0 (owner): the text of the program cannot be selected; the search field can
+    assert pg.evaluate("getComputedStyle(document.querySelector('#ct_where b')).userSelect") == 'none' and pg.evaluate("getComputedStyle(document.querySelector('#ct_q')).userSelect") != 'none'
     # ---------------------------------------------------------------- flags
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     assert pg.is_hidden('#ct_filters') and pg.is_hidden('#ct_fcols'), 'nothing flagged yet: no filter chips'
@@ -465,42 +484,16 @@ def scenario(p, kind):
     # the teal bar has no Back button any more: the Pages tab is the way back
     assert not pg.is_visible('#back'), 'no Back button in the Compare tab'
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(500); assert not pg.evaluate("document.getElementById('ws').hidden")
-    # ---------------------------------------------------------------- speed test
-    add_copy(pg, 'Copy-D', 'D-Broken')
-    pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300)
-    state0 = pg.evaluate("JSON.stringify(BookWorkspace.tab.state())")
-    def open_speed():
-        pg.click('#ws-more'); assert pg.is_visible('#ws-menu [data-m="speed"]'), 'the menu offers the speed test'
-        pg.click('#ws-menu [data-m="speed"]'); pg.wait_for_selector('#ws-scrim .ws-dlg')
-    open_speed()
-    dlg = pg.inner_text('#ws-scrim .ws-dlg'); assert 'Measure speed' in dlg and 'Page 1' in dlg and '3 other copies' in dlg and 'A-Test' in dlg, dlg
-    assert pg.is_visible('#sp-par'), 'the speed test window offers the test with several helpers at the same time'
-    pg.check('#sp-types'); pg.click('#sp-go')
-    pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=240000)
-    rows_ = pg.locator('#ws-scrim tr[data-copy]'); assert rows_.count() == 3, rows_.count()
-    bad = pg.locator('#ws-scrim tr.bad'); assert bad.count() == 1 and 'D-Broken' in bad.inner_text() and 'could not open' in bad.inner_text(), bad.all_inner_texts()
-    res = pg.evaluate("SpeedTest.last.stats"); assert res['n'] == 2 and res['failed'] == 1 and res['mean'] > 0 and res['find'] > 0, res
-    txt = pg.inner_text('#ws-scrim .ws-dlg')
-    assert 'on average' in txt and 'Your project has' in txt and 'comparisons' in txt and 'freezes' in txt, txt
-    assert pg.locator('#ws-scrim h4').count() == 1 and pg.locator('#ws-scrim h4 + table tbody tr').count() == 3, 'the three alignment types are compared'
-    # the new tile-based method (worker + OpenCV.js) ran for the two copies that open: a column in the table, numbers in the text
-    tl = pg.evaluate("SpeedTest.last.result.tile"); assert tl and tl['ok'] and tl['init']['load_s'] > 0, tl
-    assert pg.evaluate("SpeedTest.last.result.copies.filter(c => c.tile || c.tileErr).length") == 2, 'both openable copies were tried with the tile method'
-    assert 'Tile-based (new)' in pg.inner_text('#ws-scrim thead') and 'Tile-based alignment (worker, OpenCV.js)' in pg.evaluate("SpeedTest.last.text")
-    assert pg.evaluate("SpeedTest.last.text").startswith('Book Compare speed test') and 'D-Broken | FAILED' in pg.evaluate("SpeedTest.last.text")
-    pg.click('#sp-copy'); pg.wait_for_function("document.getElementById('sp-msg').textContent.length > 0", timeout=5000)
-    assert pg.evaluate("document.querySelector('.sp-text').value") == pg.evaluate("SpeedTest.last.text"), 'the numbers are also shown as text'
-    assert pg.evaluate("JSON.stringify(BookWorkspace.tab.state())") == state0, 'the speed test changes nothing in the project'
-    # Stop: the test ends early and says so
-    pg.click('[data-close]'); open_speed(); pg.uncheck('#sp-tiles'); pg.click('#sp-go'); pg.click('#sp-stop')
-    pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=240000)
-    assert 'Stopped early' in pg.inner_text('#ws-scrim .ws-dlg'), pg.inner_text('#ws-scrim .ws-dlg')
-    # closing the window in the middle ends the test without trouble, and a new one can be started afterwards
-    pg.click('[data-close]'); pg.evaluate("SpeedTest.last = null"); open_speed(); pg.uncheck('#sp-tiles'); pg.click('#sp-go'); pg.keyboard.press('Escape')
-    pg.wait_for_function("SpeedTest.last !== null", timeout=240000); assert pg.locator('#ws-scrim').count() == 0, 'the window stays closed'
-    open_speed(); assert pg.is_visible('#sp-go'); pg.click('[data-close]')
-    pg.click('#ws-more'); pg.click('#ws-menu [data-m="help"]'); assert 'Measure speed' in pg.inner_text('#ws-scrim .ws-dlg'); pg.click('[data-close]')
-    assert pg.evaluate("JSON.stringify(BookWorkspace.tab.state())") == state0
+    # 0.16.0 (owner): no menu entry for the reference copy; opening the Compare tab without one explains it and offers to choose one, with
+    # "Don't warn me again" for this project (automatic tests see this window only when they ask for it)
+    pg.evaluate("window.BC_TEST_REFWARN = true"); pg.click('#ws-compare'); pg.wait_for_selector('#ws-float #rf-ok', timeout=10000)
+    dlg = pg.inner_text('#ws-float .ws-dlg'); assert 'Choose a reference copy' in dlg and 'double-click' in dlg and '(proposed' in dlg and pg.is_visible('#rf-nowarn'), dlg
+    pg.click('#rf-cancel'); pg.wait_for_timeout(300); assert pg.locator('#ws-float').count() == 0 and pg.evaluate("BookWorkspace.tab.refCopy()") is None
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(400); pg.click('#ws-compare'); pg.wait_for_selector('#ws-float #rf-ok', timeout=10000)
+    pg.check('#rf-nowarn'); pg.click('#rf-cancel'); pg.wait_for_timeout(300)
+    pg.click('#ct_tab_pages'); pg.wait_for_timeout(400); pg.click('#ws-compare'); pg.wait_for_timeout(800)
+    assert pg.locator('#ws-float .ws-dlg').count() == 0, '"Don\'t warn me again": no window'
+    pg.evaluate("window.BC_TEST_REFWARN = false"); pg.click('#ct_tab_pages'); pg.wait_for_timeout(400)
     # item 20: a double-click on a cell compares that page with the reference copy (or, without one, with copy 1)
     pair0 = pg.evaluate("BookWorkspace.tab.state().pair"); third = [cc['id'] for cc in pg.evaluate("BookWorkspace.tab.state().copies") if cc['id'] not in pair0][0]
     ci3 = [cc['id'] for cc in pg.evaluate("BookWorkspace.tab.state().copies")].index(third)

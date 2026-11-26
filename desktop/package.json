@@ -1,7 +1,7 @@
 {
   "name": "book-compare",
   "productName": "Book Compare",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Compare scans of copies of early printed books, page by page.",
   "author": "Torge Schiefelbein",
   "license": "BSD-2-Clause",

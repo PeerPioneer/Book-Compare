@@ -81,7 +81,7 @@ with sync_playwright() as p:
     assert read_project(pg3, 'legacy')['version'] == 1 and project_files(pg3, 'legacy') == ['book-compare-project.json']
     pg3.evaluate("window.__picks.push(window.__h.legacy)"); pg3.click('#ws-more'); pg3.click('[data-m=save]'); pg3.wait_for_timeout(1200)
     assert project_files(pg3, 'legacy') == ['Book project.bookcompare', 'book-compare-project.json'], project_files(pg3, 'legacy')
-    assert '✓ Saved automatically' in pg3.inner_text('#ws-save') and 'Book project' in (pg3.get_attribute('#ws-save', 'title') or ''), pg3.inner_text('#ws-save')
+    assert '✓ Saved' in pg3.inner_text('#ws-save') and 'Book project' in (pg3.get_attribute('#ws-save', 'title') or ''), pg3.inner_text('#ws-save')
     assert pg3.evaluate("(async()=>JSON.parse(await (await (await __h.legacy.getFileHandle('book-compare-project.json')).getFile()).text()).version)()") == 1
     d = read_project(pg3, 'legacy'); assert d['version'] == 2 and len(d['roots']) == 1 and d['roots'][0]['name'] == 'scans', d['roots']
     assert [c['locs'][0]['path'] for c in d['copies']] == ['Copy-A', 'Copy-B'] and d['copies'][0]['name'] == 'Renamed-A'

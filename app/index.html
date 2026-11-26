@@ -11,9 +11,22 @@
     <meta name="theme-color" content="#ffffff" />
     <title>Book Compare</title>
     <script>
-      // the font of Book Compare (0.15.0): EB Garamond unless the owner chose the old one (Roboto) in the menu; set before anything is drawn
-      try { if (localStorage.getItem('bookcompare_font') !== 'roboto') document.documentElement.classList.add('bc-garamond'); }
-      catch (e) { document.documentElement.classList.add('bc-garamond'); }
+      // The font of Book Compare (0.16.0, owner): Roboto unless another one was chosen in ⋮ → Font … ("bookcompare_font" in this
+      // browser's storage). The list is used by that window too (js/workspace.js); fsa = font-size-adjust when not 0.52 (as in the CSS below).
+      // Set before anything is drawn.
+      window.BC_FONTS = [
+        { id: "source-sans", name: "Source Sans 3", group: "humanist", fsa: 0.50 }, { id: "fira-sans", name: "Fira Sans", group: "humanist" },
+        { id: "alegreya-sans", name: "Alegreya Sans", group: "humanist", fsa: 0.49 },
+        { id: "figtree", name: "Figtree", group: "geometric", fsa: 0.51 }, { id: "dm-sans", name: "DM Sans", group: "geometric" },
+        { id: "jost", name: "Jost", group: "geometric", fsa: 0.49 },
+        { id: "inter", name: "Inter", group: "grotesque" }, { id: "public-sans", name: "Public Sans", group: "grotesque" },
+        { id: "ibm-plex-sans", name: "IBM Plex Sans", group: "grotesque" },
+        { id: "roboto", name: "Roboto", group: "earlier" }, { id: "garamond", name: "EB Garamond", group: "earlier" }
+      ];
+      try {
+        var bcf = localStorage.getItem("bookcompare_font");
+        if (bcf && bcf !== "roboto" && window.BC_FONTS.some(function (f) { return f.id === bcf; })) document.documentElement.setAttribute("data-bcfont", bcf);
+      } catch (e) { /* no storage: Roboto */ }
     </script>
     <meta
       name="description"
@@ -151,14 +164,42 @@
         src: local("Roboto-Medium"),
           url("fonts/roboto-500.woff2") format("woff2"); /* Chrome 26+, Opera 23+, Firefox 39+ */
       }
-      /* 0.15.0 (owner, 26 Nov 2026): Book Compare tries EB Garamond (https://github.com/octaviopardo/EBGaramond12, SIL Open Font License,
-         fonts/EB-Garamond-OFL.txt) for all its text. Roboto above stays: the ⋮ menu → "Font" switches back ("bookcompare_font" =
-         "roboto"), and the class bc-garamond on <html> is set by the small script at the top of <head>. EB Garamond has a small x-height
-         (0.40 of the size, Roboto 0.53), so font-size-adjust lets it appear about as large as before; icons keep their own font. */
+      /* The fonts to choose from (0.16.0, owner: ⋮ → Font …). Roboto above is the standard; data-bcfont on <html> (set by the small
+         script at the top of <head>) switches all text to another one. All are free for any use (SIL Open Font License 1.1, the texts
+         are in fonts/), from Google Fonts (github.com/google/fonts): three of each of Google's sans-serif styles, plus EB Garamond (0.15.0).
+         font-size-adjust lets each appear about as large as Roboto (their small letters have different heights; fonts with very small ones are
+         enlarged a little less, as their letters are wider); icons keep their font. */
+      /* 0.16.0 (owner): the text of Book Compare cannot be selected (it is a program, not a page); where one types, it can */
+      body, body * { -webkit-user-select: none; user-select: none; }
+      input, textarea, [contenteditable], [contenteditable] * { -webkit-user-select: text; user-select: text; }
+      @font-face { font-family: "BC Source Sans 3"; font-weight: 200 900; font-display: swap; src: url("fonts/sourcesans3.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-weight: 400; font-display: swap; src: url("fonts/firasans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-weight: 500; font-display: swap; src: url("fonts/firasans-medium.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-weight: 600; font-display: swap; src: url("fonts/firasans-semibold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-weight: 700 900; font-display: swap; src: url("fonts/firasans-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-weight: 400; font-display: swap; src: url("fonts/alegreyasans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-weight: 500 600; font-display: swap; src: url("fonts/alegreyasans-medium.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-weight: 700 900; font-display: swap; src: url("fonts/alegreyasans-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Figtree"; font-weight: 300 900; font-display: swap; src: url("fonts/figtree.woff2") format("woff2"); }
+      @font-face { font-family: "BC DM Sans"; font-weight: 100 1000; font-display: swap; src: url("fonts/dmsans.woff2") format("woff2"); }
+      @font-face { font-family: "BC Jost"; font-weight: 100 900; font-display: swap; src: url("fonts/jost.woff2") format("woff2"); }
+      @font-face { font-family: "BC Inter"; font-weight: 100 900; font-display: swap; src: url("fonts/inter.woff2") format("woff2"); }
+      @font-face { font-family: "BC Public Sans"; font-weight: 100 900; font-display: swap; src: url("fonts/publicsans.woff2") format("woff2"); }
+      @font-face { font-family: "BC IBM Plex Sans"; font-weight: 100 700; font-display: swap; src: url("fonts/ibmplexsans.woff2") format("woff2"); }
       @font-face { font-family: "EB Garamond"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("fonts/eb-garamond.woff2") format("woff2"); }
       @font-face { font-family: "EB Garamond"; font-style: italic; font-weight: 400 800; font-display: swap; src: url("fonts/eb-garamond-italic.woff2") format("woff2"); }
-      html.bc-garamond *:not(.material-icons) { font-family: "EB Garamond", Garamond, "Times New Roman", serif !important; font-size-adjust: 0.47; }
-      html.bc-garamond { --mdc-typography-font-family: "EB Garamond", serif; }
+      html[data-bcfont] *:not(.material-icons) { font-family: var(--bc-font) !important; font-size-adjust: var(--bc-fsa) !important; }
+      html[data-bcfont] { --mdc-typography-font-family: var(--bc-font); --bc-fsa: 0.52; }
+      html[data-bcfont="source-sans"] { --bc-font: "BC Source Sans 3", Roboto, Arial, sans-serif; --bc-fsa: 0.50; }
+      html[data-bcfont="fira-sans"] { --bc-font: "BC Fira Sans", Roboto, Arial, sans-serif; }
+      html[data-bcfont="alegreya-sans"] { --bc-font: "BC Alegreya Sans", Roboto, Arial, sans-serif; --bc-fsa: 0.49; }
+      html[data-bcfont="figtree"] { --bc-font: "BC Figtree", Roboto, Arial, sans-serif; --bc-fsa: 0.51; }
+      html[data-bcfont="dm-sans"] { --bc-font: "BC DM Sans", Roboto, Arial, sans-serif; }
+      html[data-bcfont="jost"] { --bc-font: "BC Jost", Roboto, Arial, sans-serif; --bc-fsa: 0.49; }
+      html[data-bcfont="inter"] { --bc-font: "BC Inter", Roboto, Arial, sans-serif; }
+      html[data-bcfont="public-sans"] { --bc-font: "BC Public Sans", Roboto, Arial, sans-serif; }
+      html[data-bcfont="ibm-plex-sans"] { --bc-font: "BC IBM Plex Sans", Roboto, Arial, sans-serif; }
+      html[data-bcfont="garamond"] { --bc-font: "EB Garamond", Garamond, "Times New Roman", serif; --bc-fsa: 0.47; }
       /* Disable text transforms in tab */
       .mdc-tab {
         text-transform: none;
@@ -1092,8 +1133,7 @@
     <script defer src="js/project-pack.js"></script>
     <script defer src="js/results-store.js"></script>
     <script defer src="js/background-align.js"></script>
-    <script defer src="js/speedtest.js"></script>
-    <script defer src="js/compare-tab.js"></script>
+        <script defer src="js/compare-tab.js"></script>
   </head>
   <body class="mdc-typography">
     <aside id="snack" class="mdc-snackbar" data-mdc-auto-init="MDCSnackbar">
@@ -2019,7 +2059,6 @@
           document.getElementById("start_open").onclick = () => BookWorkspace.startAction("open");
           // "COMPARE" in the workspace opens the Compare tab (js/compare-tab.js), which aligns the two pages by itself.
           CompareTab.init({ compare, result, action_bar, go_to_screen, toStart: () => { go_to_screen(main.c, {}); refresh_start(); } });
-          SpeedTest.init({ compare, result });
           BookWorkspace.onCompare((d) => {
             CompareTab.enter(d);
           });

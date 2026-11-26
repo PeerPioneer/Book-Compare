@@ -1,6 +1,6 @@
 // Book Compare's service worker: keeps the website's files so that it also opens without a connection.
 // Change CACHE_NAME whenever a file listed here changes, so that the browsers load the new files.
-const CACHE_NAME = "imcomp-mdc-pwa-v36";
+const CACHE_NAME = "imcomp-mdc-pwa-v37";
 const staticAssets = [
     './',
     './favicon.ico',
@@ -22,8 +22,7 @@ const staticAssets = [
     './js/workspace.css',
     './js/compare-annot.js',
     './js/compare-box.js',
-    './js/speedtest.js',
-    './js/align-engine.js',
+      './js/align-engine.js',
     './js/align-worker.js',
     './js/project-pack.js',
     './js/results-store.js',
@@ -41,6 +40,20 @@ const staticAssets = [
     './fonts/roboto-regular.woff2',
     './fonts/roboto-500.woff2',
     './fonts/roboto-300.woff2',
+    './fonts/sourcesans3.woff2',
+    './fonts/firasans-regular.woff2',
+    './fonts/firasans-medium.woff2',
+    './fonts/firasans-semibold.woff2',
+    './fonts/firasans-bold.woff2',
+    './fonts/alegreyasans-regular.woff2',
+    './fonts/alegreyasans-medium.woff2',
+    './fonts/alegreyasans-bold.woff2',
+    './fonts/figtree.woff2',
+    './fonts/dmsans.woff2',
+    './fonts/jost.woff2',
+    './fonts/inter.woff2',
+    './fonts/publicsans.woff2',
+    './fonts/ibmplexsans.woff2',
     './images/examples/welcome-1.jpg',
     './images/examples/welcome-2.jpg',
     './images/examples/bent-1.jpg',

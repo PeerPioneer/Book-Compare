@@ -39,12 +39,6 @@ JS = """async ([a, b]) => {
              mv: !!(ws.movement && ws.movement.pixels.byteLength), u: [direct.unmatched_tiles, st.unmatched_tiles, ws.unmatched_tiles], stored: ws.stored};
   const rough = await e.roughColor(); out.rough = [rough.w, rough.h];
   e.terminate();
-  // several alignments at the same time (the speed test's second part): 2 jobs with 1 and with 2 helpers
-  const pool = [{name: 'A-Test', file: await get(a)}, {name: 'B-Test', file: await get(b)}];
-  const par = await SpeedTest.parallel(pool, {helpers: [1, 2], jobs: 2}, {stopped: () => false, status: () => {}, row: () => {}});
-  const rep = SpeedTest.parallelReport(par);
-  out.par = {rows: par.rows.map(r => ({n: r.n, ok: r.ok, done: r.jobsDone, failed: r.failed, wall: r.wall_s, stall: r.stall_ms, speed: r.speed, errors: r.errors})),
-             enough: par.enough ? par.enough.n : null, text: rep.text, summary: rep.summary.length, html: rep.rows.length};
   return out;
 }"""
 
@@ -77,33 +71,8 @@ def main():
         assert abs(cm['u'][0] - cm['u'][1]) < 0.01 and cm['u'][1] == cm['u'][2], cm['u']
         assert r['warp_wall'] < r['store_wall'], 'bending from the stored movement must be quicker than aligning'
         assert r['rough'] == [cm['w'][0], cm['h'][0]], r['rough']
-        par = r['par']
-        print('several at once: ' + ', '.join('%d helper(s): %.1f s, delay of the page %d ms, speed %s' % (x['n'], x['wall'], x['stall'], x['speed'] and round(x['speed'], 2)) for x in par['rows']))
-        assert [x['n'] for x in par['rows']] == [1, 2] or [x['n'] for x in par['rows']] == [1], par['rows']     # 2 helpers only on a computer with 2 or more threads
-        for x in par['rows']:
-            assert x['ok'] and x['done'] == 2 and x['failed'] == 0 and not x['errors'] and x['wall'] > 0 and x['stall'] >= 0, x
-        assert par['rows'][0]['speed'] is None or par['rows'][0]['speed'] == 1, par['rows'][0]
-        assert par['summary'] >= 2 and par['html'] == len(par['rows']) and par['text'].startswith('Book Compare speed test: several alignments'), par
         bad = [e for e in errs if 'bad.jpg' not in e and 'Failed to load resource' not in e]
         assert not bad, 'script errors: ' + str(bad)
-        # the window of the several-at-once test: the same page pair twice, 1 and 2 helpers (the project is replaced by a stand-in)
-        pg.evaluate("""async ([a, b]) => {
-          const get = async u => new File([await (await fetch(u)).blob()], u.split('/').pop(), {type: 'image/jpeg'}), t = BookWorkspace.tab;
-          const fa = await get(a), fb = await get(b);
-          t.speedPlan = () => ({ok: true, ref: {id: 1, name: 'A-Test'}, row: 0, rowLabel: 'Page 1', items: [{id: 2, name: 'B-Test'}], locked: [], pairsRef: 50, rowsRef: 50, pairsAll: 100, rows: 50, copies: 2});
-          t.speedFile = async id => id === 1 ? fa : fb;
-          t.modal = html => { const sc = document.createElement('div'); sc.id = 'ws-scrim'; sc.innerHTML = '<div class="ws-dlg">' + html + '</div>';
-            sc.addEventListener('click', e => { if (e.target.closest('[data-close]')) sc.remove(); }); document.body.appendChild(sc); return sc; };
-          SpeedTest.parallelConfig.helpers = [1, 2]; SpeedTest.parallelConfig.jobs = 2;
-          SpeedTest.open();
-        }""", [A, B])
-        pg.wait_for_selector('#sp-par', state='attached'); pg.evaluate("document.querySelector('#sp-par').click()")  # (the welcome window of the page lies over it)
-        pg.wait_for_function("document.querySelector('#ws-scrim h3') && /result/.test(document.querySelector('#ws-scrim h3').textContent)", timeout=150000)
-        dlg = pg.inner_text('#ws-scrim .ws-dlg')
-        assert 'Each helper took one job' in dlg and 'One helper needed' in dlg and 'Your project has 50 comparisons' in dlg, dlg
-        assert pg.locator('#ws-scrim tr[data-par]').count() == len(par['rows']), 'one table row per number of helpers'
-        assert pg.evaluate("SpeedTest.lastParallel.text") == pg.evaluate("document.querySelector('.sp-text').value"), 'the numbers are also shown as text'
-        print('several-at-once window OK'); pg.evaluate("document.querySelector('#ws-scrim [data-close]').click()")
         print('ALIGN WORKER OK'); b.close()
 
 if __name__ == '__main__':

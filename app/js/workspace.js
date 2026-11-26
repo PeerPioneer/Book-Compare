@@ -802,7 +802,7 @@
     S.copies.forEach(function (c) { (c.locs || []).forEach(function (l) { used[l.root] = true; }); });
     return {
       format: 'book-compare-project', version: 2, projectId: S.projectId, savedAt: new Date().toISOString(), title: S.title || '', lblw: S.lblw || 0, bgRun: S.bgRun || null,
-      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, boxes: S.boxes, paper: S.paper, thumbs: !!S.thumbs, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref,
+      nextCopy: S.nextCopy, ns: S.ns, folio: S.folio, labels: S.labels, skip: S.skip, flags: S.flags, annotations: S.annots, tiles: S.tiles, boxes: S.boxes, paper: S.paper, thumbs: !!S.thumbs, nextAnn: S.nextAnn, pair: S.pair, sel: S.sel, ref: S.ref, noRefWarn: !!S.noRefWarn,
       roots: S.roots.filter(function (r) { return used[r.id]; }).map(function (r) {
         var path = r.handle && r.handle.isHelper ? r.handle.rootPath : r.path;
         if (!path) return { id: r.id, name: r.name };
@@ -888,23 +888,24 @@
     b.className = c.cls; b.textContent = c.text; b.title = c.title;
     if (window.CompareTab && CompareTab.saveChanged) CompareTab.saveChanged();
   }
-  // the save state as the chip in the top bar shows it (both views)
+  // the save state as the chip in the top bar shows it (both views). 0.16.0 (owner): only the state; the rest is in its tooltip and
+  // in the message a click on it gives
   function saveChip() {
-    var t = '', cls = 'ws-save';
+    var t = '', cls = 'ws-save', why = '';
     if (!S) return { text: '', cls: cls, title: '' };
-    if (S.examples) return { text: 'Examples · not saved', cls: cls, title: 'The examples come with Book Compare. What you change here is not kept; start your own project with ⋮ → New project.' };
-    if (!HAS_FSA) { t = dirty ? 'Not saved · save project file' : 'Project file saved'; cls += dirty ? ' warn' : ' ok'; }
+    if (S.examples) return { text: 'Examples: not saved', cls: cls, title: 'The examples come with Book Compare. What you change here is not kept; start your own project with ⋮ → New project.' };
+    if (!HAS_FSA) { t = dirty ? 'Not saved' : '✓ Saved'; cls += dirty ? ' warn' : ' ok'; why = dirty ? 'Click to download the project file with your changes.' : ''; }
     else if (!proj.target) {
-      t = !S.copies.length ? 'No project yet' : proj.legacy ? 'Older project · save it as a project file' : 'Not saved yet · save the project';
+      t = !S.copies.length ? 'No project yet' : proj.legacy ? 'Older project: not saved' : 'Not saved yet';
       cls += S.copies.length ? ' warn' : '';
     }
     else if (proj.state === 'saving' || proj.state === 'dirty') { t = 'Saving …'; }
-    else if (proj.state === 'error') { t = 'Could not save · ' + proj.err; cls += ' bad'; }
-    else { t = '✓ Saved automatically' + (proj.savedAt ? ' · ' + hhmm(proj.savedAt) : ''); cls += ' ok'; }
+    else if (proj.state === 'error') { t = 'Could not save'; cls += ' bad'; why = 'Could not save: ' + proj.err + '. Click to try again.'; }
+    else { t = '✓ Saved'; cls += ' ok'; why = proj.savedAt ? 'Last saved at ' + hhmm(proj.savedAt) + '. ' : ''; }
     return { text: t, cls: cls,
-      title: proj.target ? 'Every change is saved by itself in the project file “' + targetFile(proj.target) + '”, about a second after you make it. You never have to save by hand (Ctrl+S saves at once).'
-      : proj.legacy ? 'This project was saved by an older version of Book Compare. Save it as a project file to keep your changes; the old project folder stays as it is.'
-      : 'Save the project as a file (not in one of your scan folders).' };
+      title: (why ? why + ' ' : '') + (proj.target ? 'Every change is saved by itself in the project file “' + targetFile(proj.target) + '”, about a second after you make it. You never have to save by hand (Ctrl+S saves at once).'
+      : proj.legacy ? 'This project was saved by an older version of Book Compare. Click to save it as a project file and keep your changes; the old project folder stays as it is.'
+      : 'Click to save the project as a file (not in one of your scan folders).') };
   }
   function hhmm(d) { return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
   function chipClick() { if (S && S.examples) return toast('The examples are not saved. Start your own project with ⋮ → New project.'); return proj.target ? (proj.state === 'error' ? saveNow() : toast('Every change is saved automatically in “' + targetFile(proj.target) + '”' + (proj.savedAt ? ' (last time at ' + hhmm(proj.savedAt) + ')' : '') + '. You never have to save by hand.')) : saveProjectAs(); }
@@ -1098,7 +1099,7 @@
       if (!c.locs.length) legacy.push(c);
     }
     S.nextCopy = Math.max(json.nextCopy || 1, maxId + 1);
-    S.ref = json.ref != null && copyById(json.ref) ? json.ref : null;
+    S.ref = json.ref != null && copyById(json.ref) ? json.ref : null; S.noRefWarn = !!json.noRefWarn;
     if (S.sel.ci != null && !S.copies[S.sel.ci]) S.sel.ci = S.copies.length ? 0 : null;
     hist = { undo: [], redo: [] };
     thumbMem.clear();
@@ -1227,8 +1228,8 @@
   }
 
   /* ---------------------------------------------------------------- rendering */
-  // The toolbar (items 17, 18): only what is used all the time; everything else is in "More for this cell" and in the menu of the
-  // right mouse button (on a cell, on a row name, on a copy's heading).
+  // The toolbar (items 17, 18): only what is used all the time; everything else is in the menu of the right mouse button (on a cell,
+  // on a row name, on a copy's heading). 0.16.0 (owner): no "More for this cell" button any more.
   function renderToolbar() {
     var s = selected(), tb = $('#ws-toolbar');
     var rg = range(), nrg = 0;
@@ -1242,22 +1243,20 @@
       '<button class="ws-tb" data-act="undo"' + (hist.undo.length ? '' : ' disabled') + ' title="Undo (Ctrl+Z)">Undo</button>' +
       '<button class="ws-tb" data-act="redo"' + (hist.redo.length ? '' : ' disabled') + ' title="Redo (Ctrl+Y)">Redo</button>' +
       '<span class="ws-vsep"></span>' +
-      '<button class="ws-tb" id="ws-cellmore" data-act="cellmenu"' + (s ? '' : ' disabled') + ' aria-haspopup="true" title="More for this cell, its row and its copy (also with the right mouse button)">More for this cell &#9662;</button>' +
-      '<span class="ws-vsep"></span>' +
       '<button class="ws-tb ws-tog" id="ws-pics" data-act="pics" aria-pressed="' + !!S.thumbs + '" title="Show a small picture of every page in the grid (kept in the project). The rows get taller.">' +
       '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg> Pictures in the grid</button>' +
       bgButton();
   }
-  // 0.15.0 (owner): the background alignment has its own button in the Pages tab; while it runs, the button says how far it is
+  // 0.15.0 (owner): the background alignment has its own button in the Pages tab (while it runs it is highlighted)
   function bgButton() {
     var B = window.BCBackground, st = B && B.state ? B.state() : null, run = st && !st.finished;
     var off = !HELPER || S.copies.length < 2 || !!S.examples;
     var tip = !HELPER ? 'Only in the desktop program: aligns the other copies onto the reference copy page by page and keeps the results' : 'Align the other copies onto the reference copy, page by page, while you go on working';
-    var lab = run ? (st.paused ? 'Background alignment paused' : 'Aligning in the background') + ' · ' + (st.done + st.skipped + st.failed) + ' of ' + st.total : 'Align in the background …';
+    var lab = 'Align in the background …';                     // 0.16.0 (owner): how far it is shows at the top, left of the tab Pages
     return '<span class="ws-vsep"></span><button class="ws-tb ws-bgbtn' + (run ? ' on' : '') + '" id="ws-bgbtn" data-act="bgopen"' + (off && !run ? ' disabled' : '') + ' title="' + esc(tip) + '">' +
       '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg> ' + esc(lab) + '</button>';
   }
-  // the menu for a cell (right mouse button, or "More for this cell"): its copy, its row
+  // the menu for a cell (right mouse button): its copy, its row
   function cellMenuHtml() {
     var s = selected(); if (!s) return '';
     var it = function (a, label, off, tip) { return '<button role="menuitem" data-act="' + a + '"' + (off ? ' disabled' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + label + '</button>'; };
@@ -1321,7 +1320,7 @@
     else if (S.pair[0] != null) S.pair = [S.pair[0], c.id];
     touch(); renderAll();
     if (canCompare()) compareNow();
-    else toast(ref ? 'The reference copy has no page in this row.' : 'Choose a reference copy first (menu ⋮ → Reference copy …), or mark two pages with “1” and “2”.');
+    else toast(ref ? 'The reference copy has no page in this row.' : 'Choose a reference copy first (right-click a page of a copy → Make it the reference copy), or mark two pages with “1” and “2”.');
   }
 
   function nameList(list) {
@@ -1329,8 +1328,6 @@
     return esc(names.length > 4 ? names.slice(0, 4).join(', ') + ' and ' + (names.length - 4) + ' more' : names.join(', '));
   }
   function renderSummary() {
-    var n = S.copies.length;
-    $('#ws-summary').innerHTML = '<span>' + n + ' cop' + (n === 1 ? 'y' : 'ies') + '</span><span>' + rows() + ' rows</span>';
     var lost = S.copies.filter(copyLost), bn = $('#ws-banner'), used = usedRoots();
     var allow = used.filter(function (r) { return r.handle && !r.ok; }), find = used.filter(function (r) { return !r.handle && !r.files; });
     bn.hidden = !lost.length || (!allow.length && !find.length);
@@ -1357,7 +1354,12 @@
     S.copies.forEach(function (c, i) {
       var cnt = 0; c.cells.forEach(function (x) { if (x) cnt++; });
       var k = c.id === S.pair[0] ? ' k1' : c.id === S.pair[1] ? ' k2' : '', lost = copyLost(c);
-      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + (c.id === S.ref ? '<span class="ws-star" title="Reference copy: the other copies are aligned onto it (More → Reference copy …)">★</span> ' : '') + (lost ? lostWhy(c) : cnt + ' file' + (cnt === 1 ? '' : 's') + storedCount(stH, c)) + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
+      // 0.16.0 (owner): copy 1 and copy 2 have their colour as the background of the heading, "★" in front of the reference copy's
+      // name, "1" or "2" after it; the number of files only when the copy lacks pages
+      var star = c.id === S.ref ? '<span class="ws-star" title="Reference copy: the other copies are aligned onto it (to choose another one: right-click a page of that copy → Make it the reference copy)">★</span>' : '';
+      var num = k ? '<b class="ws-hpm" title="' + (k === ' k1' ? 'Copy 1' : 'Copy 2') + ' in the Compare tab">' + (k === ' k1' ? '1' : '2') + '</b>' : '';
+      var meta = lost ? lostWhy(c) : [cnt < rows() ? cnt + ' file' + (cnt === 1 ? '' : 's') + ' in grid' : '', storedCount(stH, c)].filter(Boolean).join(' · ');
+      h += '<div class="ws-hcell' + k + '" draggable="true" data-c="' + i + '" style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px" title="Drag the heading to move this column"><div class="ws-hline">' + star + '<div class="ws-hname" data-act="rename" data-c="' + i + '" title="Click to rename">' + esc(c.name) + '</div>' + num + '</div><div class="ws-hmeta' + (lost ? ' lost' : '') + '">' + meta + '</div><button class="x" data-act="remove" data-c="' + i + '" aria-label="Remove copy ' + esc(c.name) + '" title="Remove this copy from the project (your scan files are not touched)">&times;</button><div class="ws-rz" data-c="' + i + '" title="Drag to change the width of this column. Double-click: fit the file names."></div></div>';
     });
     h += '<div class="ws-addcell"><button class="ws-addbtn" data-act="add"><span class="plus">+</span><small>Add new copy</small></button></div></div><div id="ws-rowshost"></div></div></div>';
     gb.innerHTML = h;
@@ -1381,10 +1383,10 @@
     return !!(e && typeof e.valid === 'string' && e.valid.indexOf(BCResults.ENGINE + '|') === 0);
   }
   function storedCount(st, c) {
-    if (!st) return ' in grid';
+    if (!st) return '';
     var b = 0, n = 0;
     for (var r = 0; r < c.cells.length; r++) { if (!c.cells[r]) continue; var f = refFor(r); if (f == null || f === c.id) continue; n++; if (isStored(st, c, r, c.cells[r])) b++; }
-    return n ? ' · ' + b + ' aligned' : ' in grid';
+    return n && b ? b + ' aligned' : '';
   }
   var soonT = 0;
   function renderAllSoon() { if (soonT) return; soonT = setTimeout(function () { soonT = 0; if (root && !root.hidden) renderAll(); }, 1200); }   // (at most about once a second while helpers store pages)
@@ -1398,14 +1400,14 @@
       var n = 0, cells = '';
       S.copies.forEach(function (c, ci) {
         var key = c.cells[i] || null, sel = (S.sel.ci === ci && S.sel.row === i) ? ' sel' : (rg && rg.ci === ci && i >= rg.lo && i <= rg.hi ? ' rng' : ''), wst = ' style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px"';
-        var pm = c.id === S.pair[0] ? '<b class="pm m1">1</b>' : c.id === S.pair[1] ? '<b class="pm m2">2</b>' : '';
+        var pm = c.id === S.pair[0] ? ' p1' : c.id === S.pair[1] ? ' p2' : '';            // (0.16.0: a light tint of the copy's colour, no "1"/"2" in every cell)
         var dot = isStored(stE, c, i, key) ? '<i class="ws-st" title="Aligned onto the reference copy and stored: comparing it with the reference opens at once"></i>' : '';
         var pic = '<i class="ico"></i>';
         if (key && S.thumbs) { var tu = thumbUrlNow(c, key); pic = '<span class="tn" data-mk="' + esc(c.id + '|' + key) + '">' + (tu ? '<img alt="" src="' + tu + '">' : '') + '</span>'; }
-        if (key) { n++; cells += '<div class="ws-cell filled' + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '>' + pic + '<span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + dot + pm + '</div>'; }
-        else cells += '<div class="ws-cell empty' + sel + '" data-c="' + ci + '" data-r="' + i + '"' + wst + '><span class="gap">no page</span></div>';
+        if (key) { n++; cells += '<div class="ws-cell filled' + pm + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '>' + pic + '<span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + dot + '</div>'; }
+        else cells += '<div class="ws-cell empty' + pm + sel + '" data-c="' + ci + '" data-r="' + i + '"' + wst + '><span class="gap">no page</span></div>';
       });
-      var sk = !!S.skip[i], small = sk ? 'not compared' : (i === S.ns && S.ns > 0 ? 'starts here' : n + ' of ' + S.copies.length + ' copies');
+      var sk = !!S.skip[i], small = sk ? 'not compared' : (i === S.ns && S.ns > 0 ? 'starts here' : n < S.copies.length ? n + ' of ' + S.copies.length + ' copies' : '');   // (0.16.0: only when a copy lacks the page)
       h += '<div class="ws-row' + (S.sel.row === i ? ' selrow' : '') + (sk ? ' skipped' : '') + (i === S.ns && S.ns > 0 ? ' numstart' : '') + '" style="top:' + (HEAD_H + i * ROW_H) + 'px" data-r="' + i + '"><div class="ws-lbl" data-act="lbl" data-r="' + i + '"><b>' + esc(rowLabel(i)) + '</b><small>' + small + '</small>' + flagMark(i) + '</div>' + cells + '</div>';
     }
     host.innerHTML = h;
@@ -1454,6 +1456,7 @@
     var ok = canCompare();
     $('#ws-compare').classList.toggle('notready', !ok);
     var t = $('#ws-title'); if (t && document.activeElement !== t && t.value !== (S.title || '')) t.value = S.title || '';
+    fitTitle();
   }
   function renderAll() {
     if (!root) return;
@@ -1527,13 +1530,15 @@
   function helpDialog() {
     modal('<h3>How this screen works</h3><ul>' +
       '<li>The <b>name of the project</b> goes into the field at the top left. It is shown in both tabs and proposed as the name of the project file.</li>' +
-      '<li><b>Saving:</b> once the project has a file (⋮ → Save project …), every change is saved into it by itself, about a second after you make it. The chip next to the name says “✓ Saved automatically” and the time. Ctrl+S saves at once.</li>' +
+      '<li><b>Saving:</b> once the project has a file (⋮ → Save project …), every change is saved into it by itself, about a second after you make it. The chip next to the name says “✓ Saved”; its tooltip gives the time. Ctrl+S saves at once.</li>' +
       '<li>Each <b>column</b> is one copy: a folder of scans on your disk. Each <b>row</b> is one page position. The pages in a row will be compared with each other.</li>' +
       '<li>Book Compare only <b>reads</b> your scan folders. Everything you do here (gaps, renaming, deleting files) changes only the project, never a scan file.</li>' +
       '<li>A copy with missing pages has <b>empty cells</b>. Select a cell and use <b>Insert gap here</b> to push the following files down, or <b>Close gap</b> to pull them up.</li>' +
       '<li>Covers, flyleaves and duplicates can be removed from the grid with <b>Delete file</b>. The scan itself stays on your disk, and <b>Add files to this copy</b> brings it back.</li>' +
       '<li><b>Add files to this copy</b> also adds pictures from another folder, for example pages that were scanned later.</li>' +
-      '<li><b>⋮ → Reference copy …</b> chooses the copy the others are compared with (★ in its heading). ' + (HELPER ? '<b>⋮ → Align copies in the background …</b> aligns the other copies onto it page by page and keeps the results next to the project file, so that comparisons with the reference open at once.' : 'In the desktop program the other copies can be aligned onto it in the background.') + '</li>' +
+      '<li><b>Right-click a cell</b> for everything else about that cell, its copy and its row (add files, move or rename the copy, make it the reference copy, start numbering, don’t compare a row).</li>' +
+      '<li>The headings of <b>copy 1</b> and <b>copy 2</b> (the two pages the Compare tab shows) have their colours and the number 1 or 2 after the name; their columns are lightly tinted.</li>' +
+      '<li>The <b>reference copy</b> (★ in its heading) is the copy the others are compared with; right-click a page of a copy → <b>Make it the reference copy</b> chooses it. ' + (HELPER ? 'The button <b>Align in the background</b> aligns the other copies onto it page by page and keeps the results in the project file, so that comparisons with the reference open at once.' : 'In the desktop program the other copies can be aligned onto it in the background.') + '</li>' +
       '<li>What the comparison cannot show (light inks such as red, small shifts, ...) is explained in the help of the Compare tab (its “?” button), under “What the comparison cannot show”.</li>' +
       '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later in the menu <b>⋮</b>. Double-click a row name to rename it.</li>' +
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
@@ -1544,7 +1549,7 @@
       '<li><b>Pictures in the grid</b> (toolbar) shows a small picture of every page in the cells; the rows get taller. It is kept in the project.</li>' +
       '<li><b>Moving a copy:</b> drag its heading to another place, or use <b>Move copy</b> in the toolbar. Undo works for this too.</li>' +
       '<li>If a preview says it could not be loaded, press <b>Reload</b> under it. Ctrl+Z undoes the last change. Arrow keys move the selection.</li>' +
-      '<li><b>⋮ → Measure speed on this computer</b> aligns a few real pages one after the other and shows how long each step takes here. It only reads your scans.</li></ul>' +
+      '</ul>' +
       '<div class="acts"><button class="ws-tb primary" data-close>Got it</button></div>');
   }
 
@@ -1796,41 +1801,71 @@
     sc.querySelector('#nm-ok').focus();
   }
 
-  // The one menu (⋮ in the top bar), the same in both views (items 12-16): Project, Grid (Pages view only), Export and Help.
-  // The Compare tab hands over what only it can do (export, colours, its help) with BookWorkspace.compareMenu(handlers).
+  // The one menu (⋮ in the top bar), the same in both views (items 12-16): Project, Grid (Pages tab only), Export (Compare tab only),
+  // Font and Help. The Compare tab hands over what only it can do (export) with BookWorkspace.compareMenu(handlers).
+  // 0.16.0 (owner): no "Reference copy …" (the Compare tab asks for one), no "Align copies in the background …" (its button in the
+  // Pages tab), no "How … works" (the "?" at the top), and the export entries only where they work, in the Compare tab.
   var cmpMenu = null;
   function menuHtml(where) {
-    var cmp = where === 'compare', two = S.copies.length >= 2, lost = usedRoots().some(function (r) { return !rootReady(r); });
+    var cmp = where === 'compare', lost = usedRoots().some(function (r) { return !rootReady(r); });
     var item = function (m, label, off, tip) { return '<button role="menuitem" data-m="' + m + '"' + (off ? ' disabled' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '><span class="tick"></span>' + label + '</button>'; };
-    var notHere = 'In the Compare tab: these export the two pages shown there.';
     var h = '<div class="ws-mhead">Project</div>' +
       item('save', HAS_FSA ? (proj.target ? 'Save project as …' : 'Save project …') : 'Download project file', !!S.examples, S.examples ? 'The examples are not saved' : '') +
       item('open', 'Open project …') + item('new', 'New project') +
       (lost ? item('reconnect', 'Choose scan folder again …') : '') +
-      item('ref', 'Reference copy …', !two) +
-      (HELPER ? item('bg', window.BCBackground && BCBackground.running() ? 'Background alignment (running) …' : 'Align copies in the background …', !two || !!S.examples) : '') +
-      // the website (0.11.0): shown, greyed, so that it is known that the desktop program can do it
-      (HELPER ? '' : item('bg', '<span>Align copies in the background …<small class="ws-mdesk">only in the desktop program</small></span>', true, 'Only in the desktop program: aligns the other copies onto the reference copy page by page and keeps the results')) +
       item('stored', 'Stored alignments …', !proj.target || !!S.examples, proj.target ? '' : 'Save the project as a file first: the stored alignments are kept inside it') +
       item('start', 'Back to the start screen');
     if (!cmp) h += '<hr><div class="ws-mhead">Grid</div>' +
       item('folio', S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') +
       item('colw', 'Standard width for all columns');
-    h += '<hr><div class="ws-mhead">Export</div>' +
-      item('x-aligned', 'Aligned pages (two pictures)', !cmp, cmp ? 'Copy 1 and copy 2 as aligned, as two picture files' : notHere) +
-      item('x-toggle', 'Toggle view (moving picture, GIF)', !cmp, cmp ? '' : notHere) +
-      item('x-view', 'Current view (picture)', !cmp, cmp ? 'The picture as it is shown now, e.g. Superimposed' : notHere);
-    // 0.15.0 (owner): Book Compare tries EB Garamond; the old font (Roboto) is one click away
-    var gar = document.documentElement.classList.contains('bc-garamond');
+    if (cmp) h += '<hr><div class="ws-mhead">Export</div>' +
+      item('x-aligned', 'Aligned pages (two pictures)', false, 'Copy 1 and copy 2 as aligned, as two picture files') +
+      item('x-toggle', 'Toggle view (moving picture, GIF)') +
+      item('x-view', 'Current view (picture)', false, 'The picture as it is shown now, e.g. Superimposed');
     h += '<hr><div class="ws-mhead">Font</div>' +
-      item('font', gar ? '<span>Back to the old font (Roboto)<small class="ws-mdesk">now: EB Garamond</small></span>' : '<span>Try EB Garamond<small class="ws-mdesk">now: Roboto, the old font</small></span>');
+      item('font', '<span>Choose the font …<small class="ws-mdesk">now: ' + esc(fontName(currentFont())) + '</small></span>');
     h += '<hr><div class="ws-mhead">Help</div>' +
-      item('help', cmp ? 'How the Compare tab works (keys) …' : 'How this screen works …') +
-      item('speed', 'Measure speed on this computer …') +
       (DESKTOP ? '' : item('download', 'Desktop program for Windows …')) +
       (DESKTOP ? item('updates', updInfo.state === 'newer' ? '<span>Update to version ' + esc(updInfo.latest) + ' …<small class="ws-mdesk">you have ' + esc(DESKTOP) + '</small></span>' : 'Check for updates …') : '') +
       item('licenses', 'Licenses') + item('about', 'About Book Compare …');
     return h;
+  }
+  // 0.16.0 (owner): the font of Book Compare, chosen in a window that shows every font in itself (the list: BC_FONTS in index.html)
+  function fontList() { return window.BC_FONTS || [{ id: 'roboto', name: 'Roboto', group: 'earlier' }]; }
+  function currentFont() { return document.documentElement.getAttribute('data-bcfont') || 'roboto'; }
+  function fontName(id) { var f = fontList().filter(function (x) { return x.id === id; })[0]; return f ? f.name : 'Roboto'; }
+  function fontStyle(id) {                                   // (inline and !important, so that it wins over the font chosen for everything)
+    var fam = id === 'roboto' ? 'Roboto, Arial, sans-serif' : id === 'garamond' ? '"EB Garamond", Garamond, serif' : '"BC ' + fontName(id) + '", Roboto, sans-serif';
+    var f = fontList().filter(function (x) { return x.id === id; })[0];
+    return 'font-family:' + fam + ' !important;font-size-adjust:' + (id === 'roboto' ? 'none' : id === 'garamond' ? '0.47' : (f && f.fsa) || '0.52') + ' !important';
+  }
+  function setFont(id) {
+    if (id === 'roboto') document.documentElement.removeAttribute('data-bcfont'); else document.documentElement.setAttribute('data-bcfont', id);
+    try { localStorage.setItem('bookcompare_font', id); } catch (x) { /* private mode: only for now */ }
+    window.dispatchEvent(new Event('resize'));                                              // the panels measure their text again
+    if (root) renderMenu();
+  }
+  function fontDialog() {
+    var groups = [['humanist', 'Humanist', 'shaped like handwriting with a broad pen: open and lively'],
+                  ['geometric', 'Geometric', 'built from circles and straight lines: round and even'],
+                  ['grotesque', 'Grotesque', 'plain and neutral, in the tradition of Helvetica'],
+                  ['earlier', 'Used before in Book Compare', '']];
+    var notes = { roboto: 'the standard font of Book Compare', garamond: 'a font with serifs (tried in 0.15.0)' };
+    var cur = currentFont(), h = '<h3>Font</h3><p>All the text of Book Compare is set in the font you choose; the change is shown at once. All these fonts are free for any use.</p><div class="ws-fonts">';
+    groups.forEach(function (g) {
+      var fs = fontList().filter(function (f) { return f.group === g[0]; }); if (!fs.length) return;
+      h += '<div class="ws-fgroup"><div class="ws-fghead"><b>' + g[1] + '</b>' + (g[2] ? ' · ' + g[2] : '') + '</div>';
+      fs.forEach(function (f) {
+        h += '<label class="ws-fopt"><input type="radio" name="ws-font" value="' + f.id + '"' + (f.id === cur ? ' checked' : '') + '>' +
+          '<span class="ws-fname" style=\'' + fontStyle(f.id) + '\'>' + esc(f.name) + '</span>' +
+          '<span class="ws-fsamp" style=\'' + fontStyle(f.id) + '\'>' + (notes[f.id] ? esc(notes[f.id]) : 'Copy 1 · Folio 19v · 12 of 340 pages') + '</span></label>';
+      });
+      h += '</div>';
+    });
+    h += '</div><div class="acts"><button class="ws-tb primary" data-close>Done</button></div>';
+    var sc = modal(h);
+    sc.querySelector('.ws-fonts').addEventListener('change', function (e) { if (e.target.name === 'ws-font') setFont(e.target.value); });
+    var c = sc.querySelector('input[name=ws-font]:checked'); if (c) c.focus();
   }
   function renderMenu() { $('#ws-menu').innerHTML = menuHtml('pages'); }
   // the same menu over the Compare tab (the Pages layer is hidden there): a floating copy under the ⋮ button
@@ -1854,25 +1889,15 @@
     else if (m === 'open') openProject();
     else if (m === 'new') newProject();
     else if (m === 'reconnect') reconnectScans();
-    else if (m === 'ref') refDialog();
-    else if (m === 'bg') { if (window.BCBackground) window.BCBackground.open(); }
     else if (m === 'stored') storedDialog();
     else if (m === 'start') { if (cmp && cmpMenu && cmpMenu.leave) cmpMenu.leave(); else leave(); }
     else if (m === 'folio') { commit(); S.folio = !S.folio; changed(); toast(S.folio ? 'Rows are numbered as folios now (1r, 1v, 2r …).' : 'Rows are numbered as pages now (Page 1, Page 2 …).', true); }
     else if (m === 'colw') resetWidths();
     else if (/^x-/.test(m)) { if (cmpMenu && cmpMenu[m]) cmpMenu[m](); }
-    else if (m === 'help') { if (cmp && cmpMenu && cmpMenu.help) cmpMenu.help(); else helpDialog(); }
-    else if (m === 'speed') { if (window.SpeedTest) window.SpeedTest.open(); }
     else if (m === 'download') openDownloadPage();
     else if (m === 'licenses') { var a = document.createElement('a'); a.href = 'licenses.txt'; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
     else if (m === 'about') aboutDialog();
-    else if (m === 'font') {
-      var on = !document.documentElement.classList.contains('bc-garamond');
-      document.documentElement.classList.toggle('bc-garamond', on);
-      try { localStorage.setItem('bookcompare_font', on ? 'garamond' : 'roboto'); } catch (x) { /* private mode */ }
-      window.dispatchEvent(new Event('resize'));                                              // the panels measure their text again
-      renderMenu(); toast(on ? 'The text of Book Compare is set in EB Garamond now.' : 'Back to the old font (Roboto).', true);
-    }
+    else if (m === 'font') fontDialog();
     else if (m === 'updates') { if (updInfo.state === 'newer') { showUpdateCard(true); updateNow(); } else checkUpdatesNow(); }
   }
   // item 28: how much room the stored alignments take, and removing those that are no longer needed (pages that left the grid, an older
@@ -1969,29 +1994,48 @@
     });
     return best ? best.id : null;
   }
-  async function refDialog() {
+  // The reference copy: the copy the others are compared with. 0.16.0 (owner): there is no menu entry for it any more; when the
+  // Compare tab is opened and the project has none, this window explains it (warn = true) and offers to choose one, with "Don't warn
+  // me again" for this project. Later: right-click a page of a copy → "Make it the reference copy", or the background window.
+  async function refDialog(warn) {
     if (S.copies.length < 2) return toast('Add at least two copies first.');
     var sizes = {};
     for (var i = 0; i < S.copies.length; i++) sizes[S.copies[i].id] = await firstScanSize(S.copies[i]);
     var prop = proposeRef(sizes), cur = S.ref != null ? S.ref : prop;
-    var h = '<h3>Reference copy</h3><p>The other copies are compared with the reference copy. ' + (HELPER ? 'Book Compare can align them onto it in the background (⋮ → Align copies in the background …) and keeps the results next to the project file, so that a comparison with the reference opens at once.' : 'In the desktop program, Book Compare can align the other copies onto it in the background, so that a comparison with the reference opens at once.') +
-      ' Where the reference copy has no page, the first copy from the left that has the page stands in for it.</p><div class="ws-reflist">';
+    var bg = HELPER ? 'Book Compare can align the other copies onto it in the background (button “Align in the background” in the Pages tab) and keeps the results in the project file, so that a comparison with the reference copy opens at once.'
+                    : 'In the desktop program, Book Compare can align the other copies onto it in the background, so that a comparison with the reference copy opens at once.';
+    var h = warn
+      ? '<h3>Choose a reference copy</h3><p>This project has no <b>reference copy</b> yet. The reference copy is the copy that the others are compared with: usually the most complete copy, or the one with the best scans. It is marked with ★.</p>' +
+        '<ul class="ws-refwhy"><li>A double-click on a page in the Pages tab compares it with the same page of the reference copy.</li><li>' + bg + '</li></ul>' +
+        '<p>Book Compare proposes a copy; you can change it later (right-click a page of a copy → Make it the reference copy).</p><div class="ws-reflist">'
+      : '<h3>Reference copy</h3><p>The other copies are compared with the reference copy. ' + bg + ' Where the reference copy has no page, the first copy from the left that has the page stands in for it.</p><div class="ws-reflist">';
     S.copies.forEach(function (c) {
       var p = c.cells.filter(Boolean).length, z = sizes[c.id];
       var tie = S.copies.some(function (x) { return x !== c && x.cells.filter(Boolean).length === p; });
       h += '<label><input type="radio" name="ws-ref" value="' + c.id + '"' + (c.id === cur ? ' checked' : '') + '> <b>' + esc(c.name) + '</b> · ' + p + ' page' + (p === 1 ? '' : 's') +
         (z ? ' · first scan ' + (z / 1048576).toFixed(1) + ' MB' : '') + (c.id === prop ? ' <i>(proposed: ' + (tie ? 'as many pages as another copy, bigger scans' : 'most pages') + ')</i>' : '') + '</label>';
     });
-    h += '</div><div class="acts"><button class="ws-tb" data-close>Cancel</button>' + (S.ref != null ? '<button class="ws-tb" id="rf-none">No reference copy</button>' : '') + '<button class="ws-tb primary" id="rf-ok">Use this copy</button></div>';
+    h += '</div>' + (warn ? '<label class="chk ws-nowarn"><input type="checkbox" id="rf-nowarn"> Don’t warn me again in this project</label>' : '') +
+      '<div class="acts"><button class="ws-tb" id="rf-cancel">' + (warn ? 'Not now' : 'Cancel') + '</button>' + (!warn && S.ref != null ? '<button class="ws-tb" id="rf-none">No reference copy</button>' : '') + '<button class="ws-tb primary" id="rf-ok">Use this copy</button></div>';
     var sc = modal(h);
+    var noWarn = function () { var x = sc.querySelector('#rf-nowarn'); if (x && x.checked && !S.noRefWarn) { S.noRefWarn = true; touch(); } };
     sc.querySelector('#rf-ok').onclick = function () {
       var v = sc.querySelector('input[name=ws-ref]:checked'), id = v ? +v.value : null;
-      closeModal(); if (id == null || id === S.ref) return;
+      noWarn(); closeModal(); if (id == null || id === S.ref) return;
       commit(); S.ref = id; touch(); renderAll();
-      toast('“' + copyById(id).name + '” is the reference copy now.' + (HELPER ? ' ⋮ → Align copies in the background … aligns the others onto it.' : ''));
+      toast('“' + copyById(id).name + '” is the reference copy now.' + (HELPER ? ' “Align in the background” in the Pages tab aligns the others onto it.' : ''));
     };
+    sc.querySelector('#rf-cancel').onclick = function () { noWarn(); closeModal(); };
     var none = sc.querySelector('#rf-none');
     if (none) none.onclick = function () { closeModal(); commit(); S.ref = null; touch(); renderAll(); toast('No reference copy.'); };
+    sc.querySelector('#rf-ok').focus();
+  }
+  // opening the Compare tab: a project of two or more copies without a reference copy gets the explanation (once each time, until
+  // "Don't warn me again" is ticked; the examples never)
+  function maybeWarnRef() {
+    if (S.examples || S.ref != null || S.noRefWarn || S.copies.length < 2 || $('#ws-scrim')) return;
+    if (navigator.webdriver && !window.BC_TEST_REFWARN) return;           // (automatic tests: only when a test asks for this window)
+    refDialog(true);
   }
   function resultsDir() {
     var t = proj.target;
@@ -2012,6 +2056,7 @@
     try { d = await loadPair(); } catch (e) { return toast(e && e.message ? e.message : String(e)); }
     hide();
     if (cb.compare) cb.compare(d);
+    maybeWarnRef();
   }
 
   /* ---------------------------------------------------------------- what the Compare tab (js/compare-tab.js) may ask for and change */
@@ -2133,39 +2178,7 @@
     toast: function (t) { toast(t); },
     memoryGB: function () { return HELPER && HELPER.mem ? HELPER.mem / 1073741824 : (navigator.deviceMemory || null); },
     setBgRun: function (r) { var was = JSON.stringify(S.bgRun || null), now = JSON.stringify(r || null); if (was !== now) { S.bgRun = r || null; touch(); } },
-    // ---- for the speed test (js/speedtest.js): it reads scans and changes nothing in the project
     modal: modal, closeModal: closeModal,
-    // Which page to time: the selected row if copy 1 and another copy have a page there, otherwise the row that most copies share with copy 1.
-    // Also counts the comparisons a whole book would need (every copy against copy 1, and every copy against every other).
-    speedPlan: function () {
-      ensurePair();
-      var ref = copyById(S.pair[0]), n = rows(), i;
-      if (!ref || S.copies.length < 2) return { ok: false, msg: 'The speed test needs a project with at least two copies. Add the copies in the Pages view first.' };
-      function count(r) { var k = 0; S.copies.forEach(function (c) { if (c.cells[r]) k++; }); return k; }
-      var pairsRef = 0, rowsRef = 0, pairsAll = 0, row = -1, best = 1;
-      for (i = 0; i < n; i++) {
-        if (S.skip[i]) continue;
-        var k = count(i); pairsAll += k * (k - 1) / 2;
-        if (ref.cells[i]) { rowsRef++; pairsRef += k - 1; if (k > best) { best = k; row = i; } }
-      }
-      if (S.sel.row >= 0 && S.sel.row < n && !S.skip[S.sel.row] && ref.cells[S.sel.row] && count(S.sel.row) >= 2) row = S.sel.row;
-      if (row < 0) return { ok: false, msg: 'Copy 1 (' + ref.name + ') shares no page with another copy. Choose another copy as copy 1 or another row, then try again.' };
-      var items = [], locked = [];
-      function checkLock(c) {
-        var sk = splitKey(c.cells[row]), l = c.locs && c.locs[sk.n], r = l && rootById(l.root);
-        if (r && !rootReady(r) && locked.indexOf(r.name) < 0) locked.push(r.name);
-      }
-      checkLock(ref);
-      S.copies.forEach(function (c) { if (c.id !== ref.id && c.cells[row]) { items.push({ id: c.id, name: c.name }); checkLock(c); } });
-      return { ok: true, ref: { id: ref.id, name: ref.name }, row: row, rowLabel: rowLabel(row), items: items, locked: locked, pairsRef: pairsRef, rowsRef: rowsRef, pairsAll: pairsAll, rows: n, copies: S.copies.length };
-    },
-    // the scan (a File) of a copy in a row; throws an Error whose message can be shown as it is
-    speedFile: async function (id, row) {
-      var c = copyById(id), key = c && c.cells[row];
-      if (!key) throw refusal('This copy has no page in this row.');
-      try { return await getScan(c, key); }
-      catch (e) { throw refusal(e && e.name === 'Lost' ? e.message : 'Could not open the scan: ' + niceError(e)); }
-    },
     setRow: function (i) { if (i < 0 || i >= rows()) return; S.sel = { ci: S.sel.ci != null && S.copies[S.sel.ci] ? S.sel.ci : 0, row: i }; touch(); },
     setCopy: function (slot, id) {                                     // slot 0 = copy 1, slot 1 = copy 2; choosing the other one's copy swaps them
       var c = null; S.copies.forEach(function (x) { if (String(x.id) === String(id)) c = x; });      // (a menu hands over the id as text)
@@ -2269,7 +2282,7 @@
     var t = e.target, el;
     if (t.closest('[data-close]')) return closeModal();
     if (!t.closest('#ws-menu') && !t.closest('#ws-more')) $('#ws-menu').hidden = true;
-    if (!t.closest('#ws-ctx') && !t.closest('#ws-cellmore')) closeCellMenu();
+    if (!t.closest('#ws-ctx')) closeCellMenu();
     if ((el = t.closest('[data-m]'))) {
       $('#ws-menu').hidden = true;
       if (!el.disabled) menuAction(el.dataset.m, 'pages');
@@ -2480,6 +2493,16 @@
     return true;
   }
 
+  // 0.16.0 (owner): the project's name field is as wide as its text, so that the save state follows the name closely, on the left, as in
+  // the Compare tab (and not in the middle of the top bar)
+  var fitCv = null;
+  function fitTitle() {
+    var ti = root && $('#ws-title'); if (!ti) return;
+    var cs = getComputedStyle(ti), txt = ti.value || ti.placeholder || '';
+    fitCv = fitCv || document.createElement('canvas');
+    var x = fitCv.getContext('2d'); x.font = (ti.value ? '' : 'italic ') + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    ti.style.width = Math.round(Math.max(120, Math.min(430, x.measureText(txt).width + 22))) + 'px';
+  }
   /* ---------------------------------------------------------------- showing and hiding the layer */
   function build() {
     root = document.createElement('div'); root.className = 'ws'; root.id = 'ws'; root.hidden = true;
@@ -2489,19 +2512,26 @@
       '<div class="ws-top"><div class="ws-brand">Book Compare</div>' +
       '<input class="ws-title" id="ws-title" type="text" maxlength="160" spellcheck="false" autocomplete="off" aria-label="Name of the project" title="Name of the project (shown here and in the Compare tab; it is also proposed as the name of the project file)" placeholder="Name of the project, e.g. ' + TITLE_EXAMPLE + '">' +
       '<button class="ws-save" id="ws-save" data-act="savechip"></button><div class="ws-sp"></div>' +
+      '<div class="bc-bgprog" id="ws-bgprog" hidden></div>' +                         // (0.16.0: how far the background alignment is)
       '<div class="ws-tabs" role="tablist"><button class="ws-tab" role="tab" aria-selected="true" tabindex="-1">Pages</button><button class="ws-tab" role="tab" aria-selected="false" id="ws-compare" data-act="compare" title="Compare the two pages marked “1” and “2”">Compare</button></div>' +
       '<button class="ws-icon" data-act="help" aria-label="Help: how this screen works" title="How this screen works">?</button>' +
       '<button class="ws-icon ws-dots" id="ws-more" data-act="more" aria-label="Menu" aria-haspopup="true" title="Menu: project, export, help">&#8942;</button>' +
       '<div class="ws-menu" id="ws-menu" role="menu" hidden></div></div>' +
       '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-bg" id="ws-bg" hidden></div>' +
-      '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-summary" id="ws-summary"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
+      '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
       // (0.15.0, owner: no "Compare 1 and 2" button under the previews any more - the Compare tab at the top right does it)
       '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div></aside></div>' +
       '<div id="ws-layer"></div>' +
       '<input type="file" id="ws-dirinput" class="ws-hidden" webkitdirectory multiple><input type="file" id="ws-jsoninput" class="ws-hidden" accept=".bookcompare,.json,application/json">';
     document.body.appendChild(root);
     // the marks "1" and "2" have the colours chosen for the Superimposed view (0.11.0)
-    var paintPair = function () { try { root.style.setProperty('--ws-c1', DIFF_COLOR_1); root.style.setProperty('--ws-c2', DIFF_COLOR_2); } catch (e) { /* viz.js not loaded */ } };
+    var inkOn = function (hex) {                                       // white or near-black, whichever reads better on the colour
+      var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || '')); if (!m) return '#fff';
+      var lin = function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      var L = 0.2126 * lin(parseInt(m[1], 16)) + 0.7152 * lin(parseInt(m[2], 16)) + 0.0722 * lin(parseInt(m[3], 16));
+      return (1.05 / (L + 0.05)) >= ((L + 0.05) / 0.05) ? '#fff' : '#111';
+    };
+    var paintPair = function () { try { root.style.setProperty('--ws-c1', DIFF_COLOR_1); root.style.setProperty('--ws-c2', DIFF_COLOR_2); root.style.setProperty('--ws-c1ink', inkOn(DIFF_COLOR_1)); root.style.setProperty('--ws-c2ink', inkOn(DIFF_COLOR_2)); } catch (e) { /* viz.js not loaded */ } };
     paintPair(); document.addEventListener('diffcolorschange', paintPair);
     root.addEventListener('click', onClick);
     root.addEventListener('dblclick', onDblClick);
@@ -2522,7 +2552,10 @@
     root.addEventListener('pointerup', onPointerUp);
     root.addEventListener('pointercancel', onPointerUp);
     var ti = $('#ws-title');
-    ti.addEventListener('input', function () { S.title = ti.value.slice(0, 160); touch(); if (window.CompareTab && CompareTab.titleChanged) CompareTab.titleChanged(); });
+    ti.addEventListener('input', function () { S.title = ti.value.slice(0, 160); touch(); fitTitle(); if (window.CompareTab && CompareTab.titleChanged) CompareTab.titleChanged(); });
+    window.addEventListener('resize', fitTitle);                                              // (also when another font is chosen)
+    try { document.fonts.addEventListener('loadingdone', fitTitle); document.fonts.ready.then(fitTitle); } catch (e) { /* old browser */ }
+    fitTitle();
     ti.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ti.blur(); var v = $('#ws-vp'); if (v) v.focus({ preventScroll: true }); } });
     $('#ws-jsoninput').onchange = function () {
       var f = this.files && this.files[0]; if (!f) return;

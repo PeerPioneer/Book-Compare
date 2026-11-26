@@ -23,7 +23,7 @@
 /* the top bar (the same as in the Compare tab, js/compare-tab.css .ct-top) */
 .ws-top { position: relative; flex: 0 0 46px; height: 46px; display: flex; align-items: center; gap: 12px; padding: 0 12px; margin-bottom: 10px; background: var(--ws-surface); border-bottom: 1px solid var(--ws-line); }
 .ws-brand { font-weight: 500; font-size: 16px; white-space: nowrap; }
-.ws-title { flex: 0 1 430px; min-width: 120px; height: 30px; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; font: inherit; font-size: 13.5px; color: var(--ws-fg); text-overflow: ellipsis; }
+.ws-title { flex: 0 1 auto; width: 430px; min-width: 120px; height: 30px; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; font: inherit; font-size: 13.5px; color: var(--ws-fg); text-overflow: ellipsis; }
 .ws-title:hover { border-color: var(--ws-line); }
 .ws-title:focus { border-color: var(--ws-teal); background: var(--ws-surface); outline: none; }
 .ws-title::placeholder { color: #6b7c7c; font-style: italic; }
@@ -79,9 +79,18 @@
 .ws-hcell.dl::before, .ws-hcell.dr::before, .ws-addcell.dl::before { content: ""; position: absolute; top: 0; bottom: 0; width: 4px; background: var(--ws-teal); z-index: 6; }
 .ws-hcell.dl::before, .ws-addcell.dl::before { left: -2px; }
 .ws-hcell.dr::before { right: -2px; }
-.ws-hcell.k1 { box-shadow: inset 0 4px 0 var(--ws-c1); }
-.ws-hcell.k2 { box-shadow: inset 0 4px 0 var(--ws-c2); }
-.ws-hname { font-size: 16px; font-weight: 500; cursor: text; border-radius: 3px; padding: 1px 3px; margin-left: -3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-hline { display: flex; align-items: center; gap: 5px; min-width: 0; padding-right: 26px; }
+.ws-hline .ws-star { flex: 0 0 auto; }
+.ws-hpm { flex: 0 0 auto; font-size: 13px; font-weight: 700; min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 9px; background: rgba(255, 255, 255, .25); }
+/* 0.16.0 (owner): copy 1 and copy 2 - the heading in the copy's colour, the column in a very light shade of it */
+.ws-hcell.k1 { background: var(--ws-c1); color: var(--ws-c1ink, #fff); }
+.ws-hcell.k2 { background: var(--ws-c2); color: var(--ws-c2ink, #fff); }
+.ws-hcell.k1 .ws-hmeta, .ws-hcell.k2 .ws-hmeta { color: inherit; opacity: .85; }
+.ws-hcell.k1 .ws-star, .ws-hcell.k2 .ws-star { color: inherit; }
+.ws-hcell.k1 .ws-hname:hover, .ws-hcell.k2 .ws-hname:hover { background: rgba(255, 255, 255, .22); }
+.ws-hcell.k1 .ws-rz::after, .ws-hcell.k2 .ws-rz::after { background: rgba(255, 255, 255, .5); }
+.ws-hname { font-size: 16px; font-weight: 500; cursor: text; border-radius: 3px; padding: 1px 3px; margin-left: -3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ws-hline .ws-star + .ws-hname { margin-left: 0; }
 .ws-hname:hover { background: var(--ws-band); }
 .ws-hmeta { font-size: 12px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-hmeta.lost { color: var(--ws-warn); }
@@ -115,9 +124,13 @@
 .ws-cell .ico { flex: 0 0 14px; height: 18px; border-radius: 2px; border: 1px solid var(--ws-line); background: var(--ws-line); }
 .ws-cell .fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-family: var(--ws-mono); }
 .ws-cell .gap { font-size: 12px; font-style: italic; }
-.ws-cell .pm { flex: 0 0 auto; min-width: 16px; height: 16px; border-radius: 8px; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; padding: 0 4px; }
-.ws-cell .pm.m1 { background: var(--ws-c1); }
-.ws-cell .pm.m2 { background: var(--ws-c2); }
+.ws-cell.p1 { background: color-mix(in srgb, var(--ws-c1) 7%, var(--ws-surface)); }
+.ws-cell.p2 { background: color-mix(in srgb, var(--ws-c2) 7%, var(--ws-surface)); }
+.ws-cell.empty.p1 { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ws-c1) 10%, var(--ws-hatch)) 0 6px, color-mix(in srgb, var(--ws-c1) 6%, var(--ws-surface)) 6px 12px); }
+.ws-cell.empty.p2 { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ws-c2) 10%, var(--ws-hatch)) 0 6px, color-mix(in srgb, var(--ws-c2) 6%, var(--ws-surface)) 6px 12px); }
+.ws-row.selrow .ws-cell.p1 { background: color-mix(in srgb, var(--ws-c1) 9%, var(--ws-band)); }
+.ws-row.selrow .ws-cell.p2 { background: color-mix(in srgb, var(--ws-c2) 9%, var(--ws-band)); }
+.ws-row .ws-cell.p1.rng, .ws-row .ws-cell.p2.rng, .ws-row .ws-cell.p1.sel, .ws-row .ws-cell.p2.sel { background: var(--ws-sel); }
 .ws-cell.lostc { color: var(--ws-muted); }
 .ws-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; color: var(--ws-muted); }
 .ws-empty h2 { margin: 0; color: var(--ws-fg); font-weight: 500; font-size: 18px; }
@@ -212,17 +225,10 @@
 }
 @media (prefers-reduced-motion: reduce) { .ws * { transition: none !important; animation: none !important; } }
 
-/* speed test (js/speedtest.js) */
+/* dialogs */
 .ws-dlg h4 { margin: 4px 0 0; font-size: 14px; font-weight: 500; }
 .ws-dlg label.chk { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--ws-fg); font-size: 13.5px; }
-.sp-scroll { overflow-x: auto; flex: none; }
-.sp-tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
-.sp-tbl th, .sp-tbl td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--ws-line-soft); white-space: nowrap; }
-.sp-tbl th { color: var(--ws-muted); font-weight: 500; font-size: 12px; white-space: normal; }
-.sp-tbl tr.bad td { color: var(--ws-bad); white-space: normal; }
-.sp-text { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, Consolas, monospace; border: 1px solid var(--ws-line); border-radius: 4px; padding: 6px; background: var(--ws-surface); color: var(--ws-fg); }
 .ws-dlg details summary { cursor: pointer; font-size: 13px; color: var(--ws-muted); }
-.sp-tbl tr.bad td:first-child { white-space: nowrap; }
 .ws-rl { display: block; margin: 6px auto 2px; font: inherit; font-size: 11.5px; padding: 3px 10px; border: 1px solid var(--ws-teal); background: var(--ws-surface); color: var(--ws-teal); border-radius: 4px; cursor: pointer; }
 .ws-rl:hover { background: var(--ws-teal); color: #fff; }
 
@@ -277,3 +283,37 @@
 .ws-aboutupd { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--ws-line); border-radius: 6px; margin: -4px 0 12px; font-size: 13px; }
 .ws-aboutupd span { flex: 1; min-width: 200px; }
 .ws-aboutupd.new { border-color: var(--ws-note-line); background: var(--ws-note-bg); }
+
+/* 0.16.0 (owner): how far the background alignment is, at the top of both tabs, left of "Pages" (js/background-align.js) */
+.bc-bgprog { position: relative; display: flex; align-items: center; height: 100%; }
+.bc-bgprog[hidden] { display: none !important; }
+.bc-bgpbtn { display: flex; align-items: center; gap: 8px; border: 1px solid var(--ws-line); background: var(--ws-surface); border-radius: 14px; padding: 4px 12px; font: inherit; font-size: 12.5px; color: var(--ws-fg); cursor: pointer; white-space: nowrap; }
+.bc-bgpbtn:hover, .bc-bgpbtn[aria-expanded="true"] { border-color: var(--ws-teal); }
+.bc-bgbar { width: 90px; height: 6px; border-radius: 3px; background: var(--ws-line-soft); overflow: hidden; }
+.bc-bgbar > i { display: block; height: 100%; background: var(--ws-teal); transition: width .4s; }
+.bc-bgprog.paused .bc-bgbar > i, .bc-bgprog.warn .bc-bgbar > i { background: var(--ws-muted); }
+.bc-bgprog.warn .bc-bgpbtn { border-color: var(--ws-note-line); background: var(--ws-note-bg); color: var(--ws-warn); }
+.bc-bgprog.done .bc-bgpbtn { color: var(--ws-ok); border-color: var(--ws-ok); }
+.bc-bgok { font-weight: 700; }
+.bc-bgpop { position: absolute; top: calc(100% - 4px); right: 0; z-index: 70; width: 330px; background: var(--ws-surface); border: 1px solid var(--ws-line); border-radius: 8px; box-shadow: var(--ws-shadow); padding: 10px 14px; font-size: 13px; line-height: 1.45; color: var(--ws-fg); white-space: normal; text-align: left; }
+.bc-bgpop p { margin: 0 0 6px; }
+.bc-bgwarn { color: var(--ws-warn); }
+.bc-bgacts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.bc-bgacts button { font: inherit; font-size: 12.5px; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--ws-line); background: var(--ws-surface); color: var(--ws-teal); cursor: pointer; }
+.bc-bgacts button:hover { border-color: var(--ws-teal); }
+.bc-bgacts button.primary { background: var(--ws-teal); color: #fff; border-color: var(--ws-teal); }
+
+/* 0.16.0 (owner): the font window (⋮ → Font …): every font shown in itself */
+.ws-fonts { display: flex; flex-direction: column; gap: 10px; max-height: min(60vh, 520px); overflow-y: auto; padding-right: 4px; }
+.ws-fghead { font-size: 12.5px; color: var(--ws-muted); margin-bottom: 3px; }
+.ws-fghead b { color: var(--ws-fg); font-weight: 500; }
+.ws-dlg label.ws-fopt { flex-direction: row; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 6px; cursor: pointer; color: var(--ws-fg); }
+.ws-dlg label.ws-fopt:hover, .ws-dlg label.ws-fopt:has(input:checked) { background: var(--ws-band); }
+.ws-fopt input { align-self: center; margin: 0; }
+.ws-fname { flex: 0 0 130px; font-size: 15px; }
+.ws-fsamp { font-size: 13px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-refwhy { margin: 0 0 8px; padding-left: 20px; }
+.ws-refwhy li { margin-bottom: 4px; }
+.ws-dlg label.ws-nowarn { margin-top: 8px; }
+/* file names stay in a typewriter font whatever font is chosen for the rest (0.16.0) */
+html[data-bcfont] .ws-cell .fn, html[data-bcfont] .ws-th .fnm, html[data-bcfont] .ws-dlg .mono { font-family: var(--ws-mono) !important; font-size-adjust: none !important; }

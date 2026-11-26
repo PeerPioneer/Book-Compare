@@ -1137,18 +1137,55 @@ Built 26 Nov 2026 as **version 0.15.0** (details in CHANGELOG.txt), except the i
 | N20 | View and Alignment folded when a project is opened or started | **done 0.15.0** |
 | N21 | The alignment notes: same colours, smaller, not bold, at the foot of the alignment box | **done 0.15.0** |
 | N22 | Bold page name looked different: Roboto had no bold, the browser faked it | **answered** (EB Garamond has real bold) |
-| F1 | EB Garamond for all text, Roboto kept (⋮ → Font) | **done 0.15.0; the owner decides later whether it stays** |
+| F1 | EB Garamond for all text, Roboto kept (⋮ → Font) | **done 0.15.0; replaced by the font window F2 (0.16.0)** |
 | I1 | Replace the examples by an introduction for new users ("I'm new here …"), built on onboarding practice (short, skippable, learn by doing, can be reopened); the owner's note "Exemplary difference" | **proposed - waiting for the owner** |
 | B10 | Background alignment: button in the Pages tab showing progress; window: none ticked, Select all, aligned copies greyed, reference in bold with explanation, reference changeable there | **done 0.15.0** |
 | N23 | No "Compare 1 and 2" button under the previews | **done 0.15.0** |
 | N24 | Copies at the top of the left panel: no ‹ ›, arrow next to the name, the copy's colour as background of its name; no colour legend over the picture | **done 0.15.0** |
-| D3 | Declutter: remove what is shown twice without need (other labels over the pictures, side panels, zoom columns, menu items …) | **list given to the owner - waiting** |
+| D3 | Declutter: remove what is shown twice without need (other labels over the pictures, side panels, zoom columns, menu items …) | **owner's answers 26 Nov; done 0.16.0 (§11.1h)** |
 | N25 | New project from the Compare tab goes to the empty Pages tab | **done 0.15.0** |
 | N26 | Foliation the default, first in the numbering window | **done 0.15.0** |
 | N27 | Pages tab: the page shown in the Compare tab selected and in view | **done 0.15.0** |
 | N28 | "Don't compare" for all marked rows; selected cell fades at once | **done 0.15.0** |
 | A7 | Printed area: headline, folio number, catchword, signature (also in red) added (Winterburger Antiphonarius; tested on the staged Ratdolt Antiphonarium and 93 other scans, NOT on the Winterburger scans: drive D: was not connected). Alignments stored before keep their old area | **done 0.15.0; to be checked by the owner on the Winterburger pages** |
 | A8 | Moving a corner of the printed area does not align at once ("Align with this shape") | **done 0.15.0** |
+
+### 11.1h The owner's notes of 26 November 2026 (on 0.15.0) and his declutter answers
+
+Built 26 Nov 2026 as **version 0.16.0** (details in CHANGELOG.txt), except the items marked *next round* or *waiting*. Way of working agreed
+with the owner: one theme per round; this round was the interface, the next round is the alignment.
+
+| ID | Item | Status |
+|----|------|--------|
+| N29 | Melopoiae A-Wn1 / D-W: page 6 aligns poorly; on page 16 the middle line of D-W is removed | **next round (alignment)** |
+| N30 | White pages: the red tint of A-Wn1 / D-W was nearly gone and is back. Suspected: since 0.14.0 this pair is shown from the stored movement (warpStored, a coarser map) instead of a fresh alignment; the paper code is unchanged since 0.11.0 | **next round: compare fresh and stored on his pages** |
+| N35 | A stored alignment takes long to appear: both full scans are decoded and copy 2 is bent on every visit, and the next stored page is not prepared ahead | **next round: prepare (decode and bend) the next stored page too; measure** |
+| R1 | Broader alignment testing (more prints, larger scale); owner offers his PC. Proposal: a desktop-only "alignment check" that runs over a project on his PC and writes a small report (numbers and small pictures of the worst pages) into a folder Claude can read | **proposed, next round** |
+| F2 | Font window: 3 humanist, 3 geometric, 3 grotesque Google fonts + Roboto + EB Garamond, each shown in itself, applied at once; Roboto the standard again | **done 0.16.0; the owner chooses** |
+| N31 | Link button: no background, smaller description | **done 0.16.0** |
+| N32 | "Measure speed on this computer" and its code removed | **done 0.16.0** |
+| B11 | Background progress: a bar with "N of M · time left" at the top of both tabs, left of "Pages"; a click gives details, Pause, Stop; not in the toolbar button, not shown twice | **done 0.16.0** |
+| N33 | The text of the program cannot be selected (fields can) | **done 0.16.0** |
+| N34 | Pages tab: the save state follows the project name on the left (the name field is as wide as the name) | **done 0.16.0** |
+| D3-1 | No labels over the pictures (Copy 1, Copy 2, Top and bottom, Left and right); the side panels of Superimposed keep theirs | **done 0.16.0** |
+| D3-2 | Toggle: no label; the name of the copy on screen lights up | **done 0.16.0** |
+| D3-3 | Side panels of Superimposed stay (owner: crucial) | **kept** |
+| D3-4 | "One zoom column": each picture has its own column of zoom buttons; with linked panels one column would do | **explained - waiting for the owner** |
+| D3-5 | Book map stays | **kept** |
+| D3-6 | Help only through "?" (no "How … works" in the menu) | **done 0.16.0** |
+| D3-7 | Save chip: the state only | **done 0.16.0** |
+| D3-8 | No "x of y pages" under the copy names | **done 0.16.0** |
+| D3-9 | No "Skip pages …" tick box; always skipped | **done 0.16.0** |
+| D3-10 | No "More for this cell" button (right mouse button) | **done 0.16.0** |
+| D3-11 | The selected cell is named twice (toolbar "Copy A · 1v" and the title of the right panel): proposal to drop the toolbar text | **explained - waiting for the owner** |
+| D3-12 | "2 of 3 copies" and "N files in grid" only when something is missing | **done 0.16.0** |
+| D3-13 | No "3 copies · 6 rows" | **done 0.16.0** |
+| D3-14 | Copy 1 / copy 2 headings in the copy's colour, "★ Name 1"; light tint of the column; no "1"/"2" badges in the cells | **done 0.16.0** |
+| D3-15 | Export entries only in the Compare tab | **done 0.16.0** |
+| D3-16 | No "Align copies in the background …" in the menu | **done 0.16.0** |
+| D3-17 | No "Reference copy …" in the menu; a window when the Compare tab opens without a reference copy (explains it, proposes one, "Don't warn me again in this project") | **done 0.16.0** |
+| D3-18 | "Back to the start screen" stays | **kept** |
+| I1 | Introduction for new users instead of the examples | **after the alignment round: mock-up first** |
 
 ### 11.2 After version 1
 
@@ -1169,7 +1206,7 @@ Built 26 Nov 2026 as **version 0.15.0** (details in CHANGELOG.txt), except the i
 | ID | Item | Status |
 |----|------|--------|
 | T1 | Split double-page copies (CZ-Pu, D-SHk, GB-Lbl1, SK-Mmf) with `Split-double-pages.jsx` into a *different* folder (never into the protected scan folders) | **done 16 Nov** (owner): all split; the single-page folders are now sub-folders of the original copy folders. Paths for the B copies of f.8r/8v still to be looked up |
-| T2 | Run the speed test on his PC and paste the text | **done 20 Nov** (results in §4.5) |
+| T2 | Run the speed test on his PC and paste the text | **done 20 Nov** (results in §4.5; the speed test itself was removed in 0.16.0 at the owner's request) |
 | T2b | **Several alignments at the same time** (built 20 Nov: speed-test window, button "Several at once …"): the same 16 jobs (prepare the page of one copy, align the same page of another copy onto it) with 1, 2, 4 and 8 helpers from a waiting line; shows the time per number of helpers, the gain against one helper and the longest delay of the page. The owner runs it on his PC and pastes the text; result decides how many helpers V8 uses | **done 20 Nov** (results in §4.5): 4 helpers 3.5 ×, 8 helpers 4.2 ×; default for V8 = half the threads |
 | T3 | Marked woodcut files: `Example pages\Melopoiae. Concert of Gods\19. B-Br. White lines marked.jpg` and `19. D-Mu. White lines marked.jpg` (found 15 Nov) — B-Br: vertical (teal), horizontal above Phoebus' head (red), horizontal at the feet (yellow); D-Mu: vertical (yellow) and four short lines at hand height | material for V12 |
 | T4 | Melopoiae scans on `D:\Melopoiae. Digitalisate vom Tablet`: one folder per copy, 20 files "NN. [copy].jpg"; not Melopoiae pages: Aktueller Vergleich, D-Mbs Harmoniae super odis Horatii Flacci, germanos, Grantley-Dateien | reference for V12 |

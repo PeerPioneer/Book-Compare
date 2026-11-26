@@ -1,5 +1,5 @@
 /* Book Compare: aligning copies onto the reference copy in the background (V8, V9; desktop program only).
-   Pages view → More → "Align copies in the background …": the chosen copies are aligned page by page onto the reference copy
+   Pages tab → button "Align in the background …": the chosen copies are aligned page by page onto the reference copy
    (V7; where it has no page, the copy standing in for it), by several helpers at the same time (Web Workers, js/align-engine.js).
    Only the movement of each page is kept, inside the project file (0.12.0; js/results-store.js, js/project-pack.js, V10); pages that are
    already stored and still fit are skipped, so a stopped run can simply be started again. Afterwards a comparison with the reference
@@ -36,7 +36,7 @@
     }
     if (t.refCopy() == null) {
       var s2 = t.modal('<h3>Choose the reference copy first</h3><p>The other copies are aligned onto the reference copy. Book Compare proposes one; you confirm it.</p>' +
-        '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="bg-ref">Reference copy …</button></div>');
+        '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="bg-ref">Choose the reference copy …</button></div>');
       s2.querySelector('#bg-ref').onclick = function () { t.closeModal(); t.refDialog(); };
       return;
     }
@@ -137,22 +137,17 @@
     if (window.BCResults) BCResults.flush();
     if (!quiet) render(); else hideStrip();
   }
-  function hideStrip() { var t = T(), el = t && t.bgSlot(); if (el) { el.hidden = true; el.innerHTML = ''; } renderCompare(); renderButton(); }
+  function hideStrip() { var t = T(), el = t && t.bgSlot(); if (el) { el.hidden = true; el.innerHTML = ''; } popOpen = false; renderProg(); renderCompare(); renderButton(); }
   // 0.12.0 (owner): the Compare tab, where one works most of the time, shows the warning too (with the same buttons; "Go to the page"
   // opens that page there), and, small, how far the run is
   function renderCompare() {
     var cs = window.CompareTab && CompareTab.bgSlot ? CompareTab.bgSlot() : null; if (!cs) return;
-    if (!R || R.finished) { cs.hidden = true; cs.innerHTML = ''; return; }
-    var total = R.queue.length, through = R.done + R.skipped + R.failed.length, pct = total ? Math.round(100 * through / total) : 100;
+    if (!R || R.finished || !R.warn) { cs.hidden = true; cs.innerHTML = ''; return; }      // (0.16.0: how far it is shows at the top)
     if (R.warn) {
       var w = R.warn, t = T();
       cs.className = 'ct-bgslot warn';
       cs.innerHTML = '<span><b>Background alignment paused:</b> on ' + esc(t.rowLabel(w.row)) + ', ' + Math.round(100 * w.share) + ' % of the ink of “' + esc(copyName(w.c)) + '” has no partner on “' + esc(copyName(w.ref)) + '”. The rows of the grid may be out of step there.</span>' +
         '<button data-bg="goto">Go to the page</button><button data-bg="go">Continue</button><button data-bg="ignore">Do not ask again for “' + esc(copyName(w.c)) + '”</button><button data-bg="stop">Stop</button>';
-    } else {
-      cs.className = 'ct-bgslot small';
-      cs.innerHTML = '<span>' + (R.paused ? 'Background alignment paused' : 'Aligning in the background') + ' · ' + through + ' of ' + total + '</span><span class="ws-bgbar" title="' + pct + ' %"><i style="width:' + pct + '%"></i></span>' +
-        (R.paused ? '<button data-bg="go">Continue</button>' : '<button data-bg="pause">Pause</button>');
     }
     cs.hidden = false;
     if (!cs.__bc) { cs.__bc = true; cs.addEventListener('click', onClick); }
@@ -160,33 +155,68 @@
 
   /* ---------------------------------------------------------------- the strip in the Pages view */
   function minutes(s) { return s < 90 ? 'about a minute' : s < 3600 ? 'about ' + Math.round(s / 60) + ' minutes' : 'about ' + (s / 3600).toFixed(1).replace('.0', '') + ' hours'; }
+  function shortTime(s) { return s < 90 ? '1 min' : s < 3600 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1).replace('.0', '') + ' h'; }
+  function who() { return R.ids.length === 1 ? '“' + esc(copyName(R.ids[0])) + '”' : R.ids.length + ' copies'; }
+  // how long the rest takes: the last jobs' times, shared out among the helpers (null until two pages are done)
+  function secondsLeft() {
+    var avg = 0, k = R.times.slice(-24); k.forEach(function (x) { avg += x; }); avg = k.length ? avg / k.length : 0;
+    var through = R.done + R.skipped + R.failed.length;
+    return R.times.length >= 2 ? (R.queue.length - through) * avg / R.n : null;
+  }
   function render() {
-    var t = T(), el = t && t.bgSlot(); if (!el) { renderCompare(); return; }
-    if (!R) { el.hidden = true; el.innerHTML = ''; renderCompare(); renderButton(); return; }
-    var total = R.queue.length, through = R.done + R.skipped + R.failed.length, h = '', who = R.ids.length === 1 ? '“' + esc(copyName(R.ids[0])) + '”' : R.ids.length + ' copies';
-    var pct = total ? Math.round(100 * through / total) : 100;
+    var t = T(), el = t && t.bgSlot();
+    renderProg();
+    if (!el) { renderCompare(); return; }
+    if (!R || (!R.finished && !R.warn)) { el.hidden = true; el.innerHTML = ''; renderCompare(); renderButton(); return; }
+    var h = '';
     el.className = 'ws-banner ws-bg' + (R.warn ? ' warn' : '');
     if (R.finished) {
-      h = '<span><b>Background alignment finished</b> for ' + who + ': ' + R.done + ' page' + (R.done === 1 ? '' : 's') + ' aligned' + (R.skipped ? ', ' + R.skipped + ' already stored' : '') +
+      h = '<span><b>Background alignment finished</b> for ' + who() + ': ' + R.done + ' page' + (R.done === 1 ? '' : 's') + ' aligned' + (R.skipped ? ', ' + R.skipped + ' already stored' : '') +
         (R.failed.length ? ', <b>' + R.failed.length + ' could not be aligned</b>' : '') + '. Comparisons with the reference now open at once.</span>' +
         (R.failed.length ? '<button class="ws-tb" data-bg="details">Details …</button>' : '') + '<button class="ws-tb primary" data-bg="close">Close</button>';
-    } else if (R.warn) {
+    } else {
       var w = R.warn;
       h = '<span><b>Paused:</b> on ' + esc(t.rowLabel(w.row)) + ', ' + Math.round(100 * w.share) + ' % of the ink of “' + esc(copyName(w.c)) + '” has no partner on “' + esc(copyName(w.ref)) + '”. ' +
         'The two scans may not show the same page: the rows of the grid may be out of step there (a page missing or extra in one copy).</span>' +
         '<button class="ws-tb" data-bg="goto">Go to the page</button><button class="ws-tb" data-bg="go">Continue</button><button class="ws-tb" data-bg="ignore">Continue, do not ask again for “' + esc(copyName(w.c)) + '”</button><button class="ws-tb" data-bg="stop">Stop</button>';
-    } else {
-      var avg = 0, k = R.times.slice(-24); k.forEach(function (x) { avg += x; }); avg = k.length ? avg / k.length : 0;
-      var left = R.times.length >= 2 ? (total - through) * avg / R.n : null;
-      h = '<span><b>' + (R.paused ? 'Paused' : 'Aligning in the background') + '</b> · ' + who + ' onto the reference: ' + through + ' of ' + total + ' page' + (total === 1 ? '' : 's') +
-        (left != null && !R.paused ? ' · ' + minutes(left) + ' left' : (!R.paused ? ' · working out how long it takes …' : '')) + ' · ' + R.n + ' helper' + (R.n === 1 ? '' : 's') +
-        (R.failed.length ? ' · ' + R.failed.length + ' failed' : '') + '</span><span class="ws-bgbar" title="' + pct + ' %"><i style="width:' + pct + '%"></i></span>' +
-        (R.paused ? '<button class="ws-tb" data-bg="go">Continue</button>' : '<button class="ws-tb" data-bg="pause">Pause</button>') + '<button class="ws-tb" data-bg="stop">Stop</button>';
     }
     el.innerHTML = h; el.hidden = false;
     if (!el.__bc) { el.__bc = true; el.addEventListener('click', onClick); }
     renderCompare(); renderButton();
   }
+  /* ---------------------------------------------------------------- 0.16.0 (owner): how far it is, at the top of both tabs, left of "Pages" */
+  // A small bar with the pages done and the time left; a click opens the details with Pause / Continue / Stop.
+  var popOpen = false;
+  function renderProg() {
+    var els = document.querySelectorAll('.bc-bgprog');
+    Array.prototype.forEach.call(els, function (el) {
+      if (!R) { el.hidden = true; el.innerHTML = ''; return; }
+      var total = R.queue.length, through = R.done + R.skipped + R.failed.length, pct = total ? Math.round(100 * through / total) : 100, left = secondsLeft();
+      var state = R.finished ? 'done' : R.warn ? 'warn' : R.paused ? 'paused' : 'run';
+      var txt = state === 'done' ? 'Background alignment finished' : state === 'warn' ? 'Paused: please look' : state === 'paused' ? 'Paused · ' + through + ' of ' + total :
+        through + ' of ' + total + (left != null ? ' · ' + shortTime(left) + ' left' : '');
+      var pop = '';
+      if (popOpen) {
+        if (state === 'done') pop = '<p><b>Finished</b> for ' + who() + ': ' + R.done + ' page' + (R.done === 1 ? '' : 's') + ' aligned' + (R.skipped ? ', ' + R.skipped + ' already stored' : '') +
+          (R.failed.length ? ', <b>' + R.failed.length + ' could not be aligned</b>' : '') + '.</p><div class="bc-bgacts">' + (R.failed.length ? '<button data-bg="details">Details …</button>' : '') + '<button class="primary" data-bg="close">Close</button></div>';
+        else pop = '<p><b>' + (state === 'run' ? 'Aligning in the background' : 'Paused') + '</b>: ' + who() + ' onto the reference copy.</p>' +
+          '<p>' + through + ' of ' + total + ' page' + (total === 1 ? '' : 's') + (state === 'run' ? (left != null ? ' · ' + minutes(left) + ' left' : ' · working out how long it takes …') : '') +
+          ' · ' + R.n + ' helper' + (R.n === 1 ? '' : 's') + (R.failed.length ? ' · ' + R.failed.length + ' failed' : '') + '</p>' +
+          (state === 'warn' ? '<p class="bc-bgwarn">A page needs your answer: see the message below the top bar.</p>' : '') +
+          '<div class="bc-bgacts">' + (state === 'run' ? '<button data-bg="pause">Pause</button>' : state === 'paused' ? '<button data-bg="go">Continue</button>' : '') + '<button data-bg="stop">Stop</button></div>';
+      }
+      el.className = 'bc-bgprog ' + state;
+      el.innerHTML = '<button class="bc-bgpbtn" data-bg="pop" aria-expanded="' + popOpen + '" title="Background alignment: click for the details">' +
+        (state === 'done' ? '<span class="bc-bgok" aria-hidden="true">✓</span>' : '<span class="bc-bgbar" aria-hidden="true"><i style="width:' + pct + '%"></i></span>') +
+        '<span class="bc-bgtxt">' + txt + '</span></button>' + (popOpen ? '<div class="bc-bgpop" role="dialog" aria-label="Background alignment">' + pop + '</div>' : '');
+      el.hidden = false;
+      if (!el.__bc) { el.__bc = true; el.addEventListener('click', onClick); }
+    });
+  }
+  document.addEventListener('pointerdown', function (e) {                                     // a click elsewhere closes the details
+    if (popOpen && !(e.target.closest && e.target.closest('.bc-bgprog'))) { popOpen = false; renderProg(); }
+  }, true);
+  document.addEventListener('keydown', function (e) { if (popOpen && e.key === 'Escape') { popOpen = false; renderProg(); } }, true);
   function renderButton() { var t = T(); if (t && t.refreshBgButton) t.refreshBgButton(); }
   // A run that did not finish (the program was closed meanwhile): when the project is opened again, offer to go on (item 21)
   var offered = null;
@@ -205,6 +235,7 @@
   function onClick(e) {
     var b = e.target.closest && e.target.closest('[data-bg]'); if (!b) return;
     var a = b.dataset.bg, t = T();
+    if (a === 'pop') { popOpen = !popOpen; renderProg(); return; }
     if (a === 'resume' && offered) { var o = offered; offered = null; start(o.ids, o.n); return; }
     if (a === 'forget') { offered = null; if (t.setBgRun) t.setBgRun(null); hideStrip(); return; }
     if (!R) return;
@@ -212,7 +243,7 @@
     else if (a === 'go' || a === 'ignore') { if (a === 'ignore' && R.warn) R.ignore[R.warn.c] = true; R.warn = null; R.paused = false; render(); pump(); }
     else if (a === 'goto' && R.warn) { if (window.CompareTab && CompareTab.isOpen() && t.compareAt) t.compareAt(R.warn.ref, R.warn.c, R.warn.row); else t.goTo(R.warn.c, R.warn.row); }
     else if (a === 'stop') { var r = R; stop(true); if (t.setBgRun) t.setBgRun(null); t.toast('Background alignment stopped: ' + r.done + ' page' + (r.done === 1 ? '' : 's') + ' aligned and kept. Starting it again goes on where it stopped.'); }
-    else if (a === 'close') { R = null; render(); }
+    else if (a === 'close') { R = null; popOpen = false; render(); }
     else if (a === 'details') {
       var h = '<h3>Pages that could not be aligned</h3><div class="ws-bgfail"><ul>' + R.failed.map(function (f) { return '<li><b>' + esc(copyName(f.c)) + '</b>, ' + esc(t.rowLabel(f.row)) + ': ' + esc(f.msg) + '</li>'; }).join('') +
         '</ul></div><div class="acts"><button class="ws-tb primary" data-close>Close</button></div>';

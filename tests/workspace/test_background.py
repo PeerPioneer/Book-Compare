@@ -117,7 +117,7 @@ def scenario(p, kind):
     assert pg.locator('#ws .ws-hname').count() == 3
     ids = pg.evaluate("BookWorkspace.tab.copyList().map(c => c.id)"); A, B, C = ids
     # --- before anything is set up, the background alignment asks for a saved project and a reference copy ----------------------------
-    menu(pg, 'bg'); assert 'Save the project first' in pg.inner_text('#ws-scrim'), pg.inner_text('#ws-scrim')
+    pg.click('#ws-bgbtn'); pg.wait_for_timeout(500); assert 'Save the project first' in pg.inner_text('#ws-scrim'), pg.inner_text('#ws-scrim')
     push_pick(os.path.join(PROJ, 'Test book.bookcompare')); pg.click('#bg-save'); pg.wait_for_timeout(1500)
     assert os.path.exists(os.path.join(PROJ, 'Test book.bookcompare')) and 'Choose the reference copy first' in pg.inner_text('#ws-scrim'), pg.inner_text('#ws-scrim')
     # --- the reference copy: proposed, chosen, starred, saved, undone -----------------------------------------------------------------
@@ -143,14 +143,23 @@ def scenario(p, kind):
     pg.select_option('#bg-ref', str(A)); pg.wait_for_timeout(800); assert pg.evaluate("BookWorkspace.tab.refCopy()") == A and 'A-Ref' in pg.inner_text('#ws-scrim .ws-bgref')
     pg.click('#bg-all'); assert pg.locator('#ws-scrim .bg-copy:checked').count() == 2
     pg.click('#bg-go'); pg.wait_for_timeout(800)
-    assert 'Aligning in the background' in pg.inner_text('#ws-bgbtn') or 'paused' in pg.inner_text('#ws-bgbtn').lower(), 'the button says that it runs'
-    t = wait_strip(pg, ['Aligning in the background', 'Paused', 'finished'], 30)
+    # 0.16.0 (owner): how far it is shows at the top, left of the tab "Pages" (with the time left), not in the toolbar button and not
+    # twice; a click on it gives the details with Pause and Stop
+    assert pg.inner_text('#ws-bgbtn').strip() == 'Align in the background …' and 'on' in pg.get_attribute('#ws-bgbtn', 'class').split(), 'the button stays short, highlighted while it runs'
+    assert pg.is_visible('#ws-bgprog'), 'the bar at the top'
+    cb = pg.locator('#ws-bgprog').bounding_box(); tb = pg.locator('#ws .ws-tabs').bounding_box(); assert cb['x'] + cb['width'] <= tb['x'] + 1 and abs((cb['y'] + cb['height'] / 2) - (tb['y'] + tb['height'] / 2)) < 4, (cb, tb)
+    ct = pg.inner_text('#ws-bgprog'); assert ' of 4' in ct or 'Paused' in ct, ct
+    pg.click('#ws-bgprog .bc-bgpbtn'); pg.wait_for_timeout(200)
+    pop = pg.inner_text('#ws-bgprog .bc-bgpop'); assert 'onto the reference copy' in pop and pg.locator('#ws-bgprog .bc-bgpop [data-bg=stop]').count() == 1, pop
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(150); assert pg.locator('#ws-bgprog .bc-bgpop').count() == 0
+    assert not pg.is_visible('#ws-bg') or 'Paused:' in strip(pg) or 'finished' in strip(pg), 'no second progress display in the Pages tab: ' + strip(pg)
     if os.environ.get('BOOKCOMPARE_SHOTS'): pg.wait_for_timeout(3000); pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-strip.png'))
     t = wait_strip(pg, ['Paused:', 'finished'])
     assert 'Paused:' in t and 'has no partner' in t and 'C-Test' in t, t
     # 0.13.0 (owner): the Compare tab shows the same warning, with the same buttons
     cw = pg.evaluate("(() => { const s = document.getElementById('ct_bgslot'); return s ? [s.className, s.textContent, s.querySelectorAll('[data-bg]').length] : null; })()")
     assert cw and 'warn' in cw[0] and 'has no partner' in cw[1] and 'C-Test' in cw[1] and cw[2] == 4, cw
+    assert 'Paused' in pg.evaluate("document.getElementById('ws-bgprog').textContent") and 'Paused' in pg.evaluate("document.getElementById('ct_bgprog').textContent"), 'the bar at the top of both tabs says it is paused'
     if os.environ.get('BOOKCOMPARE_SHOTS'): pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-paused.png'))
     pg.click('#ws-bg [data-bg=goto]'); pg.wait_for_timeout(500)
     sel = pg.evaluate("[document.querySelector('#ws .ws-cell.sel') && document.querySelector('#ws .ws-cell.sel').dataset.c, document.querySelector('#ws .ws-cell.sel') && document.querySelector('#ws .ws-cell.sel').dataset.r]")
@@ -166,7 +175,7 @@ def scenario(p, kind):
     sizes = list(pack()['bins'].values()); assert all(5000 < s < 3000000 for s in sizes), sizes
     pg.click('#ws-bg [data-bg=close]'); pg.wait_for_timeout(200); assert not pg.is_visible('#ws-bg')
     # started again: everything is stored already - in the window both copies are greyed out ("all aligned"); started anyway, nothing is aligned
-    menu(pg, 'bg'); pg.wait_for_timeout(300)
+    pg.click('#ws-bgbtn'); pg.wait_for_timeout(600)
     assert pg.locator('#ws-scrim .bg-copy:disabled').count() == 2 and pg.inner_text('#ws-scrim').count('all aligned') == 2, pg.inner_text('#ws-scrim')
     pg.click('#ws-scrim [data-close]'); pg.wait_for_timeout(200)
     pg.evaluate("([b, c]) => BCBackground.start([b, c], 1)", [B, C]); t = wait_strip(pg, ['finished'], 60)

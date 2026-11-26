@@ -88,12 +88,12 @@ def add_copy(pg, key, name, start=None, ticks=()):
     for i in ticks: pg.check('#ac-groups input[data-g="%d"]'%i)
     pg.click('#ac-ok'); pg.wait_for_timeout(600)
 def cellmenu(pg, act, right_click=None):
-    # the less frequent cell actions are in the menu "More for this cell" (or the right mouse button on a cell, right_click = locator)
-    if right_click is not None: right_click.click(button='right')
-    else: pg.click('#ws-cellmore')
+    # the less frequent cell actions are in the menu of the right mouse button on a cell (right_click = locator; else the selected cell)
+    # (0.16.0: no "More for this cell" button any more)
+    (right_click if right_click is not None else pg.locator('#ws .ws-cell.sel').first).click(button='right')
     pg.wait_for_timeout(120); pg.click('#ws-ctx [data-act=%s]' % act)
 def cellmenu_enabled(pg, act):
-    pg.click('#ws-cellmore'); pg.wait_for_timeout(100)
+    pg.locator('#ws .ws-cell.sel').first.click(button='right'); pg.wait_for_timeout(100)
     on = pg.locator('#ws-ctx [data-act=%s]' % act).is_enabled()
     pg.keyboard.press('Escape'); pg.wait_for_timeout(80)
     return on

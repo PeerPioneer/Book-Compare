@@ -75,8 +75,8 @@ try:
         push_pick(os.path.join(PROJ, 'Long book.bookcompare')); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(1500)
         pg.evaluate("BookWorkspace.tab.setBgRun(null)")
         # the reference, then the run with two helpers
-        pg.click('#ws-more'); pg.click('[data-m=ref]'); pg.wait_for_selector('#rf-ok'); pg.check('input[name=ws-ref][value="%d"]' % A); pg.click('#rf-ok'); pg.wait_for_timeout(800)
-        pg.click('#ws-more'); pg.click('[data-m=bg]'); pg.wait_for_timeout(500)
+        pg.evaluate("id => BookWorkspace.tab.setRef(id)", A); pg.wait_for_timeout(800)       # (0.16.0: no menu entry for the reference copy)
+        pg.click('#ws-bgbtn'); pg.wait_for_timeout(500)
         if pg.locator('#ws-scrim input[name=bg-n][value="2"]').count(): pg.check('#ws-scrim input[name=bg-n][value="2"]')
         pg.click('#bg-all'); t0 = time.time(); pg.click('#bg-go')
         marks = []                                                          # (seconds, pages through) while it runs

@@ -556,6 +556,7 @@
         // 0.15.0 (owner): in the Compare tab the colour legend of the Superimposed view is not shown: the names of the two copies stand on
         // their colours at the top of the left panel
         main.label.classList.toggle('pane__label--legend', current_mode === 'diff');
+        main.label.classList.toggle('pane__label--toggle', current_mode === 'toggle');      // 0.16.0: the copy names light up instead
         if (current_mode === 'diff' && !document.body.classList.contains('ct-active')) {   // the colour choice next to the legend (item 11); in the Compare tab: in the left panel (0.14.0)
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'pane__lblbtn'; b.id = 'legend_colors';

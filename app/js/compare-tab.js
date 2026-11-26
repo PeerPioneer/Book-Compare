@@ -55,6 +55,7 @@
     ui.top = el('div', 'ct-top ws-vars');
     ui.top.innerHTML =
       '<div class="ct-brand">Book Compare</div><div class="ct-proj" id="ct_proj"></div><button class="ws-save" id="ct_save"></button><div class="ct-sp"></div>' +
+      '<div class="bc-bgprog" id="ct_bgprog" hidden></div>' +                         // (0.16.0: how far the background alignment is, js/background-align.js)
       '<div class="ct-tabs" role="tablist"><button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages">Pages</button>' +
       '<button class="ct-tab" role="tab" aria-selected="true" id="ct_tab_compare" tabindex="-1">Compare</button></div>' +
       '<button class="ct-iconbtn ct-helpbtn" id="ct_helpbtn" title="How the Compare tab works, and its keys" aria-label="Help: how the Compare tab works, and its keys">?</button>' +
@@ -69,8 +70,8 @@
       // 0.15.0 (owner): the name of each copy stands on its colour (the colours of the Superimposed view), with the menu arrow right
       // next to it; no ‹ › any more (the keys , and . still step through the copies as copy 2)
       '<div class="ct-copies">' +
-      '<div class="ct-copy c1"><span class="ct-lab">Copy 1</span><label class="ct-cname" title="Choose copy 1"><span class="ct-cn" id="ct_c1n"></span><svg class="ct-carr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="ct_c1" aria-label="Copy 1"></select></label><span class="ct-n" id="ct_n1"></span></div>' +
-      '<div class="ct-copy c2"><span class="ct-lab">Copy 2</span><label class="ct-cname" title="Choose copy 2 (keys , and . step through the copies)"><span class="ct-cn" id="ct_c2n"></span><svg class="ct-carr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="ct_c2" aria-label="Copy 2"></select></label><span class="ct-n" id="ct_n2"></span></div>' +
+      '<div class="ct-copy c1"><span class="ct-lab">Copy 1</span><label class="ct-cname" title="Choose copy 1"><span class="ct-cn" id="ct_c1n"></span><svg class="ct-carr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="ct_c1" aria-label="Copy 1"></select></label></div>' +
+      '<div class="ct-copy c2"><span class="ct-lab">Copy 2</span><label class="ct-cname" title="Choose copy 2 (keys , and . step through the copies)"><span class="ct-cn" id="ct_c2n"></span><svg class="ct-carr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="ct_c2" aria-label="Copy 2"></select></label></div>' +
       '</div>' +
       // 0.14.0 (owner, idea F): the views are chosen in the left panel (radio buttons); the options of the chosen view unfold under it,
       // one at a time; at the end, the link of the panels. The teal bar below the pictures is gone.
@@ -112,8 +113,7 @@
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
-      '<ul class="ct-list" id="ct_list" role="listbox" aria-label="Pages"></ul>' +
-      '<label class="ct-foot"><input type="checkbox" id="ct_skip" checked><span>Skip pages that one of the two copies lacks</span></label>';
+      '<ul class="ct-list" id="ct_list" role="listbox" aria-label="Pages"></ul>';      // (0.16.0, owner: pages one copy lacks are always skipped)
 
     ui.busy = el('div', 'ct-busy');
     ui.busy.hidden = true;
@@ -168,7 +168,6 @@
     var $ = function (id) { return document.getElementById(id); };
     ui.c1 = $('ct_c1'); ui.c2 = $('ct_c2'); ui.list = $('ct_list'); ui.q = $('ct_q'); ui.where = $('ct_where');
     ui.vlist = $('ct_vlist'); ui.vval = $('ct_vval'); ui.link = $('ct_link');
-    ui.skip = $('ct_skip');
     ui.filters = $('ct_filters'); ui.fcols = $('ct_fcols'); ui.flag = $('ct_flag'); ui.pal = $('ct_flagpal');
     ui.svg = $('ct_mapsvg'); ui.tip = $('ct_tip'); ui.hov = $('ct_maphov'); ui.pin = $('ct_pin');
     ui.flagpath = $('ct_flagpath'); ui.flagpath.setAttribute('d', W().flagPath);
@@ -223,7 +222,6 @@
       if (!(m >= 4 && m <= 16 && u >= 1 && u <= 4)) { $('ct_tnote').textContent = 'Main tiles: 4 to 16; sub-tiles: 1 to 4.'; return; }
       setTiles(m === 8 && u === 3 ? null : { main: m, sub: u });
     };
-    ui.skip.onchange = function () { st.skip = ui.skip.checked; };
     ui.q.oninput = function () { st.q = ui.q.value.trim().toLowerCase(); renderList(); };
     $('ct_prev').onclick = function () { stepPage(-1); };
     $('ct_next').onclick = function () { stepPage(1); };
@@ -337,8 +335,6 @@
     var byId = {}; s.copies.forEach(function (c) { byId[c.id] = c; });
     document.getElementById('ct_c1n').textContent = byId[s.pair[0]] ? byId[s.pair[0]].name : '';
     document.getElementById('ct_c2n').textContent = byId[s.pair[1]] ? byId[s.pair[1]].name : '';
-    document.getElementById('ct_n1').textContent = byId[s.pair[0]] ? byId[s.pair[0]].pages + ' of ' + s.rows + ' pages' : '';
-    document.getElementById('ct_n2').textContent = byId[s.pair[1]] ? byId[s.pair[1]].pages + ' of ' + s.rows + ' pages' : '';
   }
   function flagSvg(c, n) {
     return '<svg class="ct-fl" viewBox="0 0 24 24" width="' + n + '" height="' + n + '" role="img" aria-label="Flagged (' + W().flagNames[c] + ')" style="color:' + W().flagColors[c] + '"><path fill="currentColor" d="' + W().flagPath + '"/></svg>';
@@ -754,6 +750,14 @@
     document.addEventListener('linkchange', renderLink);
     document.addEventListener('modechange', renderView);
     document.addEventListener('diffcolorschange', function () { var c = document.getElementById('ct_colors'); if (c) c.querySelector('svg').outerHTML = squaresSvg(); });
+    // 0.16.0 (owner): in the Toggle view the name of the copy on screen lights up (instead of a label over the picture)
+    document.addEventListener('togglechange', function (e) {
+      if (!ui || !ui.side) return;
+      var n = st.on && VIEWS[viewIndex()][0] === 'toggle' ? e.detail : 0, c1 = ui.side.querySelector('.ct-copy.c1'), c2 = ui.side.querySelector('.ct-copy.c2');
+      ui.side.classList.toggle('ct-toggling', !!n);
+      if (c1) c1.classList.toggle('lit', n === 1);
+      if (c2) c2.classList.toggle('lit', n === 2);
+    });
   }
 
   /* ---------------------------------------------------------------- moving around */
@@ -818,6 +822,8 @@
       '</tbody></table>' +
       '<ul><li><b>Left panel:</b> the two copies; the <b>View</b> (the options of the chosen view unfold under its name: colours and paper of the Superimposed view, speed of the Toggle, Aligned / Original scan of the Copy 2 view); <b>Zoom and move all panels together</b> (the link; crossed out when every panel zooms and moves on its own); how this page is aligned; the pages; and, at the bottom, the page navigation and the flag. The small tab on its right edge folds the panel away: the page navigation stays in the bottom left corner.</li>' +
       '<li><b>Copy 1 and copy 2</b> can be shown in two small panels beside the superimposed picture: the strip at the right edge opens them.</li>' +
+      '<li><b>Toggle view:</b> the name of the copy that is on screen lights up in the left panel.</li>' +
+      '<li>The arrows and keys for the next and previous page <b>skip the pages that one of the two copies lacks</b>; the list shows them in grey.</li>' +
       '<li><b>Copy 2 view</b> (key 6): <b>Aligned</b> shows copy 2 as the alignment moved it, <b>Original scan</b> as it was scanned. Copy 1 is never changed.</li>' +
       '<li><b>Movement map</b> (left panel) colours the parts of copy 2 that the fine alignment moved, with arrows for the direction.</li>' +
       '<li><b>Alignment of this page</b> (left panel, folded at first): Stiffer / Standard / Flexible sets how small the pieces of copy 2 may be that move on their own; the movement map shows what moved; “Printed area” shows the area that is aligned, and its corners can be dragged.</li>' +
@@ -988,6 +994,7 @@
     if (!st.on && !st.everShown) { E.compare.prepare_for_tab(); st.everShown = true; }
     st.on = true;
     render();
+    if (window.BCBackground && BCBackground.render) BCBackground.render();                   // (the bar at the top: how far the background alignment is)
     E.go_to_screen(E.compare.cc, { inline: 'end', behavior: 'auto' });
     if (st.shown === key(s)) {                                                               // nothing changed since the pictures on screen
       if (first && first.urls) first.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { /* ignore */ } });
@@ -1014,7 +1021,6 @@
     leave: toPages,
     isOpen: function () { return st.on; },
     inFocus: function () { return st.on && st.focus; },
-    transform: function () { return st.transform === 'tiles' ? 'perspective' : st.transform; },   // the OLDER alignment type to time in the speed test (it measures the tiles separately)
     lastTiles: function () { return st.lastTiles || null; },                                 // what the tile alignment of the picture on screen reported (tests)
     prepared: function () { return { busy: pre.busy, cached: pre.cache.size }; },            // the next page being prepared (tests)
     toast: function (t) { if (ui) toast(t); },

@@ -497,6 +497,8 @@ class Visualization {
     draw_toggle_image(flag = false) {
         this._draw_image(flag ? this.aligned : this.input_image, true);
         this.draw();
+        // 0.16.0 (owner): the Compare tab lights up the name of the copy that is on screen (1 or 2)
+        document.dispatchEvent(new CustomEvent('togglechange', { detail: flag ? 2 : 1 }));
     }
 
     draw_diff_image() {
@@ -546,6 +548,7 @@ class Visualization {
         }
         if (speed === 0) {
             this.TOGGLE_IMAGES = false;
+            document.dispatchEvent(new CustomEvent('togglechange', { detail: 0 }));
             return;
         }
         this.TOGGLE_IMAGES = true;

@@ -75,12 +75,12 @@ with sync_playwright() as p:
         pg.evaluate("k=>window.__picks.push(window.__h[k])", target); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(400)
         assert 'scan folder' in pg.inner_text('#ws-toast'), 'saving into a scan folder must be refused'
     pg.evaluate("window.__picks.push(window.__h.proj)"); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(900)
-    assert '✓ Saved automatically' in pg.inner_text('#ws-save') and 'Book project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
+    assert '✓ Saved' in pg.inner_text('#ws-save') and 'Book project' in (pg.get_attribute('#ws-save', 'title') or ''), pg.inner_text('#ws-save')
     assert project_files(pg) == ['Book project.bookcompare'], project_files(pg)        # the project is one file
     d = read_project(pg); assert [c['name'] for c in d['copies']] == ['A-Test', 'B-Test', 'C-Test'] and d['labels'] == {'2': 'Index'} and d['folio'] is True
     assert d['version'] == 2 and len(d['roots']) == 3 and all(len(c['locs']) == 1 for c in d['copies']) and 'tray' not in d
     # 0.11.0: the chip says that saving is automatic, with the time; Ctrl+S saves at once and says so
-    import re as _re; assert _re.search(r'\d\d:\d\d', pg.inner_text('#ws-save')), pg.inner_text('#ws-save')
+    import re as _re; assert _re.search(r'\d\d:\d\d', pg.get_attribute('#ws-save', 'title')) and not _re.search(r'\d\d:\d\d', pg.inner_text('#ws-save')), pg.inner_text('#ws-save')   # 0.16.0: the time only in the tooltip
     pg.locator('#ws-vp').focus(); pg.keyboard.press('Control+s'); pg.wait_for_timeout(600)
     assert 'Saved in' in pg.inner_text('#ws-toast') and 'saved automatically' in pg.inner_text('#ws-toast'), pg.inner_text('#ws-toast')
     # 0.12.0: the website keeps stored alignments inside the project file too (a real file of the browser's own storage here)
@@ -99,9 +99,9 @@ with sync_playwright() as p:
     pg.wait_for_function("document.querySelectorAll('#ws .ws-cell .tn img').length >= 3", timeout=20000)
     pg.wait_for_timeout(1200); assert read_project(pg)['thumbs'] is True
     pg.click('#ws-pics'); pg.wait_for_timeout(300); assert pg.locator('#ws .ws-cell .tn').count() == 0 and abs(pg.locator('#ws .ws-row').first.bounding_box()['height'] - h40) < 1
-    # the website shows the desktop-only items of the menu greyed, with a note
-    pg.click('#ws-more'); assert pg.is_disabled('#ws-menu [data-m=bg]') and 'only in the desktop program' in pg.inner_text('#ws-menu [data-m=bg]'); pg.click('#ws-more')
-    assert pg.is_disabled('#ws-bgbtn') and 'desktop program' in (pg.get_attribute('#ws-bgbtn', 'title') or ''), 'the toolbar button too (0.15.0)'
+    # the website shows the background alignment greyed, with a note (0.16.0: only the toolbar button, no menu entry)
+    pg.click('#ws-more'); assert pg.locator('#ws-menu [data-m=bg]').count() == 0 and pg.locator('#ws-menu [data-m=ref]').count() == 0 and pg.locator('#ws-menu [data-m=help]').count() == 0; pg.click('#ws-more')
+    assert pg.is_disabled('#ws-bgbtn') and 'desktop program' in (pg.get_attribute('#ws-bgbtn', 'title') or ''), 'the toolbar button (0.15.0)'
     assert pg.locator('#ws-cmpbtn').count() == 0, 'no "Compare 1 and 2" button under the previews (0.15.0)'
     # column width, moving a copy, deleting a range of files with Shift (the grid is left as it was)
     import gridchecks; gridchecks.run(pg, col, lambda: read_project(pg))
@@ -125,10 +125,29 @@ with sync_playwright() as p:
     cell(1, 2).click(button='right'); pg.wait_for_timeout(150)
     assert pg.is_visible('#ws-ctx') and [t.strip().split(' (')[0].split(' · ')[0].upper() for t in pg.locator('#ws-ctx .ws-mhead').all_inner_texts()] == ['THIS CELL', 'THIS COPY', 'THIS ROW']
     pg.keyboard.press('Escape'); pg.wait_for_timeout(100); assert pg.locator('#ws-ctx').count() == 0
-    # the one menu: Project, Grid, Export (only in the Compare tab) and Help
+    # the one menu: Project, Grid, Font and Help (0.16.0: Export only in the Compare tab, where it works)
     pg.click('#ws-more'); heads = [t.strip().upper() for t in pg.locator('#ws-menu .ws-mhead').all_inner_texts()]
-    assert heads == ['PROJECT', 'GRID', 'EXPORT', 'FONT', 'HELP'] and not pg.locator('#ws-menu [data-m=x-view]').is_enabled(), heads
+    assert heads == ['PROJECT', 'GRID', 'FONT', 'HELP'] and pg.locator('#ws-menu [data-m=x-view]').count() == 0, heads
     pg.keyboard.press('Escape')
+    # 0.16.0 (owner): a quieter grid - no "3 copies · 6 rows", no "1"/"2" in every cell (the column of copy 1 and copy 2 is lightly tinted,
+    # its heading has the copy's colour and the number after the name), the notes only where something is missing, no "More for this cell"
+    assert pg.locator('#ws-summary').count() == 0 and pg.locator('#ws .ws-cell .pm').count() == 0 and pg.locator('#ws-cellmore').count() == 0
+    st0 = pg.evaluate("BookWorkspace.tab.state()"); ids = [c_['id'] for c_ in st0['copies']]; i1 = ids.index(st0['pair'][0]); i2 = ids.index(st0['pair'][1])
+    h1 = pg.locator('#ws .ws-hcell[data-c="%d"]' % i1)
+    assert 'k1' in h1.get_attribute('class') and h1.locator('.ws-hpm').inner_text() == '1' and pg.locator('#ws .ws-hcell[data-c="%d"] .ws-hpm' % i2).inner_text() == '2'
+    assert pg.evaluate("(i) => getComputedStyle(document.querySelector('#ws .ws-hcell[data-c=\"' + i + '\"]')).backgroundColor", i1) == pg.evaluate("(() => { const d = document.createElement('div'); d.style.color = DIFF_COLOR_1; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; })()"), 'the heading of copy 1 has its colour'
+    assert pg.locator('#ws .ws-cell.p1').count() == pg.locator('#ws .ws-cell[data-c="%d"]' % i1).count() > 0 and pg.locator('#ws .ws-cell.p2').count() > 0
+    smalls = pg.evaluate("[...document.querySelectorAll('#ws .ws-lbl')].map(l => [+l.dataset.r, (l.querySelector('small') || {}).textContent || ''])")
+    full = [i for i in range(pg.evaluate("BookWorkspace.tab.rowCount()")) if all(pg.evaluate("([c, r]) => !!BookWorkspace.tab.cellKey(c, r)", [cid, i]) for cid in ids)]
+    for i, t_ in smalls:
+        if i in full: assert t_ in ('', 'starts here', 'not compared'), (i, t_)
+        elif t_ not in ('starts here', 'not compared'): assert 'of 3 copies' in t_, (i, t_)
+    metas = pg.locator('#ws .ws-hmeta').all_inner_texts(); rc = pg.evaluate("BookWorkspace.tab.rowCount()")
+    for ci, cid in enumerate(ids):
+        n_ = sum(1 for r in range(rc) if pg.evaluate("([c, r]) => !!BookWorkspace.tab.cellKey(c, r)", [cid, r]))
+        assert (('%d files in grid' % n_) in metas[ci]) == (n_ < rc), (ci, n_, rc, metas[ci])
+    # 0.16.0 (owner): the text of the program cannot be selected, only what one types
+    assert pg.evaluate("getComputedStyle(document.querySelector('#ws .ws-lbl b')).userSelect") == 'none' and pg.evaluate("getComputedStyle(document.querySelector('#ws-title')).userSelect") != 'none'
     # deleting a file: gone from the workspace, no "set aside" tray, the scan itself is untouched
     assert pg.locator('#ws-tray').count() == 0 and 'Set aside' not in pg.inner_text('#ws')
     cell(2, 0).click(); assert pg.inner_text('[data-act=del]') == 'Delete file'; pg.click('[data-act=del]'); pg.wait_for_timeout(1500)     # automatic saving
