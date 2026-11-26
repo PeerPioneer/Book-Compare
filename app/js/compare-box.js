@@ -3,7 +3,8 @@
    "Printed area" (left panel, tile alignment only) shows the area the alignment works on, on all three pictures (they have the same size and
    shape: copy 2 is bent onto copy 1). It starts as the automatic box (a rectangle, dashed). Each of its four corners can be dragged on its
    own on the superimposed picture: everything outside the shape is then left out of the alignment, in both copies (main use: a slanted dark
-   binding edge or a sliver of the next page). When a corner is let go, the pair is aligned again at once. "Back to automatic" removes the shape.
+   binding edge or a sliver of the next page). 0.15.0 (owner): letting a corner go does not align at once; several corners can be moved,
+   then "Align with this shape" aligns the pair again ("Undo the change" puts the corners back). "Back to automatic" removes the shape.
    The shape belongs to the SCAN of copy 1 (the page that the other copy is bent onto) and is saved in the project (workspace.js keeps it).
    Corners are stored as fractions of the picture (0-1 across and down), clockwise from the top left.
 
@@ -11,7 +12,7 @@
 (function () {
   'use strict';
   var H = null, ui = null;
-  var st = { on: false, quad: null, hand: false, drag: -1 };
+  var st = { on: false, quad: null, hand: false, drag: -1, pending: null, pendFor: null };
 
   function W() { return H.W(); }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
@@ -35,18 +36,28 @@
     if (o.main) for (var i = 0; i < 4; i++) s += '<circle data-h="' + i + '" cx="' + (q[2 * i] * w).toFixed(1) + '" cy="' + (q[2 * i + 1] * h).toFixed(1) + '" r="8" style="fill:#fff;stroke:#00807a;stroke-width:3"><title>Drag this corner</title></circle>';
     svg.innerHTML = s;
   }
+  function shownKey() { var sh = H.shown(); return sh ? sh.row + '|' + sh.pair[0] + '|' + sh.pair[1] : null; }
   function render() {
     if (!ui) return;
     var ok = usable();
-    if (st.drag < 0) st.quad = ok ? current() : null;
+    if (st.pending && st.pendFor !== shownKey()) st.pending = null;                       // (another page or pair: the change is dropped)
+    if (st.drag < 0) st.quad = ok ? (st.pending ? st.pending.slice() : current()) : null;
     ui.ov.forEach(function (o) { o.box.hidden = !ok; if (ok) draw(o); });
     var pm = document.getElementById('pane_main'); if (pm) pm.classList.toggle('ct-boxedit', !!ok);      // (the annotation tools would cover a corner)
-    ui.auto.hidden = !(ok && st.hand);
+    ui.auto.hidden = !(ok && st.hand && !st.pending);
+    ui.apply.hidden = ui.undo.hidden = !(ok && st.pending);
     var sh = H.shown();
     ui.note.hidden = !st.on;
     ui.note.innerHTML = !st.on ? '' : !ok ? 'The printed area is shown when the pages are aligned.' :
-      (st.hand ? '<b>Set by hand</b> for this scan of ' + esc(copyName(sh.pair[0])) + '. ' : 'Found automatically. ') +
-      'Drag a corner on the superimposed picture: everything outside the shape is left out of the alignment (for example a dark binding edge or a sliver of the next page). The pages are aligned again at once.';
+      st.pending ? 'Changed, not aligned yet: move more corners if you like, then “Align with this shape”.' :
+      (st.hand ? 'Set by hand for this scan of ' + esc(copyName(sh.pair[0])) + '. ' : 'Found automatically. ') +
+      'Drag a corner on the superimposed picture: everything outside the shape is left out of the alignment (for example a dark binding edge or a sliver of the next page). Then “Align with this shape”.';
+  }
+  function apply() {
+    var sh = H.shown(); if (!sh || !st.pending) return;
+    var q = st.pending.map(function (v) { return Math.round(v * 10000) / 10000; });
+    if (W().setBoxSetting(sh.row, sh.pair[0], q) === false) { H.say('That shape is too small: drag the corners further apart.'); return; }
+    st.pending = null; H.realign(); render();
   }
   function onDown(e) {
     var c = e.target.closest && e.target.closest('[data-h]'); if (!c || !usable()) return;
@@ -62,15 +73,14 @@
     function up() {
       svg.removeEventListener('pointermove', mv); svg.removeEventListener('pointerup', up); svg.removeEventListener('pointercancel', up);
       st.drag = -1;
-      var sh = H.shown(); if (!sh) return;
-      var q = st.quad.map(function (v) { return Math.round(v * 10000) / 10000; });
-      if (W().setBoxSetting(sh.row, sh.pair[0], q) === false) { H.say('That shape is too small: drag the corners further apart.'); render(); return; }
-      H.realign();
+      if (!H.shown()) return;
+      st.pending = st.quad.slice(); st.pendFor = shownKey(); render();                    // (0.15.0: not aligned at once)
     }
     svg.addEventListener('pointermove', mv); svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
   }
   function build() {
-    ui = { ov: [], check: document.getElementById('ct_box'), auto: document.getElementById('ct_boxauto'), note: document.getElementById('ct_boxnote') };
+    ui = { ov: [], check: document.getElementById('ct_box'), auto: document.getElementById('ct_boxauto'), note: document.getElementById('ct_boxnote'),
+      apply: document.getElementById('ct_boxapply'), undo: document.getElementById('ct_boxundo') };
     if (!ui.check) { ui = null; return; }
     [['pane_main', true], ['pane_o1', false], ['pane_o2', false]].forEach(function (p) {
       var pane = document.getElementById(p[0]), content = pane && pane.querySelector('.pane__content'); if (!content) return;
@@ -83,13 +93,16 @@
     });
     if (ui.main) ui.main.svg.addEventListener('pointerdown', onDown);
     ui.check.onchange = function () { st.on = this.checked; render(); };
-    ui.auto.onclick = function () { var sh = H.shown(); if (!sh) return; W().setBoxSetting(sh.row, sh.pair[0], null); H.realign(); render(); };
+    ui.auto.onclick = function () { var sh = H.shown(); if (!sh) return; st.pending = null; W().setBoxSetting(sh.row, sh.pair[0], null); H.realign(); render(); };
+    ui.apply.onclick = apply;
+    ui.undo.onclick = function () { st.pending = null; render(); };
   }
 
   window.CompareBox = {
     init: function (hooks) { H = hooks; build(); render(); },
     refresh: render,
     isOn: function () { return st.on; },
-    quad: function () { return st.quad ? st.quad.slice() : null; }       // what is drawn (tests)
+    quad: function () { return st.quad ? st.quad.slice() : null; },      // what is drawn (tests)
+    pending: function () { return !!st.pending; }
   };
 })();

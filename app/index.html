@@ -10,6 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="theme-color" content="#ffffff" />
     <title>Book Compare</title>
+    <script>
+      // the font of Book Compare (0.15.0): EB Garamond unless the owner chose the old one (Roboto) in the menu; set before anything is drawn
+      try { if (localStorage.getItem('bookcompare_font') !== 'roboto') document.documentElement.classList.add('bc-garamond'); }
+      catch (e) { document.documentElement.classList.add('bc-garamond'); }
+    </script>
     <meta
       name="description"
       content="Image Compare is a lightweight, standalone and offline application to visually compare two images and highlight the differences between them. This application can be used in desktop computers and mobile phones without requiring installation as it runs entires in a web browser. Image Compare is an open source software developed and maintained by the VGG Oxford."
@@ -146,6 +151,14 @@
         src: local("Roboto-Medium"),
           url("fonts/roboto-500.woff2") format("woff2"); /* Chrome 26+, Opera 23+, Firefox 39+ */
       }
+      /* 0.15.0 (owner, 26 Nov 2026): Book Compare tries EB Garamond (https://github.com/octaviopardo/EBGaramond12, SIL Open Font License,
+         fonts/EB-Garamond-OFL.txt) for all its text. Roboto above stays: the ⋮ menu → "Font" switches back ("bookcompare_font" =
+         "roboto"), and the class bc-garamond on <html> is set by the small script at the top of <head>. EB Garamond has a small x-height
+         (0.40 of the size, Roboto 0.53), so font-size-adjust lets it appear about as large as before; icons keep their own font. */
+      @font-face { font-family: "EB Garamond"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("fonts/eb-garamond.woff2") format("woff2"); }
+      @font-face { font-family: "EB Garamond"; font-style: italic; font-weight: 400 800; font-display: swap; src: url("fonts/eb-garamond-italic.woff2") format("woff2"); }
+      html.bc-garamond *:not(.material-icons) { font-family: "EB Garamond", Garamond, "Times New Roman", serif !important; font-size-adjust: 0.47; }
+      html.bc-garamond { --mdc-typography-font-family: "EB Garamond", serif; }
       /* Disable text transforms in tab */
       .mdc-tab {
         text-transform: none;

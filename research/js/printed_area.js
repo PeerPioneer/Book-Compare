@@ -41,6 +41,20 @@ function redScaled(cv, rgba, w, h) {
   } finally { S.free(); }
 }
 
+/* 0.15.0: the darkest of red, green and blue per pixel, scaled like redScaled - black AND red (or other coloured) print are dark in it.
+   Used only to find lines of print beside the block of text (extendBoxByHeadLines); the alignment itself keeps the red channel (A6/B5). */
+function darkScaled(cv, rgba, w, h) {
+  const S = scope();
+  try {
+    const m8 = S.add(new cv.Mat(h, w, cv.CV_8U)), r = m8.data;
+    for (let i = 0, j = 0; i < r.length; i++, j += 4) { const a = rgba[j], b = rgba[j + 1], c = rgba[j + 2]; r[i] = a < b ? (a < c ? a : c) : (b < c ? b : c); }
+    const out8 = S.add(new cv.Mat());
+    if (h === H0) m8.copyTo(out8); else cv.resize(m8, out8, new cv.Size(Math.round(w * H0 / h), H0), 0, 0, cv.INTER_AREA);
+    const out = S.add(new cv.Mat()); out8.convertTo(out, cv.CV_32F);
+    return S.release(out);
+  } finally { S.free(); }
+}
+
 /* Otsu threshold of a uint8 array (OpenCV's own, via a Mat) */
 function otsu(cv, u8, rows, cols) {
   const S = scope();
@@ -203,4 +217,74 @@ function extendBoxByStaves(box, ref, gapFrac = 0.03) {
   return [x0, sy0, x1, sy1];
 }
 
-module.exports = { H0, redScaled, inkMap, printedBox, smoothBlur, extendBoxByStaves, scope };
+/* 0.15.0 (owner, 26 Nov 2026: the Winterburger Antiphonarius never had its folio number and headline inside the printed area). A headline, a folio
+   number, a catchword or a signature - a line or a few lines of print just above or below the block of text - belong to the printed area, but
+   printedBox leaves them out: one line is too thin for its density regions (the 101 px opening), and red print hardly shows in the red channel.
+   This adds them, from the darkest-channel picture (dark, see darkScaled): ink without long straight lines (rules, staff lines, page edges), in
+   the band up to `up` (12 %) of the height above the box and `down` (6 %) below it; only pieces whose middle lies across the width of the box,
+   that do not run into the sides of the band (a sliver of the next page, a page edge), and that are text-sized (not dust: 21 px high or 300 px
+   of ink); a round or oval stamp (a large hollow ring) is left out with everything inside it. A piece joins while it lies within `gap` (4.5 % of the height) of the box or of a piece already taken, so a far-away mark does not.
+   Returns { box, top, bottom } (top / bottom: how many pixels were added there). */
+function extendBoxByHeadLines(cv, box, dark, o = {}) {
+  const up = o.up != null ? o.up : 0.12, down = o.down != null ? o.down : 0.06, gapF = o.gap != null ? o.gap : 0.045;
+  const W = dark.cols, H = dark.rows, [bx0, by0, bx1, by1] = box;
+  const tol = Math.round(0.03 * W), gap = Math.round(gapF * H), ex = Math.round(0.02 * W), ey = Math.round(0.02 * H), minH = Math.round(0.007 * H);
+  const zx0 = Math.max(ex, bx0 - tol), zx1 = Math.min(W - ex, bx1 + tol), zw = zx1 - zx0;
+  if (zw < 100) return { box, top: 0, bottom: 0 };
+  const S = scope();
+  try {
+    const ink = S.add(inkMap(cv, dark)), d = ink.data32F;
+    // the pieces of print in rows ya..yb (within the band zx0..zx1), long straight lines taken out first
+    const pieces = (ya, yb) => {
+      const zh = yb - ya; if (zh < 8) return [];
+      let b = new Uint8Array(zw * zh);
+      for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) b[y * zw + x] = d[(y + ya) * W + x + zx0] > 0.5 ? 1 : 0;
+      const lh = openRect(dilateRect(b, zw, zh, 7, 1), zw, zh, 1, Math.min(250, Math.round(zw * 0.5)));
+      const lv = openRect(dilateRect(b, zw, zh, 1, 7), zw, zh, Math.min(150, Math.round(zh * 0.7)), 1);
+      for (let i = 0; i < lh.length; i++) lh[i] |= lv[i];
+      const lines = dilateRect(lh, zw, zh, 5, 5);
+      for (let i = 0; i < b.length; i++) if (lines[i]) b[i] = 0;
+      const m = S.add(new cv.Mat(zh, zw, cv.CV_8U)); m.data.set(b);
+      const lab = S.add(new cv.Mat()), st = S.add(new cv.Mat()), cen = S.add(new cv.Mat());
+      const n = cv.connectedComponentsWithStats(m, lab, st, cen, 8), out = [], rings = [];
+      for (let i = 1; i < n; i++) {
+        const x = st.intAt(i, 0), y = st.intAt(i, 1), w = st.intAt(i, 2), h = st.intAt(i, 3), a = st.intAt(i, 4);
+        if (x <= 1 || x + w >= zw - 1) continue;                                          // runs into the side of the band
+        // a library stamp (owner's scans: round or oval, often red or violet, so it shows in this picture): a large hollow ring - left out,
+        // with everything inside it
+        if (h > 0.035 * H && w > 0.5 * h && w < 2.2 * h && a < 0.35 * w * h) { rings.push([zx0 + x, ya + y, zx0 + x + w, ya + y + h]); continue; }
+        const mid = zx0 + x + w / 2; if (mid < bx0 || mid > bx1) continue;                 // its middle is not across the box
+        if (h > 0.06 * H) continue;                                                        // a big blot, not a line of print
+        if (h < minH && a < 300) continue;                                                 // dust
+        out.push({ x0: zx0 + x, x1: zx0 + x + w, y0: ya + y, y1: ya + y + h, a });
+      }
+      m.delete(); lab.delete(); st.delete(); cen.delete();
+      return out.filter(p => !rings.some(r => (p.x0 + p.x1) / 2 >= r[0] && (p.x0 + p.x1) / 2 <= r[2] && (p.y0 + p.y1) / 2 >= r[1] && (p.y0 + p.y1) / 2 <= r[3]));
+    };
+    let nx0 = bx0, ny0 = by0, nx1 = bx1, ny1 = by1;
+    // above
+    {
+      const P = pieces(Math.max(ey, by0 - Math.round(up * H)), by0), used = new Set();
+      let cur = by0, moved = true, area = 0;
+      while (moved) { moved = false; for (let i = 0; i < P.length; i++) if (!used.has(i) && P[i].y1 >= cur - gap) { used.add(i); area += P[i].a; if (P[i].y0 < cur) { cur = P[i].y0; moved = true; } } }
+      if (used.size && area >= 250 && cur < by0) {
+        ny0 = Math.max(0, cur - 6);
+        for (const i of used) { nx0 = Math.min(nx0, P[i].x0 - 4); nx1 = Math.max(nx1, P[i].x1 + 4); }
+      }
+    }
+    // below
+    {
+      const P = pieces(by1, Math.min(H - ey, by1 + Math.round(down * H))), used = new Set();
+      let cur = by1, moved = true, area = 0;
+      while (moved) { moved = false; for (let i = 0; i < P.length; i++) if (!used.has(i) && P[i].y0 <= cur + gap) { used.add(i); area += P[i].a; if (P[i].y1 > cur) { cur = P[i].y1; moved = true; } } }
+      if (used.size && area >= 250 && cur > by1) {
+        ny1 = Math.min(H, cur + 6);
+        for (const i of used) { nx0 = Math.min(nx0, P[i].x0 - 4); nx1 = Math.max(nx1, P[i].x1 + 4); }
+      }
+    }
+    nx0 = Math.max(0, nx0); nx1 = Math.min(W, nx1);
+    return { box: [nx0, ny0, nx1, ny1], top: by0 - ny0, bottom: ny1 - by1 };
+  } finally { S.free(); }
+}
+
+module.exports = { H0, redScaled, darkScaled, inkMap, printedBox, smoothBlur, extendBoxByStaves, extendBoxByHeadLines, scope };

@@ -383,7 +383,7 @@
     return out.join(win ? '\\' : '/') || null;
   }
   function blank() {
-    return { title: '', lblw: 0, projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, paper: {}, thumbs: false, nextAnn: 1, folio: false, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
+    return { title: '', lblw: 0, projectId: uid(), roots: [], copies: [], labels: {}, ns: 0, skip: {}, flags: {}, annots: {}, tiles: {}, boxes: {}, paper: {}, thumbs: false, nextAnn: 1, folio: true, nextCopy: 1, sel: { ci: null, row: 0 }, pair: [null, null], ref: null };
   }
   function rows() { var m = 0; S.copies.forEach(function (c) { if (c.cells.length > m) m = c.cells.length; }); return m; }
   function trim(c) { while (c.cells.length && c.cells[c.cells.length - 1] === null) c.cells.pop(); }
@@ -1245,7 +1245,17 @@
       '<button class="ws-tb" id="ws-cellmore" data-act="cellmenu"' + (s ? '' : ' disabled') + ' aria-haspopup="true" title="More for this cell, its row and its copy (also with the right mouse button)">More for this cell &#9662;</button>' +
       '<span class="ws-vsep"></span>' +
       '<button class="ws-tb ws-tog" id="ws-pics" data-act="pics" aria-pressed="' + !!S.thumbs + '" title="Show a small picture of every page in the grid (kept in the project). The rows get taller.">' +
-      '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg> Pictures in the grid</button>';
+      '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg> Pictures in the grid</button>' +
+      bgButton();
+  }
+  // 0.15.0 (owner): the background alignment has its own button in the Pages tab; while it runs, the button says how far it is
+  function bgButton() {
+    var B = window.BCBackground, st = B && B.state ? B.state() : null, run = st && !st.finished;
+    var off = !HELPER || S.copies.length < 2 || !!S.examples;
+    var tip = !HELPER ? 'Only in the desktop program: aligns the other copies onto the reference copy page by page and keeps the results' : 'Align the other copies onto the reference copy, page by page, while you go on working';
+    var lab = run ? (st.paused ? 'Background alignment paused' : 'Aligning in the background') + ' · ' + (st.done + st.skipped + st.failed) + ' of ' + st.total : 'Align in the background …';
+    return '<span class="ws-vsep"></span><button class="ws-tb ws-bgbtn' + (run ? ' on' : '') + '" id="ws-bgbtn" data-act="bgopen"' + (off && !run ? ' disabled' : '') + ' title="' + esc(tip) + '">' +
+      '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg> ' + esc(lab) + '</button>';
   }
   // the menu for a cell (right mouse button, or "More for this cell"): its copy, its row
   function cellMenuHtml() {
@@ -1261,7 +1271,10 @@
       it('renamecopy', 'Rename copy …') + it('setref', S.ref === s.c.id ? '★ Is the reference copy' : 'Make it the reference copy', S.ref === s.c.id) +
       '<hr><div class="ws-mhead">This row · <span>' + esc(rowLabel(s.row)) + '</span></div>' +
       it('startnum', 'Start numbering at this row …') + it('renamerow', 'Rename this row …') +
-      it('skiprow', S.skip[s.row] ? 'Compare this row again' : 'Don’t compare this row');
+      (function () {                                                      // 0.15.0 (owner): for all the marked rows at once
+        var rg = range(), lo = rg ? rg.lo : s.row, hi = rg ? rg.hi : s.row, n = hi - lo + 1;
+        return it('skiprow', S.skip[s.row] ? (n > 1 ? 'Compare these ' + n + ' rows again' : 'Compare this row again') : (n > 1 ? 'Don’t compare these ' + n + ' rows' : 'Don’t compare this row'));
+      })();
   }
   function openCellMenu(x, y) {
     closeCellMenu();
@@ -1439,7 +1452,7 @@
   }
   function renderBar() {
     var ok = canCompare();
-    $('#ws-compare').classList.toggle('notready', !ok); $('#ws-cmpbtn').classList.toggle('notready', !ok);
+    $('#ws-compare').classList.toggle('notready', !ok);
     var t = $('#ws-title'); if (t && document.activeElement !== t && t.value !== (S.title || '')) t.value = S.title || '';
   }
   function renderAll() {
@@ -1524,7 +1537,7 @@
       '<li>What the comparison cannot show (light inks such as red, small shifts, ...) is explained in the help of the Compare tab (its “?” button), under “What the comparison cannot show”.</li>' +
       '<li>Rows are positions in the book, not tied to any copy. If the first rows hold a cover or flyleaf, select the row of the first printed page and choose <b>Start numbering at this row</b>: you decide there between pagination (Page 1, 2, 3 …) and foliation (1r, 1v, 2r …). You can switch later in the menu <b>⋮</b>. Double-click a row name to rename it.</li>' +
       '<li><b>Don’t compare this row</b> keeps a row in the grid but leaves it out of the comparison.</li>' +
-      '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press <b>Compare 1 and 2</b> (or the tab <b>Compare</b> at the top): they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The tab <b>Pages</b> brings you here again.</li>' +
+      '<li>On the right you see the page of every copy in the selected row. Mark two of them with <b>1</b> and <b>2</b>, then press the tab <b>Compare</b> at the top: they open in the <b>Compare tab</b>, which aligns them by itself. There you can go through the book page by page, flag pages (key F), draw circles, rectangles and notes on the superimposed picture, and see the whole book on the book map. The arrows button at the top right (<b>focus mode</b>) hides everything except the pictures; Esc brings it back. The tab <b>Pages</b> brings you here again.</li>' +
       '<li>When you reopen a saved project the browser asks once for permission to read your scans again. Click <b>Allow access to scans</b>; you do not have to pick the folders again.</li>' +
       '<li><b>Delete several files at once:</b> click the first cell, hold <b>Shift</b> and click the last one (or press Shift + the up/down arrow). The whole range is marked; <b>Delete</b> removes it and the pages below move up.</li>' +
       '<li><b>Column width:</b> drag the right edge of a column heading; a double-click fits the longest file name. <b>⋮ → Standard width for all columns</b> resets them.</li>' +
@@ -1771,8 +1784,8 @@
     var row = s.row, folio = S.folio;
     var sc = modal('<h3>Start numbering at row ' + (row + 1) + '</h3>' +
       '<p>' + (row ? 'The rows above become front matter (Front 1, Front 2 …). ' : '') + 'This row becomes the first numbered page. How should the pages be numbered?</p>' +
-      '<label class="inl opt"><input type="radio" name="nm-style" value="page"' + (folio ? '' : ' checked') + '><span><b>Pagination</b><br>Every page gets a number: Page 1, Page 2, Page 3 …</span></label>' +
       '<label class="inl opt"><input type="radio" name="nm-style" value="folio"' + (folio ? ' checked' : '') + '><span><b>Foliation</b><br>Every leaf gets a number, front and back: 1r, 1v, 2r, 2v …</span></label>' +
+      '<label class="inl opt"><input type="radio" name="nm-style" value="page"' + (folio ? '' : ' checked') + '><span><b>Pagination</b><br>Every page gets a number: Page 1, Page 2, Page 3 …</span></label>' +
       '<p class="note">You can switch later (menu ⋮). Row names you typed yourself are kept.</p>' +
       '<div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="nm-ok">Start numbering</button></div>');
     sc.querySelector('#nm-ok').onclick = function () {
@@ -1807,6 +1820,10 @@
       item('x-aligned', 'Aligned pages (two pictures)', !cmp, cmp ? 'Copy 1 and copy 2 as aligned, as two picture files' : notHere) +
       item('x-toggle', 'Toggle view (moving picture, GIF)', !cmp, cmp ? '' : notHere) +
       item('x-view', 'Current view (picture)', !cmp, cmp ? 'The picture as it is shown now, e.g. Superimposed' : notHere);
+    // 0.15.0 (owner): Book Compare tries EB Garamond; the old font (Roboto) is one click away
+    var gar = document.documentElement.classList.contains('bc-garamond');
+    h += '<hr><div class="ws-mhead">Font</div>' +
+      item('font', gar ? '<span>Back to the old font (Roboto)<small class="ws-mdesk">now: EB Garamond</small></span>' : '<span>Try EB Garamond<small class="ws-mdesk">now: Roboto, the old font</small></span>');
     h += '<hr><div class="ws-mhead">Help</div>' +
       item('help', cmp ? 'How the Compare tab works (keys) …' : 'How this screen works …') +
       item('speed', 'Measure speed on this computer …') +
@@ -1849,6 +1866,13 @@
     else if (m === 'download') openDownloadPage();
     else if (m === 'licenses') { var a = document.createElement('a'); a.href = 'licenses.txt'; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
     else if (m === 'about') aboutDialog();
+    else if (m === 'font') {
+      var on = !document.documentElement.classList.contains('bc-garamond');
+      document.documentElement.classList.toggle('bc-garamond', on);
+      try { localStorage.setItem('bookcompare_font', on ? 'garamond' : 'roboto'); } catch (x) { /* private mode */ }
+      window.dispatchEvent(new Event('resize'));                                              // the panels measure their text again
+      renderMenu(); toast(on ? 'The text of Book Compare is set in EB Garamond now.' : 'Back to the old font (Roboto).', true);
+    }
     else if (m === 'updates') { if (updInfo.state === 'newer') { showUpdateCard(true); updateNow(); } else checkUpdatesNow(); }
   }
   // item 28: how much room the stored alignments take, and removing those that are no longer needed (pages that left the grid, an older
@@ -2075,6 +2099,14 @@
     },
     // ---- for the reference copy and the background alignment (js/results-store.js, js/background-align.js, V7-V10)
     refCopy: function () { return S.ref; },
+    // 0.15.0: for the window of the background alignment - how many pages of a copy need the reference, and how many of them are stored
+    alignedOf: function (id) {
+      var c = copyById(id), st = storedEntries(), n = 0, b = 0; if (!c) return { n: 0, b: 0 };
+      for (var r = 0; r < c.cells.length; r++) { if (!c.cells[r]) continue; var f = refFor(r); if (f == null || f === c.id) continue; n++; if (isStored(st, c, r, c.cells[r])) b++; }
+      return { n: n, b: b };
+    },
+    refreshBgButton: function () { var b = root && document.getElementById('ws-bgbtn'); if (b) b.outerHTML = bgButton().replace('<span class="ws-vsep"></span>', ''); },
+    setRef: function (id) { if (id == null || id === S.ref || !copyById(id)) return; commit(); S.ref = id; changed(); },
     refFor: refFor,
     refDialog: refDialog,
     cellKey: function (copyId, row) { var c = copyById(copyId); return (c && S.copies.indexOf(c) >= 0 && c.cells[row]) || null; },
@@ -2144,7 +2176,11 @@
     },
     swap: function () { S.pair = [S.pair[1], S.pair[0]]; touch(); },
     loadPair: loadPair,
-    showPages: function () { show(); }
+    // 0.15.0 (owner): coming from the Compare tab, the page shown there is selected in the grid (in the column of copy 1) and scrolled into view
+    showPages: function () {
+      var row = S && S.sel ? S.sel.row : 0, c1 = S && S.pair ? S.pair[0] : null;
+      if (c1 != null && copyById(c1) && row >= 0 && row < rows()) goTo(c1, row); else show();
+    }
   };
 
   /* ---------------------------------------------------------------- events */
@@ -2259,6 +2295,7 @@
       case 'more': renderMenu(); $('#ws-menu').hidden = !$('#ws-menu').hidden; return;
       case 'compare': return compareNow();
       case 'pics': S.thumbs = !S.thumbs; touch(); renderAll(); return;
+      case 'bgopen': if (window.BCBackground) window.BCBackground.open(); return;
       case 'savechip': return chipClick();
       case 'openproj': return openProject();
       case 'continue': return continueLast();
@@ -2271,7 +2308,11 @@
       case 'mvl': closeCellMenu(); if (s && s.ci > 0) moveCopy(s.ci, s.ci - 1); return;
       case 'mvr': closeCellMenu(); if (s && s.ci < S.copies.length - 1) moveCopy(s.ci, s.ci + 1); return;
       case 'startnum': closeCellMenu(); if (s) numberingDialog(s); return;
-      case 'skiprow': closeCellMenu(); if (s) { commit(); if (S.skip[s.row]) delete S.skip[s.row]; else S.skip[s.row] = true; changed(); toast(S.skip[s.row] ? 'This row will not be compared.' : 'This row will be compared again.', true); } return;
+      case 'skiprow': closeCellMenu(); if (s) {
+        var rg2 = range(), lo2 = rg2 ? rg2.lo : s.row, hi2 = rg2 ? rg2.hi : s.row, off2 = !S.skip[s.row], n2 = hi2 - lo2 + 1;
+        commit(); for (var q2 = lo2; q2 <= hi2; q2++) { if (off2) S.skip[q2] = true; else delete S.skip[q2]; }
+        changed(); toast(n2 > 1 ? (off2 ? 'These ' + n2 + ' rows will not be compared.' : 'These ' + n2 + ' rows will be compared again.') : (off2 ? 'This row will not be compared.' : 'This row will be compared again.'), true);
+      } return;
       case 'gap': closeCellMenu(); if (s) gapDialog(s); return;
       case 'closegap': closeCellMenu(); if (s && !s.key) closeGapAction(s); return;
       case 'cellmenu': { var bb = a.getBoundingClientRect(); if (root.querySelector('#ws-ctx')) closeCellMenu(); else openCellMenu(bb.left, bb.bottom + 4); return; }
@@ -2397,6 +2438,8 @@
     if (S.copies.length && dirty && !S.examples && !(await confirmDialog('Start a new project?', 'The current project has changes that are not saved. They will be lost.', 'Start new project'))) return;
     projectChanging();
     S = blank(); REG = {}; hist = { undo: [], redo: [] }; thumbMem.clear(); anchor = null; proj.target = null; proj.pack = null; proj.legacy = null; proj.state = 'none'; proj.name = ''; dirty = false;
+    // 0.15.0 (owner): a new project always starts in the (empty) Pages tab, also when "New project" was chosen in the Compare tab
+    if (window.CompareTab && CompareTab.isOpen && CompareTab.isOpen()) CompareTab.toPages(); else if (root && root.hidden) show();
     renderAll();
   }
 
@@ -2452,8 +2495,8 @@
       '<div class="ws-menu" id="ws-menu" role="menu" hidden></div></div>' +
       '<div class="ws-banner" id="ws-banner" hidden></div><div class="ws-banner ws-bg" id="ws-bg" hidden></div>' +
       '<div class="ws-stage"><div class="ws-main"><div class="ws-toolbar" id="ws-toolbar"></div><div class="ws-summary" id="ws-summary"></div><div class="ws-gridbox" id="ws-gridbox"></div></div>' +
-      '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div>' +
-      '<div class="ws-pvacts"><button class="ws-cmpbtn" id="ws-cmpbtn" data-act="compare">Compare 1 and 2</button></div></aside></div>' +
+      // (0.15.0, owner: no "Compare 1 and 2" button under the previews any more - the Compare tab at the top right does it)
+      '<aside class="ws-panel"><h2 id="ws-pvtitle"></h2><div class="ws-sub" id="ws-pvsub"></div><div class="ws-thumbs" id="ws-thumbs"></div></aside></div>' +
       '<div id="ws-layer"></div>' +
       '<input type="file" id="ws-dirinput" class="ws-hidden" webkitdirectory multiple><input type="file" id="ws-jsoninput" class="ws-hidden" accept=".bookcompare,.json,application/json">';
     document.body.appendChild(root);

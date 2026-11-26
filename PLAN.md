@@ -1128,6 +1128,28 @@ Built 25 Nov 2026 as **version 0.13.0** (details in CHANGELOG.txt); D1b and S1 a
 | D1b | Left panel as in idea F with the owner's changes (no teal bar; copies, View with radio buttons and unfolding options, link button crossed out when off, Alignment, pages; navigation pinned at the bottom; folded panel = slim line + navigation card in the bottom left corner, without the copy names - owner 25 Nov evening) | **done 0.14.0** |
 | S1 | Owner: alignments "not saved" (A-Wn1 against D-W, page 8 → 7 → 8 aligned again). As decided 21 Nov (D4) only pairs with the reference were stored; a pair of two other copies is aligned directly (copy 2 onto copy 1, not via the reference). Now every aligned pair is kept in the project file | **done 0.14.0** |
 
+### 11.1g The owner's notes of 26 November 2026 (on 0.14.0)
+
+Built 26 Nov 2026 as **version 0.15.0** (details in CHANGELOG.txt), except the items marked *proposed*.
+
+| ID | Item | Status |
+|----|------|--------|
+| N20 | View and Alignment folded when a project is opened or started | **done 0.15.0** |
+| N21 | The alignment notes: same colours, smaller, not bold, at the foot of the alignment box | **done 0.15.0** |
+| N22 | Bold page name looked different: Roboto had no bold, the browser faked it | **answered** (EB Garamond has real bold) |
+| F1 | EB Garamond for all text, Roboto kept (⋮ → Font) | **done 0.15.0; the owner decides later whether it stays** |
+| I1 | Replace the examples by an introduction for new users ("I'm new here …"), built on onboarding practice (short, skippable, learn by doing, can be reopened); the owner's note "Exemplary difference" | **proposed - waiting for the owner** |
+| B10 | Background alignment: button in the Pages tab showing progress; window: none ticked, Select all, aligned copies greyed, reference in bold with explanation, reference changeable there | **done 0.15.0** |
+| N23 | No "Compare 1 and 2" button under the previews | **done 0.15.0** |
+| N24 | Copies at the top of the left panel: no ‹ ›, arrow next to the name, the copy's colour as background of its name; no colour legend over the picture | **done 0.15.0** |
+| D3 | Declutter: remove what is shown twice without need (other labels over the pictures, side panels, zoom columns, menu items …) | **list given to the owner - waiting** |
+| N25 | New project from the Compare tab goes to the empty Pages tab | **done 0.15.0** |
+| N26 | Foliation the default, first in the numbering window | **done 0.15.0** |
+| N27 | Pages tab: the page shown in the Compare tab selected and in view | **done 0.15.0** |
+| N28 | "Don't compare" for all marked rows; selected cell fades at once | **done 0.15.0** |
+| A7 | Printed area: headline, folio number, catchword, signature (also in red) added (Winterburger Antiphonarius; tested on the staged Ratdolt Antiphonarium and 93 other scans, NOT on the Winterburger scans: drive D: was not connected). Alignments stored before keep their old area | **done 0.15.0; to be checked by the owner on the Winterburger pages** |
+| A8 | Moving a corner of the printed area does not align at once ("Align with this shape") | **done 0.15.0** |
+
 ### 11.2 After version 1
 
 | ID | Item | Status |

@@ -66,16 +66,16 @@
     ui.side.innerHTML =
       // option C (owner 23 Nov 2026): the two copies right under each other (no Swap button), then ONE folded section for the alignment of
       // this page, so that the page list gets the rest of the height
+      // 0.15.0 (owner): the name of each copy stands on its colour (the colours of the Superimposed view), with the menu arrow right
+      // next to it; no ‹ › any more (the keys , and . still step through the copies as copy 2)
       '<div class="ct-copies">' +
-      '<div class="ct-copy c1"><span class="ct-lab">Copy 1</span><select id="ct_c1" aria-label="Copy 1"></select><span class="ct-n" id="ct_n1"></span></div>' +
-      '<div class="ct-copy c2"><span class="ct-lab">Copy 2</span><div class="ct-row"><select id="ct_c2" aria-label="Copy 2"></select>' +
-      '<button class="ct-step" id="ct_c2up" title="Previous copy as copy 2 (key ,)" aria-label="Previous copy">&#8249;</button>' +
-      '<button class="ct-step" id="ct_c2dn" title="Next copy as copy 2 (key .)" aria-label="Next copy">&#8250;</button></div><span class="ct-n" id="ct_n2"></span></div>' +
+      '<div class="ct-copy c1"><span class="ct-lab">Copy 1</span><label class="ct-cname" title="Choose copy 1"><span class="ct-cn" id="ct_c1n"></span><svg class="ct-carr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="ct_c1" aria-label="Copy 1"></select></label><span class="ct-n" id="ct_n1"></span></div>' +
+      '<div class="ct-copy c2"><span class="ct-lab">Copy 2</span><label class="ct-cname" title="Choose copy 2 (keys , and . step through the copies)"><span class="ct-cn" id="ct_c2n"></span><svg class="ct-carr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="ct_c2" aria-label="Copy 2"></select></label><span class="ct-n" id="ct_n2"></span></div>' +
       '</div>' +
       // 0.14.0 (owner, idea F): the views are chosen in the left panel (radio buttons); the options of the chosen view unfold under it,
       // one at a time; at the end, the link of the panels. The teal bar below the pictures is gone.
-      '<div class="ct-alsec ct-vsec open" id="ct_vsec">' +
-      '<button class="ct-alhead" id="ct_vhead" aria-expanded="true" aria-controls="ct_vbody"><span class="ct-tri" aria-hidden="true"></span><span class="ct-altitle">View</span><span class="ct-alval" id="ct_vval">Superimposed</span></button>' +
+      '<div class="ct-alsec ct-vsec" id="ct_vsec">' +
+      '<button class="ct-alhead" id="ct_vhead" aria-expanded="false" aria-controls="ct_vbody"><span class="ct-tri" aria-hidden="true"></span><span class="ct-altitle">View</span><span class="ct-alval" id="ct_vval">Superimposed</span></button>' +
       '<div class="ct-vbody" id="ct_vbody"><div class="ct-vbin"><div class="ct-vlist" id="ct_vlist" role="radiogroup" aria-label="View"></div>' +
       '<div class="ct-linkrow"><button type="button" class="ct-link" id="ct_link" aria-pressed="true">' +
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/><path class="ct-linkx" d="M4 4l16 16"/></svg>' +
@@ -99,11 +99,16 @@
       // V2b: the printed area, shown and corrected by hand (js/compare-box.js)
       '<div class="ct-check ct-boxrow"><label title="Show the area the alignment works on; its corners can be dragged"><input type="checkbox" id="ct_box"> Printed area</label>' +
       '<button class="ct-tadvbtn" id="ct_boxauto" hidden title="Forget the shape set by hand and use the box found automatically">Back to automatic</button></div>' +
+      '<div class="ct-boxacts"><button class="ct-tapply" id="ct_boxapply" hidden title="Align the two pages again, leaving out everything outside the shape">Align with this shape</button>' +
+      '<button class="ct-tadvbtn" id="ct_boxundo" hidden title="Put the corners back where they were">Undo the change</button></div>' +
       '<p class="ct-tnote" id="ct_boxnote" hidden></p>' +
-      '</div></div>' +
-      '<p class="ct-mvleg" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span><br><b class="ct-mvarr">&#8599;</b> arrows: the direction in which that part of copy 2 was moved (drawn longer than the real shift)</p>' +
-      '<p class="ct-hint" id="ct_hint" hidden></p>' +
-      '<div class="ct-warn" id="ct_warn" hidden></div>' +
+      '</div>' +
+      // 0.15.0 (owner): the notes about the alignment of this page stand at the foot of its box (also when it is folded), in its own
+      // colours and a little smaller
+      '<p class="ct-mvleg ct-alnote" id="ct_mvleg" hidden><i style="background:#ffe000"></i>2 to 4 px <i style="background:#ff8c00"></i>under 8 <i style="background:#e61e1e"></i>under 15 <i style="background:#c800c8"></i>15 px or more <span>(at 3000 px page height)</span><br><b class="ct-mvarr">&#8599;</b> arrows: the direction in which that part of copy 2 was moved (drawn longer than the real shift)</p>' +
+      '<p class="ct-hint ct-alnote" id="ct_hint" hidden></p>' +
+      '<div class="ct-warn ct-alnote" id="ct_warn" hidden></div>' +
+      '</div>' +
       '<div class="ct-listhead"><h3>Pages</h3></div>' +
       '<div class="ct-filters" id="ct_filters"></div><div class="ct-fcols" id="ct_fcols" hidden></div>' +
       '<label class="ct-search"><input id="ct_q" type="search" placeholder="Find page, e.g. 4r or Index" autocomplete="off"></label>' +
@@ -144,8 +149,18 @@
     ui.rc = rc;
     [ui.top, ui.side, ui.bar].forEach(function (e) { e.hidden = true; });
     // the coloured edge of the two copy boxes shows the colours chosen for the Superimposed view (0.11.0)
+    // the colour of a copy is the background of its name (0.15.0); the letters are white or black, whichever reads better on it
+    var inkOn = function (hex) {
+      var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || '')); if (!m) return '#fff';
+      var lin = function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      var L = 0.2126 * lin(parseInt(m[1], 16)) + 0.7152 * lin(parseInt(m[2], 16)) + 0.0722 * lin(parseInt(m[3], 16));
+      return (1.05 / (L + 0.05)) >= ((L + 0.05) / 0.05) ? '#fff' : '#111';
+    };
     var paintCopies = function () {
-      try { ui.side.style.setProperty('--ct-c1', DIFF_COLOR_1); ui.side.style.setProperty('--ct-c2', DIFF_COLOR_2); } catch (e) { /* viz.js not loaded */ }
+      try {
+        ui.side.style.setProperty('--ct-c1', DIFF_COLOR_1); ui.side.style.setProperty('--ct-c2', DIFF_COLOR_2);
+        ui.side.style.setProperty('--ct-c1ink', inkOn(DIFF_COLOR_1)); ui.side.style.setProperty('--ct-c2ink', inkOn(DIFF_COLOR_2));
+      } catch (e) { /* viz.js not loaded */ }
     };
     paintCopies();
     document.addEventListener('diffcolorschange', paintCopies);
@@ -192,17 +207,11 @@
     $('ct_tab_pages').onclick = toPages;
     ui.c1.onchange = function () { W().setCopy(0, ui.c1.value); afterCopies(); };
     ui.c2.onchange = function () { W().setCopy(1, ui.c2.value); afterCopies(); };
-    $('ct_c2up').onclick = function () { stepCopy(1, -1); };
-    $('ct_c2dn').onclick = function () { stepCopy(1, 1); };
     ui.tiles = $('ct_tiles');
-    // the section "Alignment of this page" is folded at first; whether it is open is remembered on this computer
-    var alOpen = false; try { alOpen = localStorage.getItem('bookcompare_alsec') === 'open'; } catch (x) { /* private mode */ }
-    var setAl = function (open, keep) {
-      $('ct_albody').hidden = !open; $('ct_alhead').setAttribute('aria-expanded', String(open)); ui.tiles.classList.toggle('open', open);
-      if (keep) { try { localStorage.setItem('bookcompare_alsec', open ? 'open' : 'folded'); } catch (x) { /* private mode */ } }
-    };
-    setAl(alOpen, false);
-    $('ct_alhead').onclick = function () { setAl($('ct_albody').hidden, true); };
+    // the section "Alignment of this page" is folded at first, and again whenever a project is opened or started (0.15.0, owner)
+    var setAl = function (open) { $('ct_albody').hidden = !open; $('ct_alhead').setAttribute('aria-expanded', String(open)); ui.tiles.classList.toggle('open', open); };
+    setAl(false);
+    $('ct_alhead').onclick = function () { setAl($('ct_albody').hidden); };
     ui.tiles.querySelector('.ct-seg').onclick = function (e) {
       var b = e.target.closest('button[data-tp]'); if (!b) return;
       setTiles(PRESETS[b.dataset.tp]);
@@ -326,6 +335,8 @@
     ui.c1.innerHTML = opts; ui.c2.innerHTML = opts;
     ui.c1.value = s.pair[0]; ui.c2.value = s.pair[1];
     var byId = {}; s.copies.forEach(function (c) { byId[c.id] = c; });
+    document.getElementById('ct_c1n').textContent = byId[s.pair[0]] ? byId[s.pair[0]].name : '';
+    document.getElementById('ct_c2n').textContent = byId[s.pair[1]] ? byId[s.pair[1]].name : '';
     document.getElementById('ct_n1').textContent = byId[s.pair[0]] ? byId[s.pair[0]].pages + ' of ' + s.rows + ' pages' : '';
     document.getElementById('ct_n2').textContent = byId[s.pair[1]] ? byId[s.pair[1]].pages + ' of ' + s.rows + ' pages' : '';
   }
@@ -446,7 +457,7 @@
     if (!t || t.sparse || st.transform !== 'tiles' || !(t.unmatched_tiles > MISMATCH)) { w.hidden = true; return; }
     w.hidden = false;
     w.title = 'The two scans may not show the same page: perhaps a page is missing or extra in one copy, and the rows of the grid are out of step here.';
-    w.innerHTML = '<b>' + Math.round(t.unmatched_tiles * 100) + ' % of the ink has no partner</b>: not the same page? ' +
+    w.innerHTML = Math.round(t.unmatched_tiles * 100) + ' % of the ink has no partner: not the same page? ' +
       '<span class="ct-warnacts"><button class="ct-tapply" id="ct_warnpages">Go to the pages</button><button class="ct-tadvbtn" id="ct_warnok">Continue</button></span>';
     $('ct_warnpages').onclick = toPages;
     $('ct_warnok').onclick = function () { w.hidden = true; };
@@ -456,7 +467,7 @@
     if (!m || !m.hint || st.transform !== 'tiles') { h.hidden = true; return; }
     h.hidden = false;
     h.title = 'Part of this page was moved by about ' + m.hint.px + ' px by the fine alignment, with a sharp edge: a line or block may have been re-set or shifted here.';
-    h.innerHTML = '<b>Shifted block, about ' + m.hint.px + ' px</b> <button class="ct-hintbtn" id="ct_hintshow" aria-pressed="' + !!st.mvOn + '">' + (st.mvOn ? 'Hide' : 'Show') + '</button>';
+    h.innerHTML = 'Shifted block, about ' + m.hint.px + ' px <button class="ct-hintbtn" id="ct_hintshow" aria-pressed="' + !!st.mvOn + '">' + (st.mvOn ? 'Hide' : 'Show') + '</button>';
     $('ct_hintshow').onclick = function () {                                     // (0.12.0: shows and hides the movement map)
       st.mvOn = !st.mvOn; $('ct_mv').checked = st.mvOn; drawMovement();
       this.textContent = st.mvOn ? 'Hide' : 'Show'; this.setAttribute('aria-pressed', String(st.mvOn));
@@ -649,7 +660,7 @@
   function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (window.CompareBox) CompareBox.refresh(); if (ui.busy.classList.contains('bad')) setBusy(null); if (ui.mv) ui.mv.hidden = true; var h = document.getElementById('ct_hint'); if (h) h.hidden = true; var w = document.getElementById('ct_warn'); if (w) w.hidden = true; }   // a new wish makes an old message obsolete
   function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale', 'ct-blank'); }
   // another project (0.12.0, owner): the pictures of the old one are not shown, not even dimmed, until the first page of the new one is ready
-  function forget() { st.shown = null; st.lastTiles = null; if (ui) ui.rc.classList.add('ct-blank'); }
+  function forget() { st.shown = null; st.lastTiles = null; if (ui) { ui.rc.classList.add('ct-blank'); foldMenus(); } }       // a project is opened or started
 
 
   /* ---------------------------------------------------------------- the views (left panel, 0.14.0) */
@@ -709,6 +720,13 @@
     renderSpeed(); renderLink();
   }
   function closeView() { /* (0.12.0's view bubble in the teal bar is gone: nothing to fold away) */ }
+  function openViews(open) {
+    var v = document.getElementById('ct_vsec'); if (!v) return;
+    v.classList.toggle('open', open); document.getElementById('ct_vhead').setAttribute('aria-expanded', String(open));
+  }
+  // 0.15.0 (owner): when a project is opened or a new one is started, the View and the Alignment sections are folded
+  function foldMenus() { openViews(false); if (ui && document.getElementById('ct_albody')) { $id('ct_albody').hidden = true; $id('ct_alhead').setAttribute('aria-expanded', 'false'); $id('ct_tiles').classList.remove('open'); } }
+  function $id(i) { return document.getElementById(i); }
   function setView(i, says) {
     var v = VIEWS[i]; if (!v || !E) return;
     E.compare.visualisation_select.MDCSelect.setValue(v[0]);                                // the base app reacts to this menu (hidden in the Compare tab)
@@ -717,13 +735,7 @@
   }
   function wireViews() {
     buildViews();
-    var vOpen = true; try { vOpen = localStorage.getItem('bookcompare_vsec') !== 'folded'; } catch (x) { /* private mode */ }
-    var setV = function (open, keep) {
-      document.getElementById('ct_vsec').classList.toggle('open', open); document.getElementById('ct_vhead').setAttribute('aria-expanded', String(open));
-      if (keep) { try { localStorage.setItem('bookcompare_vsec', open ? 'open' : 'folded'); } catch (x) { /* private mode */ } }
-    };
-    setV(vOpen, false);
-    document.getElementById('ct_vhead').onclick = function () { setV(!document.getElementById('ct_vsec').classList.contains('open'), true); };
+    document.getElementById('ct_vhead').onclick = function () { openViews(!document.getElementById('ct_vsec').classList.contains('open')); };
     ui.vlist.addEventListener('click', function (e) {
       var b = e.target.closest('.ct-vrow'); if (b) { setView(+b.dataset.i); return; }
       var sp = e.target.closest('#ct_speed button[data-sp]');
@@ -997,6 +1009,7 @@
 
   window.CompareTab = {
     init: function (parts) { E = parts; build(); },
+    toPages: function () { if (st.on) toPages(); },
     enter: enter,
     leave: toPages,
     isOpen: function () { return st.on; },

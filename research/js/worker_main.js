@@ -25,7 +25,7 @@ function loadOpenCv() {
 }
 
 /* a scan -> red channel at the working height of 3000 px (32-bit float Mat); keep = true also keeps the opened picture (bmp) for the caller */
-async function decodeRed(cv, file, keep) {
+async function decodeRed(cv, file, keep, wantDark) {
   var P = require('./printed_area');
   var t0 = performance.now(), bmp;
   try { bmp = await createImageBitmap(file); }
@@ -36,7 +36,8 @@ async function decodeRed(cv, file, keep) {
   ctx.drawImage(bmp, 0, 0, w, P.H0); if (!keep) bmp.close();
   var id = ctx.getImageData(0, 0, w, P.H0);
   var red = P.redScaled(cv, id.data, w, P.H0);
-  return { red: red, w0: w0, h0: h0, bmp: keep ? bmp : null, decode_s: (performance.now() - t0) / 1000 };
+  var dark = wantDark ? P.darkScaled(cv, id.data, w, P.H0) : null;                    // (0.15.0: the reference only - headlines, folio numbers in any colour)
+  return { red: red, dark: dark, w0: w0, h0: h0, bmp: keep ? bmp : null, decode_s: (performance.now() - t0) / 1000 };
 }
 
 /* The other copy in colour, bent onto the reference at the reference's full size (Compare tab, V3).
@@ -86,8 +87,8 @@ function warpColour(cv, bmp, r, ref, refW0, refH0) {
 async function setReference(cv, file, key, quad) {
   var Pl = require('./pipeline');
   if (refState) { refState.ref.delete(); refState = null; } lastJob = null;
-  var d = await decodeRed(cv, file);
-  try { refState = Pl.prepareReference(cv, d.red); } finally { d.red.delete(); }     // a page that fails keeps no memory (A5)
+  var d = await decodeRed(cv, file, false, true);
+  try { refState = Pl.prepareReference(cv, d.red, d.dark); } finally { d.red.delete(); if (d.dark) d.dark.delete(); }     // a page that fails keeps no memory (A5)
   refState.w0 = d.w0; refState.h0 = d.h0; refState.key = key || null;
   var Wr = refState.ref.cols, Hr = refState.ref.rows, b = refState.box;
   refState.autoBoxF = [b[0] / Wr, b[1] / Hr, b[2] / Wr, b[3] / Hr];                   // the automatic box, as fractions (shown in the Compare tab)

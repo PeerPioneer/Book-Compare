@@ -45,7 +45,9 @@ with sync_playwright() as p:
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
     # "Start numbering" asks for pagination or foliation
     cell(0, 1).click(); cellmenu(pg, 'startnum'); pg.wait_for_timeout(150)
-    assert pg.locator('#ws-scrim input[name=nm-style]').count() == 2 and pg.locator('#ws-scrim input[value=page]').is_checked()
+    # 0.15.0 (owner): foliation is the default for a new project and stands first
+    assert pg.locator('#ws-scrim input[name=nm-style]').count() == 2 and pg.locator('#ws-scrim input[value=folio]').is_checked()
+    assert pg.locator('#ws-scrim input[name=nm-style]').first.get_attribute('value') == 'folio'
     pg.check('#ws-scrim input[value=folio]'); pg.click('#nm-ok'); pg.wait_for_timeout(150)
     lbl = lambda r: pg.locator('#ws .ws-lbl[data-r="%d"] b' % r).inner_text()
     assert [lbl(0), lbl(1), lbl(2), lbl(3)] == ['Front 1', '1r', '1v', '2r'], [lbl(0), lbl(1), lbl(2), lbl(3)]
@@ -58,6 +60,16 @@ with sync_playwright() as p:
     assert [lbl(1), lbl(2), lbl(3)] == ['1r', 'Index', '2r']
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(150); assert lbl(1) == 'Page 1'      # undo also undoes the switch
     pg.keyboard.press('Control+y'); pg.wait_for_timeout(150); assert lbl(1) == '1r'
+    # 0.15.0 (owner): "Don't compare" works on all the marked rows at once, and the selected cell fades at once
+    cell(0, 3).click(); cell(0, 5).click(modifiers=['Shift']); pg.wait_for_timeout(150)
+    cellmenu(pg, 'skiprow'); pg.wait_for_timeout(200)
+    assert all(pg.locator('#ws .ws-row[data-r="%d"]' % r).first.evaluate("e => e.classList.contains('skipped')") for r in (3, 4, 5)), 'rows 3 to 5 are not compared'
+    assert not pg.locator('#ws .ws-row[data-r="2"]').first.evaluate("e => e.classList.contains('skipped')")
+    op = pg.evaluate("getComputedStyle(document.querySelector('#ws .ws-cell.sel > *')).opacity"); assert float(op) < 0.75, ('the selected cell is faded at once', op)
+    cell(0, 4).click(); cellmenu(pg, 'skiprow'); pg.wait_for_timeout(200)
+    assert not pg.locator('#ws .ws-row[data-r="4"]').first.evaluate("e => e.classList.contains('skipped')") and pg.locator('#ws .ws-row[data-r="3"]').first.evaluate("e => e.classList.contains('skipped')"), 'one row back'
+    pg.keyboard.press('Control+z'); pg.keyboard.press('Control+z'); pg.wait_for_timeout(200)
+    assert not any(pg.locator('#ws .ws-row[data-r="%d"]' % r).first.evaluate("e => e.classList.contains('skipped')") for r in (3, 4, 5)), 'undo'
     # a project must never be saved in a folder that holds scans of this project (a folder that only contains such folders is fine, see test_roots.py)
     for target in ('B', 'AB'):
         pg.evaluate("k=>window.__picks.push(window.__h[k])", target); pg.click('#ws-more'); pg.click('[data-m=save]'); pg.wait_for_timeout(400)
@@ -89,6 +101,8 @@ with sync_playwright() as p:
     pg.click('#ws-pics'); pg.wait_for_timeout(300); assert pg.locator('#ws .ws-cell .tn').count() == 0 and abs(pg.locator('#ws .ws-row').first.bounding_box()['height'] - h40) < 1
     # the website shows the desktop-only items of the menu greyed, with a note
     pg.click('#ws-more'); assert pg.is_disabled('#ws-menu [data-m=bg]') and 'only in the desktop program' in pg.inner_text('#ws-menu [data-m=bg]'); pg.click('#ws-more')
+    assert pg.is_disabled('#ws-bgbtn') and 'desktop program' in (pg.get_attribute('#ws-bgbtn', 'title') or ''), 'the toolbar button too (0.15.0)'
+    assert pg.locator('#ws-cmpbtn').count() == 0, 'no "Compare 1 and 2" button under the previews (0.15.0)'
     # column width, moving a copy, deleting a range of files with Shift (the grid is left as it was)
     import gridchecks; gridchecks.run(pg, col, lambda: read_project(pg))
     # N2: the project's name, in the top bar; kept in the project file
@@ -113,7 +127,7 @@ with sync_playwright() as p:
     pg.keyboard.press('Escape'); pg.wait_for_timeout(100); assert pg.locator('#ws-ctx').count() == 0
     # the one menu: Project, Grid, Export (only in the Compare tab) and Help
     pg.click('#ws-more'); heads = [t.strip().upper() for t in pg.locator('#ws-menu .ws-mhead').all_inner_texts()]
-    assert heads == ['PROJECT', 'GRID', 'EXPORT', 'HELP'] and not pg.locator('#ws-menu [data-m=x-view]').is_enabled(), heads
+    assert heads == ['PROJECT', 'GRID', 'EXPORT', 'FONT', 'HELP'] and not pg.locator('#ws-menu [data-m=x-view]').is_enabled(), heads
     pg.keyboard.press('Escape')
     # deleting a file: gone from the workspace, no "set aside" tray, the scan itself is untouched
     assert pg.locator('#ws-tray').count() == 0 and 'Set aside' not in pg.inner_text('#ws')

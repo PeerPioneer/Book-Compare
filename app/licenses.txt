@@ -534,3 +534,9 @@ the use of this software, even if advised of the possibility of such damage.
 OpenCV.js 5.0.0 (deps/opencv/opencv.js), used by the tile-based alignment
 Licence: Apache License 2.0 - the full text is in deps/opencv/LICENSE.txt.
 Built from OpenCV (https://opencv.org); packaged by the npm package @techstark/opencv-js.
+
+====================================================================
+EB Garamond (fonts/eb-garamond.woff2, fonts/eb-garamond-italic.woff2), the font of Book Compare since 0.15.0
+Copyright 2017 The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12).
+Licence: SIL Open Font License 1.1 - the full text is in fonts/EB-Garamond-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/ebgaramond) and reduced to the Latin characters (woff2).

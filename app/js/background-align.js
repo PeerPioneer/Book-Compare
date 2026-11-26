@@ -40,19 +40,39 @@
       s2.querySelector('#bg-ref').onclick = function () { t.closeModal(); t.refDialog(); };
       return;
     }
-    var ref = t.refCopy(), list = t.copyList().filter(function (c) { return c.id !== ref; });
-    var h = '<h3>Align copies in the background</h3><p>The chosen copies are aligned page by page onto the reference copy <b>' + esc(copyName(ref)) + '</b> ★. ' +
+    // 0.15.0 (owner): no copy is ticked at first ("Select all" ticks them); copies whose pages are all aligned already are greyed out;
+    // the reference copy is in the list, in bold, without a box to tick, and can be changed right here
+    var ref = t.refCopy(), all = t.copyList();
+    var h = '<h3>Align copies in the background</h3><p>The copies you tick are aligned page by page onto the reference copy. ' +
       'Only how each page had to be moved is kept, inside the project file (about 0.2 MB a page). ' +
-      'Afterwards, comparing a page with the reference opens at once. Pages that are already stored are skipped. You can go on working meanwhile.</p><div class="ws-bgopts">';
-    list.forEach(function (c) { h += '<label><input type="checkbox" class="bg-copy" value="' + c.id + '" checked> <b>' + esc(c.name) + '</b> · ' + c.pages + ' page' + (c.pages === 1 ? '' : 's') + '</label>'; });
-    h += '</div><div class="ws-bgopts"><label><input type="radio" name="bg-n" value="' + half() + '" checked> ' + half() + ' helper' + (half() === 1 ? '' : 's') + ' at the same time (half of this computer; recommended)</label>';
+      'Afterwards, comparing a page with the reference opens at once. Pages that are already stored are skipped. You can go on working meanwhile.</p>' +
+      '<div class="ws-bgopts ws-bglist" id="bg-list">';
+    all.forEach(function (c) {
+      if (c.id === ref) {
+        h += '<div class="ws-bgref"><span class="ws-bgrefname"><b>★ ' + esc(c.name) + '</b> · ' + c.pages + ' page' + (c.pages === 1 ? '' : 's') + '</span>' +
+          '<span class="ws-bgrefwhy">the reference copy: the others are aligned onto it</span></div>';
+        return;
+      }
+      var a = t.alignedOf ? t.alignedOf(c.id) : { n: c.pages, b: 0 }, full = a.n > 0 && a.b >= a.n, none = a.n === 0;
+      h += '<label class="' + (full || none ? 'done' : '') + '"' + (full ? ' title="All its pages are aligned onto the reference copy already"' : none ? ' title="No page of this copy has a reference page beside it"' : '') + '>' +
+        '<input type="checkbox" class="bg-copy" value="' + c.id + '"' + (full || none ? ' disabled' : '') + '> <b>' + esc(c.name) + '</b> · ' + c.pages + ' page' + (c.pages === 1 ? '' : 's') +
+        (full ? ' · all aligned' : a.b ? ' · ' + a.b + ' of ' + a.n + ' aligned' : '') + '</label>';
+    });
+    h += '</div><div class="ws-bgsel"><button class="ws-tb" id="bg-all">Select all</button>' +
+      '<label class="ws-bgchref">Reference copy <select id="bg-ref" aria-label="Reference copy">' + all.map(function (c) { return '<option value="' + c.id + '"' + (c.id === ref ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></label></div>';
+    h += '<div class="ws-bgopts"><label><input type="radio" name="bg-n" value="' + half() + '" checked> ' + half() + ' helper' + (half() === 1 ? '' : 's') + ' at the same time (half of this computer; recommended)</label>';
     if (threads() > half()) h += '<label><input type="radio" name="bg-n" value="' + threads() + '"> ' + threads() + ' helpers (all of this computer: quicker, but the computer is slow meanwhile and needs more memory)</label>';
     h += '</div><div class="acts"><button class="ws-tb" data-close>Cancel</button><button class="ws-tb primary" id="bg-go">Start</button></div>';
     var sc = t.modal(h);
+    sc.querySelector('#bg-all').onclick = function () { Array.prototype.forEach.call(sc.querySelectorAll('.bg-copy:not(:disabled)'), function (x) { x.checked = true; }); };
+    sc.querySelector('#bg-ref').onchange = function () {                              // another reference copy: the list is drawn again for it
+      var id = +this.value; t.closeModal(); if (t.setRef) t.setRef(id);
+      t.toast('“' + copyName(id) + '” is the reference copy now.'); open();
+    };
     sc.querySelector('#bg-go').onclick = function () {
       var ids = Array.prototype.map.call(sc.querySelectorAll('.bg-copy:checked'), function (x) { return +x.value; });
       var n = +((sc.querySelector('input[name=bg-n]:checked') || {}).value || half());
-      if (!ids.length) return t.toast('Tick at least one copy.');
+      if (!ids.length) return t.toast('Tick at least one copy (or “Select all”).');
       t.closeModal(); start(ids, n);
     };
   }
@@ -117,7 +137,7 @@
     if (window.BCResults) BCResults.flush();
     if (!quiet) render(); else hideStrip();
   }
-  function hideStrip() { var t = T(), el = t && t.bgSlot(); if (el) { el.hidden = true; el.innerHTML = ''; } renderCompare(); }
+  function hideStrip() { var t = T(), el = t && t.bgSlot(); if (el) { el.hidden = true; el.innerHTML = ''; } renderCompare(); renderButton(); }
   // 0.12.0 (owner): the Compare tab, where one works most of the time, shows the warning too (with the same buttons; "Go to the page"
   // opens that page there), and, small, how far the run is
   function renderCompare() {
@@ -142,7 +162,7 @@
   function minutes(s) { return s < 90 ? 'about a minute' : s < 3600 ? 'about ' + Math.round(s / 60) + ' minutes' : 'about ' + (s / 3600).toFixed(1).replace('.0', '') + ' hours'; }
   function render() {
     var t = T(), el = t && t.bgSlot(); if (!el) { renderCompare(); return; }
-    if (!R) { el.hidden = true; el.innerHTML = ''; renderCompare(); return; }
+    if (!R) { el.hidden = true; el.innerHTML = ''; renderCompare(); renderButton(); return; }
     var total = R.queue.length, through = R.done + R.skipped + R.failed.length, h = '', who = R.ids.length === 1 ? '“' + esc(copyName(R.ids[0])) + '”' : R.ids.length + ' copies';
     var pct = total ? Math.round(100 * through / total) : 100;
     el.className = 'ws-banner ws-bg' + (R.warn ? ' warn' : '');
@@ -165,8 +185,9 @@
     }
     el.innerHTML = h; el.hidden = false;
     if (!el.__bc) { el.__bc = true; el.addEventListener('click', onClick); }
-    renderCompare();
+    renderCompare(); renderButton();
   }
+  function renderButton() { var t = T(); if (t && t.refreshBgButton) t.refreshBgButton(); }
   // A run that did not finish (the program was closed meanwhile): when the project is opened again, offer to go on (item 21)
   var offered = null;
   function offer(run) {

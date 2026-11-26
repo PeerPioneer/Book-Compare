@@ -101,6 +101,10 @@ def scenario(p, kind):
     start_helper(); open_workspace(pg)
     add_copy(pg, 'Copy-A', 'A-Test'); add_copy(pg, 'Copy-B', 'B-Test'); add_copy(pg, 'Copy-C', 'C-Test')
     assert pg.locator('#ws .ws-hname').count() == 3
+    # 0.15.0 (owner): a new project numbers its rows as folios (1r, 1v ...); this test uses pagination (Page 1, Page 2 ...)
+    assert pg.locator('#ws .ws-lbl[data-r="0"] b').inner_text() == '1r', pg.locator('#ws .ws-lbl[data-r="0"] b').inner_text()
+    pg.click('#ws-more'); pg.click('#ws-menu [data-m=folio]'); pg.wait_for_timeout(200)
+    assert pg.locator('#ws .ws-lbl[data-r="0"] b').inner_text() == 'Page 1'
     # COMPARE opens the Compare tab and aligns by itself
     pg.locator('#ws .ws-lbl[data-r="0"]').first.click(); pg.wait_for_timeout(300)
     pg.click('#ws-compare'); wait_aligned(pg, 'first pair')
@@ -132,13 +136,14 @@ def scenario(p, kind):
     assert pg.get_attribute('#ct_alhead', 'aria-expanded') == 'false' and not pg.is_visible('#ct_albody') and pg.inner_text('#ct_alval') == 'Standard'
     lh0 = pg.locator('#ct_list').bounding_box()['height']
     pg.click('#ct_alhead'); pg.wait_for_timeout(150)
-    assert pg.get_attribute('#ct_alhead', 'aria-expanded') == 'true' and pg.is_visible('#ct_albody') and pg.evaluate("localStorage.getItem('bookcompare_alsec')") == 'open'
+    assert pg.get_attribute('#ct_alhead', 'aria-expanded') == 'true' and pg.is_visible('#ct_albody')
     lh1 = pg.locator('#ct_list').bounding_box()['height']; assert lh1 <= lh0 and lh1 >= 140, ('the page list gets the height the sections leave, at least 150 px (the panel scrolls when needed)', lh0, lh1)
-    # the coloured edges of the two copy boxes are the colours of the Superimposed view (blue / red by default)
-    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c1')).borderLeftColor") == 'rgb(0, 70, 200)'
-    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c2')).borderLeftColor") == 'rgb(230, 0, 0)'
+    # the names of the two copies stand on the colours of the Superimposed view (blue / red by default; 0.15.0)
+    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c1 .ct-cname')).backgroundColor") == 'rgb(0, 70, 200)'
+    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c2 .ct-cname')).backgroundColor") == 'rgb(230, 0, 0)'
     # "Paper" (0.11.0; 0.14.0: in the options of the Superimposed view in the left panel): a copy's paper whiter, display only, kept in the project
     assert not pg.is_visible('#legend_paper') and not pg.is_visible('#legend_colors'), 'no buttons in the legend over the picture any more'
+    pg.click('#ct_vhead'); pg.wait_for_timeout(350)                                    # (the View section is folded at first, 0.15.0)
     pg.click('#ct_paper'); pg.wait_for_timeout(300)
     assert pg.locator('#ws-float .ct-prow').count() == 2 and 'B-Test' in pg.inner_text('#ws-float .ws-dlg')
     c2id = pg.evaluate("BookWorkspace.tab.state().pair[1]")
@@ -147,6 +152,7 @@ def scenario(p, kind):
     pg.click('#ws-float .ct-seg[data-k="1"] button[data-v="0"]'); pg.wait_for_timeout(300)
     assert pg.evaluate("BookWorkspace.tab.paper(%d)" % c2id) == 0 and pg.evaluate("window.BC_PAPER") == [0, 0]
     pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200)
+    pg.click('#ct_vhead'); pg.wait_for_timeout(350)                                    # (folded again)
     # tile settings for copy 2 on this page (V15): presets, advanced numbers, saved per copy and page, back to standard
     def tset(): return pg.evaluate("(() => { const s = BookWorkspace.tab.state(); return BookWorkspace.tab.tileSetting(s.row, s.pair[1]); })()")
     assert pg.is_visible('#ct_tiles') and pg.get_attribute('#ct_tiles button[data-tp=std]', 'aria-pressed') == 'true' and tset() is None
@@ -182,9 +188,12 @@ def scenario(p, kind):
     pg.fill('#ct_q', '4'); assert pg.locator('#ct_list li[data-i]').count() == 1, pg.inner_text('#ct_list')
     pg.click('#ct_list li[data-i="3"]'); wait_aligned(pg, 'list click'); assert 'Page 4' in where(pg), where(pg)
     pg.fill('#ct_q', ''); assert pg.locator('#ct_list li[data-i]').count() == 4
-    # item 6a: the small arrows beside copy 2 step through the copies (copy 1 is left out); then copy 2 = C (has only two pages): rows 3 and 4 are marked, and "next" skips them
-    pg.click('#ct_c2up'); pg.wait_for_timeout(300); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'C-Test', 'from B back over A (copy 1) to C'
-    pg.click('#ct_c2dn'); wait_aligned(pg, 'arrow: back to B'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
+    # item 6a (0.15.0: without the ‹ › buttons): the keys , and . step through the copies as copy 2 (copy 1 is left out); then copy 2 = C (has only two pages): rows 3 and 4 are marked, and "next" skips them
+    assert pg.locator('#ct_c2up, #ct_c2dn').count() == 0, 'no ‹ › beside the copies'
+    assert pg.inner_text('#ct_c1n') == 'A-Test' and pg.inner_text('#ct_c2n') == 'B-Test', 'the names of the copies are shown on their colours'
+    nb = pg.locator('#ct_c2n').bounding_box(); ab = pg.locator('.ct-copy.c2 .ct-carr').bounding_box(); assert 0 <= ab['x'] - (nb['x'] + nb['width']) <= 10, ('the menu arrow right next to the name', nb, ab)
+    bg = pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c1 .ct-cname')).backgroundColor"); assert bg == 'rgb(0, 70, 200)', ('copy 1 on its colour', bg)
+    assert pg.evaluate("getComputedStyle(document.querySelector('.ct-copy.c1 .ct-cname')).color") == 'rgb(255, 255, 255)', 'white letters on the dark blue'
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     pg.keyboard.press('.'); pg.wait_for_timeout(300); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'C-Test', 'key . = next copy'
     pg.keyboard.press(','); wait_aligned(pg, 'key , back to B'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
@@ -199,7 +208,7 @@ def scenario(p, kind):
     pg.evaluate("document.getElementById('ct_skip').click()")
     # copy 2: the up arrow button of the panel goes back to B (there are no keys for switching copies any more)
     pg.click('#ct_list li[data-i="0"]'); wait_aligned(pg, 'row 1 again')
-    pg.click('#ct_c2up'); wait_aligned(pg, 'copy 2 up'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test'
+    pg.select_option('#ct_c2', label='B-Test'); wait_aligned(pg, 'copy 2 back to B'); assert pg.evaluate("document.getElementById('ct_c2').selectedOptions[0].text") == 'B-Test' and pg.inner_text('#ct_c2n') == 'B-Test'
     # ---------------------------------------------------------------- 0.14.0 (owner, idea F): no teal bar; views, link and navigation in the left panel
     def vis(sel): return pg.evaluate("(s) => { const e = document.querySelector(s); return !!e && e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden'; }", sel)
     assert pg.evaluate("[...document.querySelectorAll('#compare_screen > footer .bar')].filter(b => b.offsetParent !== null).length") == 0, 'no teal bar below the pictures'
@@ -213,7 +222,8 @@ def scenario(p, kind):
     assert pg.evaluate("getComputedStyle(document.querySelector('#ct_where b')).fontWeight") == '700', 'the page name is bold'
     fb = pg.locator('#ct_flag').bounding_box(); nb = pg.locator('#ct_next').bounding_box(); assert 0 <= fb['x'] - (nb['x'] + nb['width']) <= 12 and fb['width'] <= 26, ('the flag: small, next to ›', fb, nb)
     # the View section: six radio buttons; the options of the chosen view only
-    assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'true' and pg.inner_text('#ct_vval') == 'Superimposed'
+    assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'false' and pg.inner_text('#ct_vval') == 'Superimposed', 'View is folded at first (0.15.0)'
+    pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'true'
     assert [t.strip() for t in pg.locator('#ct_vlist .ct-vrow .nm').all_inner_texts()] == ['Superimposed', 'Toggle', 'Top and bottom', 'Left and right', 'Copy 1', 'Copy 2']
     assert pg.get_attribute('#ct_v_diff', 'aria-checked') == 'true' and pg.locator('#ct_vlist [role=radio][aria-checked=true]').count() == 1
     assert pg.get_attribute('#ct_v_onlyimage1', 'title') == 'A-Test' and pg.get_attribute('#ct_v_onlyimage2', 'title') == 'B-Test', 'the tip of Copy 1 / Copy 2 is the name the owner gave the copy'
@@ -250,7 +260,7 @@ def scenario(p, kind):
     assert pg.get_attribute('#ct_link', 'aria-pressed') == 'false' and not pg.evaluate("BCLink.linked()") and pg.evaluate("getComputedStyle(document.querySelector('#ct_link .ct-linkx')).opacity") == '1', 'unlinked: the symbol is crossed out'
     pg.click('#ct_link'); pg.wait_for_timeout(250); assert pg.evaluate("BCLink.linked()")
     # the View section folds too, and is remembered
-    pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'false' and pg.evaluate("localStorage.getItem('bookcompare_vsec')") == 'folded' and pg.locator('#ct_vbody').bounding_box()['height'] < 2
+    pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'false' and pg.locator('#ct_vbody').bounding_box()['height'] < 2
     pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'true'
     # the panel folded away: a slim line with the tab, and the navigation stays as a small card in the bottom left corner
     pg.click('#ct_sidebtn'); pg.wait_for_timeout(500)
@@ -261,12 +271,12 @@ def scenario(p, kind):
     pg.click('#ct_next'); wait_aligned(pg, 'next page with the panel folded'); pg.click('#ct_prev'); wait_aligned(pg, 'back')
     pg.click('#ct_sidebtn'); pg.wait_for_timeout(400); assert vis('.ct-side') and not vis('.ct-sline') and 'folded' not in pg.get_attribute('#ct_nav', 'class')
     # the colour note of the Superimposed view names the copies the way the grid does (not "image 1" / "image 2")
-    wait_aligned(pg, 'difference again'); legend = pg.inner_text('#pane_main .pane__label') if pg.locator('#pane_main .pane__label').count() else ''
-    assert 'A-Test' in legend and 'B-Test' in legend and 'image 1' not in legend and 'image 2' not in legend, legend
+    wait_aligned(pg, 'difference again')
+    assert not pg.is_visible('#pane_main .pane__label'), 'no colour legend over the superimposed picture (0.15.0: the names stand on their colours in the left panel)'
     # the one menu (⋮ in the top bar): Project, Export and Help; the export entries work here; Escape closes it
     pg.click('#ct_more'); pg.wait_for_timeout(300)
     heads = [t.strip().upper() for t in pg.locator('#ws-fmenu .ws-mhead').all_inner_texts()]
-    assert heads == ['PROJECT', 'EXPORT', 'HELP'], heads
+    assert heads == ['PROJECT', 'EXPORT', 'FONT', 'HELP'], heads
     assert pg.locator('#ws-fmenu [data-m=x-view]').is_enabled() and pg.locator('#ws-fmenu [data-m=save]').count() == 1 and pg.locator('#ws-fmenu [data-m=about]').count() == 1
     mb = pg.locator('#ws-fmenu .ws-menu').bounding_box()
     top_el = pg.evaluate("(p) => { const e = document.elementFromPoint(p[0], p[1]); return e ? (e.closest('#ws-fmenu') ? 'menu' : e.className) : 'none'; }", [mb['x'] + mb['width'] / 2, mb['y'] + mb['height'] - 6])
@@ -277,6 +287,16 @@ def scenario(p, kind):
     pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200); assert pg.locator('#ws-float').count() == 0
     pg.click('#ct_helpbtn'); pg.wait_for_timeout(300); assert 'Page Down' in pg.inner_text('#ws-float .ws-dlg'), 'the keys are in the help'
     pg.click('#ws-float [data-close]'); pg.wait_for_timeout(200)
+    # 0.15.0 (owner): EB Garamond for all text; the old font (Roboto) one click away in the menu, remembered on this computer
+    ff = lambda sel: pg.evaluate("(s) => getComputedStyle(document.querySelector(s)).fontFamily", sel)
+    assert pg.evaluate("document.documentElement.classList.contains('bc-garamond')") and 'EB Garamond' in ff('#ct_where b') and 'EB Garamond' in ff('#ct_list li'), 'EB Garamond everywhere'
+    assert pg.evaluate("document.fonts.check('16px \"EB Garamond\"')"), 'the font file is loaded'
+    pg.click('#ct_more'); pg.wait_for_timeout(200); assert 'Back to the old font' in pg.inner_text('#ws-fmenu [data-m=font]')
+    pg.click('#ws-fmenu [data-m=font]'); pg.wait_for_timeout(300)
+    assert not pg.evaluate("document.documentElement.classList.contains('bc-garamond')") and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'roboto' and 'EB Garamond' not in ff('#ct_where b'), 'back to Roboto'
+    pg.click('#ct_more'); pg.wait_for_timeout(200); assert 'Try EB Garamond' in pg.inner_text('#ws-fmenu [data-m=font]'); pg.click('#ws-fmenu [data-m=font]'); pg.wait_for_timeout(300)
+    assert pg.evaluate("document.documentElement.classList.contains('bc-garamond')") and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'garamond'
+    assert pg.evaluate("[...document.querySelectorAll('.material-icons')].every(e => getComputedStyle(e).fontFamily.indexOf('Material Icons') >= 0)"), 'the icons keep their font'
     # ---------------------------------------------------------------- flags
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     assert pg.is_hidden('#ct_filters') and pg.is_hidden('#ct_fcols'), 'nothing flagged yet: no filter chips'
@@ -488,7 +508,19 @@ def scenario(p, kind):
     pg.evaluate("r => { const v = document.getElementById('ws-vp'); if (v) v.scrollTop = Math.max(0, r * 40 - 40); }", r3); pg.wait_for_timeout(200)
     pg.locator('#ws .ws-cell.filled[data-c="%d"][data-r="%d"]' % (ci3, r3)).dblclick(); wait_aligned(pg, 'double-click')
     st3 = pg.evaluate("BookWorkspace.tab.state()"); assert st3['pair'] == [pair0[0], third] and st3['row'] == r3 and pg.is_visible('#ct_list'), st3
+    # 0.15.0 (owner): back in the Pages tab, the page shown in the Compare tab is selected (in the column of copy 1) and in view
+    pg.evaluate("() => { const v = document.getElementById('ws-vp'); if (v) v.scrollTop = 0; }")
     pg.click('#ct_tab_pages'); pg.wait_for_timeout(400)
+    ci1 = [cc['id'] for cc in pg.evaluate("BookWorkspace.tab.state().copies")].index(pair0[0])
+    sel = pg.locator('#ws .ws-cell.sel'); assert sel.count() == 1 and sel.get_attribute('data-r') == str(r3) and sel.get_attribute('data-c') == str(ci1), (r3, ci1, sel.count() and sel.get_attribute('data-r'))
+    vb = pg.locator('#ws-vp').bounding_box(); sb = sel.bounding_box(); assert sb['y'] >= vb['y'] - 1 and sb['y'] + sb['height'] <= vb['y'] + vb['height'] + 1, 'the selected page is in view'
+    # 0.15.0 (owner): "New project" in the Compare tab goes to the (empty) Pages tab
+    pg.locator('#ws .ws-cell.filled').first.dblclick(); wait_aligned(pg, 'compare again')
+    pg.evaluate("BookWorkspace.tab && 0"); pg.click('#ct_more'); pg.wait_for_timeout(200); pg.click('#ws-fmenu [data-m=new]'); pg.wait_for_timeout(600)
+    if pg.locator('#ws-float .ws-dlg, #ws-scrim .ws-dlg').count():                         # (unsaved changes: confirm)
+        pg.locator('#ws-float .ws-dlg button.primary, #ws-scrim .ws-dlg button.primary').first.click(); pg.wait_for_timeout(600)
+    assert not pg.evaluate("document.getElementById('ws').hidden") and not pg.evaluate("CompareTab.isOpen()"), 'the Pages tab is shown'
+    assert pg.locator('#ws .ws-hname').count() == 0, 'and it is empty'
     c.close(); stop_helper()
     print('  %s: ok' % kind)
 

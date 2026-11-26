@@ -1,7 +1,7 @@
 'use strict';
 /* The alignment chain without any file handling, so that it can run in Node.js (research scripts) and in the browser's worker (app).
    Input: the red channel of a scan scaled to 3000 px height as a 32-bit float Mat (see printed_area.js: redScaled). */
-const { inkMap, printedBox, extendBoxByStaves, scope } = require('./printed_area');
+const { inkMap, printedBox, extendBoxByStaves, extendBoxByHeadLines, scope } = require('./printed_area');
 const { roughAlign, warp } = require('./rough_align');
 const { tileAlign, alignMarginItems, identityMap } = require('./tile_align');
 
@@ -37,7 +37,7 @@ function inkIn(ink, box) {
    Where the standard box is right the two boxes are the same or differ by a few pixels (every other scan tested), so nothing changes there.
    Returns { box, which: 'standard' | 'border', standard, border, why, stretched } (stretched: A1, the box was extended over staves that hang on it). */
 const BORDER = 0.05, MORE_INK = 1.08, NEAR_EMPTY = 0.02;
-function chooseBox(cv, red, ink) {
+function chooseBox(cv, red, ink, dark) {
   const std = printedBox(cv, red), W = red.cols, H = red.rows;
   const tx = Math.round(0.01 * W), ty = Math.round(0.01 * H);
   const sides = (std[0] <= tx) + (std[2] >= W - tx) + (std[1] <= ty) + (std[3] >= H - ty);
@@ -50,16 +50,21 @@ function chooseBox(cv, red, ink) {
     const ext = extendBoxByStaves(box, ink);
     if (ext[1] !== box[1] || ext[3] !== box[3]) { box = ext; stretched = true; }
   }
+  let head = null, before = box.slice();                                                               // 0.15.0: headline, folio number, catchword, signature
+  if (dark && !(typeof process !== 'undefined' && process.env && process.env.BC_NOHEAD === '1')) {   // (BC_NOHEAD=1: research, switched off)
+    const e = extendBoxByHeadLines(cv, box, dark);
+    if (e.top || e.bottom) { head = { top: e.top, bottom: e.bottom }; box = e.box; }
+  }
   const density = inkIn(ink, box) / Math.max(1, (box[2] - box[0]) * (box[3] - box[1]));                // share of the box that is ink (real pages: 0.10-0.40)
-  return { box, which, standard: std, border: bor, why, stretched, density };
+  return { box, which, standard: std, border: bor, why, stretched, density, head, before };
 }
 
 /* reference copy: printed area and ink map (kept for all copies that are aligned onto it) */
-function prepareReference(cv, red) {
+function prepareReference(cv, red, dark) {
   const t0 = now();
   const ref = inkMap(cv, red), t1 = now();
   let pick;
-  try { pick = chooseBox(cv, red, ref); } catch (e) { ref.delete(); throw e; }          // (a failure leaves nothing behind: printedBox and inkMap free their own memory)
+  try { pick = chooseBox(cv, red, ref, dark); } catch (e) { ref.delete(); throw e; }          // (a failure leaves nothing behind: printedBox and inkMap free their own memory)
   const t2 = now();
   const box = pick.box;
   return { ref, box, boxInfo: pick, times: { box_s: (t2 - t1) / 1000, ink_ref_s: (t1 - t0) / 1000 } };
@@ -154,4 +159,4 @@ function alignCopyIn(cv, refState, red, opts, S) {
   return out;
 }
 
-module.exports = { prepareReference, alignCopy, unmatchedShare, now, applyQuad, quadOk, quadMask };
+module.exports = { prepareReference, chooseBox, alignCopy, unmatchedShare, now, applyQuad, quadOk, quadMask };

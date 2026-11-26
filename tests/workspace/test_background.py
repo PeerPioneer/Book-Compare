@@ -9,7 +9,7 @@ It uses the desktop program's scan reader (desktop/server.js) with REAL folders 
     in "<project>.bookcompare results" (index.json + one file per pair); started again, everything is skipped
   * the Compare tab shows a pair with the reference from the stored movement (no aligning), aligns any other pair directly and prepares
     the next page meanwhile (then shown from memory); a changed tile setting is aligned again and replaces the stored one
-  * the printed area (V2b): shown on the pictures, a corner dragged on the superimposed picture, aligned again at once, saved for that scan,
+  * the printed area (V2b): shown on the pictures, a corner dragged on the superimposed picture, aligned again with "Align with this shape" (0.15.0), saved for that scan,
     used again when coming back to the page, "Back to automatic"
   * the scan folders are never changed
 Run:  python3 tests/workspace/test_background.py   (needs Node)
@@ -130,10 +130,20 @@ def scenario(p, kind):
     pg.keyboard.press('Control+y'); pg.wait_for_timeout(1500); assert pg.evaluate("BookWorkspace.tab.refCopy()") == A
     assert pg.evaluate("[0, 1].map(r => BookWorkspace.tab.refFor(r))") == [A, A]
     # --- the background alignment: started, paused on the page with two different pages, continued, finished ----------------------------
-    menu(pg, 'bg'); dlg = pg.inner_text('#ws-scrim')
-    assert 'B-Test' in dlg and 'C-Test' in dlg and 'A-Ref' in dlg and 'helper' in dlg, dlg
-    assert pg.locator('#ws-scrim .bg-copy').count() == 2, 'the reference itself is not offered'
+    # 0.15.0 (owner): a button in the Pages tab opens the window; no copy is ticked at first; "Select all"; the reference copy is listed, in bold,
+    # without a box, with a short explanation; another reference copy can be chosen right there
+    assert pg.is_enabled('#ws-bgbtn') and 'Align in the background' in pg.inner_text('#ws-bgbtn')
+    pg.click('#ws-bgbtn'); pg.wait_for_timeout(400); dlg = pg.inner_text('#ws-scrim')
+    assert 'B-Test' in dlg and 'C-Test' in dlg and 'A-Ref' in dlg and 'helper' in dlg and 'the reference copy' in dlg, dlg
+    assert pg.locator('#ws-scrim .bg-copy').count() == 2 and pg.locator('#ws-scrim .bg-copy:checked').count() == 0, 'two copies to tick (not the reference), none ticked'
+    assert pg.evaluate("getComputedStyle(document.querySelector('#ws-scrim .ws-bgrefname b')).fontWeight") in ('700', 'bold') and 'A-Ref' in pg.inner_text('#ws-scrim .ws-bgref')
+    pg.click('#bg-go'); pg.wait_for_timeout(300); assert 'Tick at least one copy' in pg.inner_text('#ws-toast') and pg.is_visible('#ws-scrim')
+    pg.select_option('#bg-ref', str(B)); pg.wait_for_timeout(800)                      # another reference copy, from the window
+    assert pg.evaluate("BookWorkspace.tab.refCopy()") == B and 'B-Test' in pg.inner_text('#ws-scrim .ws-bgref'), 'B is the reference now'
+    pg.select_option('#bg-ref', str(A)); pg.wait_for_timeout(800); assert pg.evaluate("BookWorkspace.tab.refCopy()") == A and 'A-Ref' in pg.inner_text('#ws-scrim .ws-bgref')
+    pg.click('#bg-all'); assert pg.locator('#ws-scrim .bg-copy:checked').count() == 2
     pg.click('#bg-go'); pg.wait_for_timeout(800)
+    assert 'Aligning in the background' in pg.inner_text('#ws-bgbtn') or 'paused' in pg.inner_text('#ws-bgbtn').lower(), 'the button says that it runs'
     t = wait_strip(pg, ['Aligning in the background', 'Paused', 'finished'], 30)
     if os.environ.get('BOOKCOMPARE_SHOTS'): pg.wait_for_timeout(3000); pg.screenshot(path=os.path.join(os.environ['BOOKCOMPARE_SHOTS'], 'background-strip.png'))
     t = wait_strip(pg, ['Paused:', 'finished'])
@@ -155,8 +165,11 @@ def scenario(p, kind):
     assert max(e['u'] for e in idx['entries'].values() if e['c1'] == C) > 0.3, 'the mismatched page is stored with its share of ink without partner'
     sizes = list(pack()['bins'].values()); assert all(5000 < s < 3000000 for s in sizes), sizes
     pg.click('#ws-bg [data-bg=close]'); pg.wait_for_timeout(200); assert not pg.is_visible('#ws-bg')
-    # started again: everything is stored already
-    menu(pg, 'bg'); pg.click('#bg-go'); t = wait_strip(pg, ['finished'], 60)
+    # started again: everything is stored already - in the window both copies are greyed out ("all aligned"); started anyway, nothing is aligned
+    menu(pg, 'bg'); pg.wait_for_timeout(300)
+    assert pg.locator('#ws-scrim .bg-copy:disabled').count() == 2 and pg.inner_text('#ws-scrim').count('all aligned') == 2, pg.inner_text('#ws-scrim')
+    pg.click('#ws-scrim [data-close]'); pg.wait_for_timeout(200)
+    pg.evaluate("([b, c]) => BCBackground.start([b, c], 1)", [B, C]); t = wait_strip(pg, ['finished'], 60)
     assert '0 pages aligned' in t and '4 already stored' in t, t
     pg.click('#ws-bg [data-bg=close]')
     # item 21: a small dot in every stored cell, and how many pages of a copy are aligned, in its heading
@@ -168,7 +181,7 @@ def scenario(p, kind):
     # item 29: a scan with another date but the same content (copied to another computer): the stored results still fit
     fb = os.path.join(BOOKS, 'Copy-B', 'p1.jpg'); st0 = os.stat(fb); os.utime(fb, ns=(st0.st_atime_ns, st0.st_mtime_ns + 10 * 86400 * 10**9))
     try:
-        menu(pg, 'bg'); pg.click('#bg-go'); t = wait_strip(pg, ['finished'], 60)
+        pg.evaluate("([b, c]) => BCBackground.start([b, c], 1)", [B, C]); t = wait_strip(pg, ['finished'], 60)
         assert '0 pages aligned' in t and '4 already stored' in t, ('a new date alone does not make a stored result stale', t)
     finally: os.utime(fb, ns=(st0.st_atime_ns, st0.st_mtime_ns))
     pg.click('#ws-bg [data-bg=close]'); pg.wait_for_timeout(1300)
@@ -239,7 +252,14 @@ def scenario(p, kind):
     hb = pg.locator('#pane_main .ct-qbox circle[data-h="0"]').bounding_box(); sv = pg.locator('#pane_main .ct-qbox svg').bounding_box()
     cx, cy = hb['x'] + hb['width'] / 2, hb['y'] + hb['height'] / 2
     pg.mouse.move(cx, cy); pg.mouse.down(); pg.mouse.move(cx + sv['width'] * 0.05, cy + sv['height'] * 0.03, steps=6); pg.mouse.up()
-    wait_aligned(pg, 'after a corner was moved')
+    # 0.15.0 (owner): letting the corner go does not align at once; "Align with this shape" does
+    pg.wait_for_timeout(600)
+    assert pg.evaluate("CompareBox.pending()") and not pg.evaluate("CompareTab.lastTiles()").get('quad') and pg.is_visible('#ct_boxapply') and pg.is_visible('#ct_boxundo') and 'not aligned yet' in pg.inner_text('#ct_boxnote')
+    assert not (project().get('boxes') or {}), 'nothing is kept before the shape is applied'
+    pg.click('#ct_boxundo'); pg.wait_for_timeout(200); assert pg.evaluate("CompareBox.quad()") == q0 and not pg.is_visible('#ct_boxapply'), 'undo puts the corners back'
+    pg.mouse.move(cx, cy); pg.mouse.down(); pg.mouse.move(cx + sv['width'] * 0.05, cy + sv['height'] * 0.03, steps=6); pg.mouse.up(); pg.wait_for_timeout(300)
+    pg.click('#ct_boxapply')
+    wait_aligned(pg, 'after a corner was moved and the shape applied')
     lt = pg.evaluate("CompareTab.lastTiles()")
     assert lt.get('quad') and not lt.get('stored'), ('aligned again with the shape', lt.get('quad'), lt.get('stored'))
     assert abs(lt['quad'][0] - (q0[0] + 0.05)) < 0.02 and abs(lt['quad'][1] - (q0[1] + 0.03)) < 0.02 and lt['quad'][2:] == [round(v, 4) for v in q0[2:]], (q0, lt['quad'])

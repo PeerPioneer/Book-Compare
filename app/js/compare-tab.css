@@ -23,15 +23,20 @@ div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
 
 .ct-side { position: absolute; top: var(--ct-top-h); left: 0; bottom: var(--ct-nav-h, 0px); width: var(--ct-side-w); z-index: 3; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; background: #f6f9f9; border-right: 1px solid #cfdcdc; color: #1b2a2a; font-size: 14px; }
 .ct-copies { padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 6px; }
-.ct-copy { border: 1px solid #cfdcdc; background: #fff; border-radius: 6px; padding: 6px 10px 5px; border-left-width: 5px; }
-.ct-copy.c1 { border-left-color: var(--ct-c1, #0046c8); }
-.ct-copy.c2 { border-left-color: var(--ct-c2, #e60000); }
+.ct-copy { border: 1px solid #cfdcdc; background: #fff; border-radius: 6px; padding: 6px 10px 6px; }
+/* 0.15.0 (owner): the name of the copy on its colour, the menu arrow right next to it (the real menu lies invisibly over the name) */
+.ct-cname { position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; box-sizing: border-box; margin: 3px 0 2px; padding: 3px 9px 3px 10px; border-radius: 6px; font-size: 16px; font-weight: 500; line-height: 1.3; cursor: pointer; }
+.ct-copy.c1 .ct-cname { background: var(--ct-c1, #0046c8); color: var(--ct-c1ink, #fff); }
+.ct-copy.c2 .ct-cname { background: var(--ct-c2, #e60000); color: var(--ct-c2ink, #fff); }
+.ct-cn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ct-cn:empty::before { content: '\2014'; }
+.ct-carr { flex: 0 0 auto; }
+.ct-cname select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+.ct-cname:focus-within { outline: 2px solid #008080; outline-offset: 2px; }
 .ct-lab { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #5a6d6d; }
 .ct-row { display: flex; gap: 4px; align-items: center; }
-.ct-copy select, .ct-align select { width: 100%; min-width: 0; font: inherit; font-size: 16px; font-weight: 500; border: 0; background: transparent; color: #1b2a2a; padding: 2px 0; cursor: pointer; }
+.ct-align select { width: 100%; min-width: 0; font: inherit; font-size: 16px; font-weight: 500; border: 0; background: transparent; color: #1b2a2a; padding: 2px 0; cursor: pointer; }
 .ct-n { display: block; font-size: 12px; color: #5a6d6d; }
-.ct-step:hover { border-color: #008080; }
-.ct-step { flex: 0 0 auto; width: 28px; height: 28px; border: 1px solid #cfdcdc; background: #fff; border-radius: 6px; cursor: pointer; color: #008080; font-size: 18px; line-height: 1; padding: 0 0 2px; }
 .ct-alsec { margin: 0 12px 4px; border: 1px solid #cfdcdc; border-radius: 8px; background: #fff; font-size: 12.5px; color: #33494a; }
 .ct-alsec[hidden] { display: none; }
 .ct-alhead { width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 8px 10px; text-align: left; font: inherit; font-size: 13.5px; color: #1b2a2a; cursor: pointer; border-radius: 8px; }
@@ -44,7 +49,6 @@ div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
 .ct-albody { padding: 2px 10px 10px; border-top: 1px solid #e6eeee; }
 .ct-albody[hidden] { display: none; }
 .ct-albody .ct-seg { margin-top: 8px; }
-#ct_mvleg, .ct-side > .ct-hint, .ct-side > .ct-warn { margin-left: 12px; margin-right: 12px; }
 .ct-seg { display: flex; border: 1px solid #b9cccc; border-radius: 6px; overflow: hidden; }
 .ct-seg button { flex: 1; border: 0; background: #fff; padding: 5px 4px; font: inherit; font-size: 12px; cursor: pointer; color: #1b2a2a; }
 .ct-seg button + button { border-left: 1px solid #b9cccc; }
@@ -56,19 +60,21 @@ div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
 .ct-tapply { border: 1px solid #00807a; background: #fff; color: #00807a; border-radius: 4px; padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer; }
 .ct-tnote { margin: 5px 0 0; color: #7a4b00; font-size: 12px; }
 .ct-tnote:empty { display: none; }
+.ct-boxacts { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+.ct-boxacts:not(:has(button:not([hidden]))) { display: none; }
 .ct-check { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; }
 .ct-check label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-.ct-mvleg { margin: 5px 0 0; font-size: 11.5px; color: #5a6d6d; line-height: 1.6; }
+.ct-mvleg { color: #5a6d6d; line-height: 1.6; }
 .ct-mvleg[hidden] { display: none; }
 .ct-mvleg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 3px 0 6px; vertical-align: -1px; }
 .ct-mvleg i:first-child { margin-left: 0; }
 .ct-mvleg span { white-space: nowrap; }
-.ct-hint { margin: 8px 0 0; padding: 7px 9px; background: #fbf0fb; border: 1px solid #e3b8e3; border-radius: 6px; font-size: 12.5px; line-height: 1.4; }
-.ct-hint[hidden] { display: none; }
-.ct-warn { margin: 8px 0 0; padding: 7px 9px; background: #fff4e5; border: 1px solid #f0c27a; border-radius: 6px; font-size: 12.5px; line-height: 1.4; }
-.ct-warn[hidden] { display: none; }
+/* 0.15.0 (owner): the notes about the alignment of this page sit at the foot of its box, in its colours, a little smaller, not bold */
+.ct-alnote { margin: 0; padding: 6px 10px 7px; border-top: 1px solid #e6eeee; font-size: 11.5px; line-height: 1.45; color: #33494a; }
+.ct-alnote[hidden] { display: none; }
+.ct-warn.ct-alnote { box-shadow: inset 3px 0 0 #e8a33c; }      /* the one that may mean "not the same page": a thin orange edge only */
 .ct-warnacts { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
-.ct-hintbtn { border: 0; background: none; color: #8a008a; font: inherit; font-weight: 500; padding: 0; cursor: pointer; text-decoration: underline; }
+.ct-hintbtn { border: 0; background: none; color: #00807a; font: inherit; font-weight: 400; padding: 0; cursor: pointer; text-decoration: underline; }
 .ct-mv { display: none; position: absolute; inset: 0; pointer-events: none; box-sizing: border-box; padding: .25em; }
 div.result_container.ct-on .ct-mv:not([hidden]) { display: block; }
 .ct-mv canvas { display: block; width: 100%; height: 100%; }
@@ -76,7 +82,7 @@ div.result_container.ct-on .ct-mv:not([hidden]) { display: block; }
 .ct-listhead h3 { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #5a6d6d; }
 .ct-search { display: block; padding: 6px 12px; }
 .ct-search input { width: 100%; font: inherit; font-size: 13.5px; border: 1px solid #cfdcdc; border-radius: 4px; padding: 6px 8px; background: #fff; color: inherit; }
-.ct-search input:focus, .ct-copy select:focus-visible, .ct-align select:focus-visible { outline: 2px solid #008080; outline-offset: 1px; }
+.ct-search input:focus, .ct-align select:focus-visible { outline: 2px solid #008080; outline-offset: 1px; }
 .ct-list { list-style: none; margin: 0; padding: 0; flex: 1 0 auto; min-height: 150px; height: 0; overflow-y: auto; border-top: 1px solid #e2ebeb; border-bottom: 1px solid #e2ebeb; background: #fff; }
 .ct-list li { display: flex; align-items: center; gap: 8px; padding: 6px 14px; cursor: pointer; font-size: 14px; }
 .ct-list li:hover { background: #eaf4f4; }
@@ -118,6 +124,7 @@ div.result_container.ct-on .ct-mv:not([hidden]) { display: block; }
    in the left panel; the colour and paper buttons moved from the legend over the picture into the options of the Superimposed view. */
 body.ct-active #compare_screen > footer .bar { display: none !important; }
 body.ct-active #legend_colors, body.ct-active #legend_paper { display: none !important; }
+body.ct-active .pane__label--legend { display: none !important; }      /* 0.15.0: the colours are shown on the copy names in the left panel */
 
 /* the page navigation, pinned to the bottom of the left panel */
 .ct-nav { position: absolute; left: 0; bottom: 0; z-index: 4; box-sizing: border-box; width: var(--ct-side-w); height: var(--ct-nav-h); display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border-top: 1px solid #cfdcdc; border-right: 1px solid #cfdcdc; color: #1b2a2a; }
