@@ -1,0 +1,8 @@
+version: 0.17.0
+files:
+  - url: https://github.com/PeerPioneer/Book-Compare/releases/download/v0.17.0/Book-Compare-Setup-0.17.0.exe
+    sha512: D5Mlc+mKSQkeXXAnRZL5PVQERyIxmbLi445qyoZUEruKRbuSAW6Kl75XisaoDOGMvCR4JTqrhnkdsSrgmaUmhQ==
+    size: 131511904
+path: https://github.com/PeerPioneer/Book-Compare/releases/download/v0.17.0/Book-Compare-Setup-0.17.0.exe
+sha512: D5Mlc+mKSQkeXXAnRZL5PVQERyIxmbLi445qyoZUEruKRbuSAW6Kl75XisaoDOGMvCR4JTqrhnkdsSrgmaUmhQ==
+releaseDate: '2026-11-27T01:05:49.970Z'

@@ -1,0 +1,1 @@
+Read by the one-click update of Book Compare 0.13.0 (its publish setting was "generic"). Later versions read latest.yml on the Releases page. Written by .github/workflows/desktop.yml for each new version.
