@@ -11,8 +11,8 @@ div.result_container.ct-on.ct-blank #workspace { opacity: 0; transition: none; }
 .ct-top *, .ct-side *, .ct-barleft *, .ct-view *, .ct-busy *, .ct-map * { box-sizing: border-box; }
 
 .ct-top { position: absolute; top: 0; left: 0; right: 0; height: 46px; z-index: 3; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #fff; border-bottom: 1px solid #cfdcdc; color: #1b2a2a; }
-.ct-brand { font-weight: 500; font-size: 16px; }
-.ct-proj { color: #5a6d6d; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ct-proj { color: #1b2a2a; font-size: 18px; font-weight: 600; padding-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ct-proj.none { color: #6b7c7c; font-weight: 400; font-style: italic; font-size: 15px; }
 .ct-sp { flex: 1; }
 .ct-iconbtn { width: 32px; height: 32px; border: 1px solid #cfdcdc; background: #fff; border-radius: 4px; cursor: pointer; font-size: 17px; line-height: 1; color: #008080; }
 .ct-iconbtn:hover { border-color: #008080; }
@@ -364,3 +364,12 @@ body.ct-active #compare_screen > footer #more { display: none !important; }
 /* 0.16.0 (owner): no labels over the pictures in the Compare tab, except on the small panels beside Superimposed and Toggle */
 body.ct-active .ws-stacked .pane__label, body.ct-active .ws-sidebyside .pane__label,
 body.ct-active .ws-single1 .pane__label, body.ct-active .ws-single2 .pane__label, body.ct-active .pane__label--toggle { display: none !important; }
+
+/* 0.17.0 (owner, to try): one column of zoom buttons while the panels are linked - the big picture's in Superimposed and Toggle, the
+   second picture's in Top and bottom / Left and right; the others keep their horizontal scroll bar only */
+body.ct-active #workspace.ws-linked.ws-three #pane_o1, body.ct-active #workspace.ws-linked.ws-three #pane_o2,
+body.ct-active #workspace.ws-linked.ws-stacked #pane_o1, body.ct-active #workspace.ws-linked.ws-sidebyside #pane_o1 { grid-template-columns: minmax(0, 1fr) 0; }
+body.ct-active #workspace.ws-linked.ws-three #pane_o1 .pane__vbar, body.ct-active #workspace.ws-linked.ws-three #pane_o2 .pane__vbar,
+body.ct-active #workspace.ws-linked.ws-stacked #pane_o1 .pane__vbar, body.ct-active #workspace.ws-linked.ws-sidebyside #pane_o1 .pane__vbar,
+body.ct-active #workspace.ws-linked.ws-three #pane_o1 .pane__corner, body.ct-active #workspace.ws-linked.ws-three #pane_o2 .pane__corner,
+body.ct-active #workspace.ws-linked.ws-stacked #pane_o1 .pane__corner, body.ct-active #workspace.ws-linked.ws-sidebyside #pane_o1 .pane__corner { display: none; }

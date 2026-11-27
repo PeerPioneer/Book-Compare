@@ -148,6 +148,11 @@ def scenario(p, kind):
     assert pg.inner_text('#ws-bgbtn').strip() == 'Align in the background …' and 'on' in pg.get_attribute('#ws-bgbtn', 'class').split(), 'the button stays short, highlighted while it runs'
     assert pg.is_visible('#ws-bgprog'), 'the bar at the top'
     cb = pg.locator('#ws-bgprog').bounding_box(); tb = pg.locator('#ws .ws-tabs').bounding_box(); assert cb['x'] + cb['width'] <= tb['x'] + 1 and abs((cb['y'] + cb['height'] / 2) - (tb['y'] + tb['height'] / 2)) < 4, (cb, tb)
+    # 0.17.0 (owner): the bar on the left, right after the project name; the save notice on the right, next to the tab "Pages"
+    nb = pg.locator('#ws-title').bounding_box(); sb = pg.locator('#ws-save').bounding_box()
+    assert 0 <= cb['x'] - (nb['x'] + nb['width']) < 40 and cb['x'] + cb['width'] < sb['x'] and 0 <= tb['x'] - (sb['x'] + sb['width']) < 30, (nb, cb, sb, tb)
+    cct = pg.evaluate("(() => { const a = document.getElementById('ct_bgprog'), t = document.getElementById('ct_proj'); return a && t ? [a.previousElementSibling === t, !a.hidden] : null; })()")
+    assert cct and cct[0], cct
     ct = pg.inner_text('#ws-bgprog'); assert ' of 4' in ct or 'Paused' in ct, ct
     pg.click('#ws-bgprog .bc-bgpbtn'); pg.wait_for_timeout(200)
     pop = pg.inner_text('#ws-bgprog .bc-bgpop'); assert 'onto the reference copy' in pop and pg.locator('#ws-bgprog .bc-bgpop [data-bg=stop]').count() == 1, pop
@@ -187,6 +192,15 @@ def scenario(p, kind):
         pg.wait_for_timeout(250)
     assert pg.locator('#ws .ws-st').count() == 4, pg.locator('#ws .ws-st').count()
     assert '2 aligned' in pg.inner_text('#ws .ws-hcell[data-c="1"] .ws-hmeta') and 'aligned' not in pg.inner_text('#ws .ws-hcell[data-c="0"] .ws-hmeta')
+    assert pg.locator('#ws svg.ws-st').count() == 4, '0.17.0: a small check mark, not a dot'
+    # 0.17.0 (owner): the alignment report - every stored pair with its numbers, pictures of the worst pages, the data as JSON
+    rep = pg.evaluate(r"""(async () => { const r = await BCAlignReport.run(2, () => {}); const h = BCAlignReport.html(r);
+        const m = h.match(/<script type="application\/json" id="bc-report-data">([\s\S]*?)<\/script>/);
+        return { n: r.list.length, shots: r.shots.map(s => [!!s.url, s.error || null, s.bend_s]), imgs: (h.match(/<img /g) || []).length, data: JSON.parse(m[1]) }; })()""")
+    assert rep['n'] == 4 and rep['imgs'] == 2 and all(s[0] and s[1] is None and s[2] > 0 for s in rep['shots']), rep
+    assert len(rep['data']['pairs']) == 4 and all(p_['copy'] in ('B-Test', 'C-Test') and p_['u'] is not None for p_ in rep['data']['pairs']), rep['data']
+    pg.click('#ws-more'); pg.click('#ws-menu [data-m=report]'); pg.wait_for_selector('#ar-go')
+    assert 'stored alignment' in pg.inner_text('#ws-scrim'); pg.click('#ar-cancel'); pg.wait_for_timeout(200)
     # item 29: a scan with another date but the same content (copied to another computer): the stored results still fit
     fb = os.path.join(BOOKS, 'Copy-B', 'p1.jpg'); st0 = os.stat(fb); os.utime(fb, ns=(st0.st_atime_ns, st0.st_mtime_ns + 10 * 86400 * 10**9))
     try:
@@ -225,8 +239,10 @@ def scenario(p, kind):
     assert len(bc_entries()) == 2, ('B against C on this page and the next page prepared are stored', pr, len(bc_entries()))
     pg.click('#ct_next'); wait_aligned(pg, 'prepared page')
     lt = pg.evaluate("CompareTab.lastTiles()"); assert lt.get('stored') is True, ('the prepared page is shown without aligning', lt)
+    h0 = pg.evaluate("CompareTab.prepared().bentHits")
     pg.click('#ct_prev'); wait_aligned(pg, 'B against C, back to page 1')
     lt = pg.evaluate("CompareTab.lastTiles()"); assert lt.get('stored') is True, ('going back: shown from the project file, not aligned again', lt)
+    assert pg.evaluate("CompareTab.prepared().bentHits") == h0 + 1, '0.17.0: the page just left is kept bent, so going back draws it at once'
     NST = len(index()['entries']); assert NST == 6, NST
     pg.click('#ct_next'); wait_aligned(pg, 'B against C, page 2 again')
     # a changed tile setting: the stored result no longer fits, the page is aligned again and stored anew

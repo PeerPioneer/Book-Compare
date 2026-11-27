@@ -5,6 +5,7 @@
    movement field and used to bend the other copy onto the reference. Four levels with smaller and smaller tiles.
    Level = [tile size, step, search radius, outlier threshold] in pixels at the 3000 px working height. */
 const { scope } = require('./printed_area');
+const { openRect } = require('./rectmorph');
 const LEVELS = [[384, 192, 56, 8.0], [192, 96, 14, 3.0], [96, 48, 6, 2.0], [48, 24, 3, 1.5]];
 
 /* Tile settings (V15, owner 17 Nov 2026): "main tiles" = how many large tiles cover the page height (standard about 8: 3000 / 384),
@@ -29,14 +30,14 @@ function subpixel(v, i, n) {          // v(k) for k = 0..n-1 given as function
 }
 
 /* shift of every tile. box = [x0, x1, y0, y1]. Returns {cx, cy, SX, SY (Float32Array rows*cols, NaN = missing), rows, cols} */
-function measureLevel(cv, ref, mov, box, tile, step, search, minInk = 0.04, minCorr = 0.45) {
+function measureLevel(cv, ref, mov, box, tile, step, search, minInk = 0.04, minCorr = 0.45, inkOf = null) {
   const [x0, x1, y0, y1] = box;
   const xs = [], ys = [];
   for (let x = x0; x < x1 - tile; x += step) xs.push(x);
   for (let y = y0; y < y1 - tile; y += step) ys.push(y);
   const rows = ys.length, cols = xs.length;
   const SX = new Float32Array(rows * cols).fill(NaN), SY = SX.slice();
-  const W = ref.cols, rd = ref.data32F;
+  const W = ref.cols, rd = (inkOf || ref).data32F;          // (inkOf: the map whose ink decides whether a tile is measured at all)
   const S = scope(), r = S.add(new cv.Mat());
   let inked = 0, matched = 0;
   try {
@@ -100,6 +101,29 @@ function repair(S, rows, cols, threshold) {
   return { S, bad };
 }
 
+/* Staff lines left out of the MEASURING (research, BC_NOLINES=1): in music printed in two impressions (staves first, then notes), the notes
+   and the lines of one copy can stand differently to each other than in another copy. The tiles then follow the lines in some places and
+   the notes in others, which bends the lines into waves and leaves notes doubled. Without the long horizontal lines the tiles follow the
+   notes and the text; the lines are still bent along with everything else, but no longer pull. m: ink map (CV_32F 0-1); b: its blurred copy,
+   changed in place. LINE: shortest run of ink, in working pixels, that counts as a line. */
+const LINE = 61, LINEW = (typeof process !== 'undefined' && process.env && process.env.BC_LINEW) ? +process.env.BC_LINEW : 0;
+function withoutLines(m, b) {
+  const W = m.cols, H = m.rows, d = m.data32F, bin = new Uint8Array(W * H);
+  for (let i = 0; i < bin.length; i++) bin[i] = d[i] > 0.5 ? 1 : 0;
+  const lines = openRect(bin, W, H, 1, LINE), bd = b.data32F;
+  // a line pixel and its direct neighbours above and below (the blur spreads the line by about a pixel)
+  for (let y = 0; y < H; y++) for (let x = 0, o = y * W; x < W; x++, o++) {
+    if (lines[o] || (y > 0 && lines[o - W]) || (y < H - 1 && lines[o + W])) bd[o] *= LINEW;
+  }
+}
+function rowMedian(S, rows, cols, k) {          // research: median over k neighbouring tiles of the same row
+  const out = new Float32Array(S.length), h = Math.floor(k / 2);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const v = []; for (let d = -h; d <= h; d++) { const ii = Math.min(cols - 1, Math.max(0, i + d)); v.push(S[j * cols + ii]); }
+    out[j * cols + i] = median(v);
+  }
+  return out;
+}
 /* movement field for every pixel: bilinear interpolation between tile centres, clamped outside (as RegularGridInterpolator) */
 function denseField(cv, cx, cy, S, rows, cols, W, H) {
   const out = new Float32Array(W * H);
@@ -151,17 +175,24 @@ function tileAlign(cv, ref, mov, box, opts = {}) {
   const envLevels = (typeof process !== 'undefined' && process.env && process.env.BC_LEVELS) ? LEVELS.slice(0, +process.env.BC_LEVELS) : null;   // research only: use just the first N levels (a stiffer alignment)
   const levels = opts.levels || envLevels || LEVELS, W = ref.cols, H = ref.rows, stats = [];
   const S = scope(), refB = S.add(new cv.Mat()); cv.GaussianBlur(ref, refB, new cv.Size(0, 0), 0.8);
+  const noLines = opts.noLines != null ? opts.noLines : !!(typeof process !== 'undefined' && process.env && process.env.BC_NOLINES === '1');
+  const refB0 = noLines ? S.add(refB.clone()) : null;
+  if (noLines) withoutLines(ref, refB);
   let cur = mov;
   try {
   const total = opts.trackField ? { fx: new Float32Array(W * H), fy: new Float32Array(W * H) } : null;   // sum of all level fields (research: movement map)
   for (const [tile, step, search, threshold] of levels) {
     const t0 = Date.now();
     const movB = S.add(new cv.Mat()); cv.GaussianBlur(cur, movB, new cv.Size(0, 0), 0.8);
-    const { cx, cy, SX, SY, rows, cols, inked, matched } = measureLevel(cv, refB, movB, box, tile, step, search);
+    if (noLines) withoutLines(cur, movB);
+    const { cx, cy, SX, SY, rows, cols, inked, matched } = measureLevel(cv, refB, movB, box, tile, step, search, undefined, undefined, refB0);
     movB.delete();
     const t1 = Date.now();
     const fx = denseField(cv, cx, cy, repair(SX, rows, cols, threshold).S, rows, cols, W, H);
-    const fy = denseField(cv, cx, cy, repair(SY, rows, cols, threshold).S, rows, cols, W, H);
+    let SYr = repair(SY, rows, cols, threshold).S;
+    const hs = (typeof process !== 'undefined' && process.env && process.env.BC_HSMOOTH) ? +process.env.BC_HSMOOTH : 0;     // research only: vertical shifts smoothed along each row of tiles (straight staff lines)
+    if (hs > 1 && tile <= (+process.env.BC_HSMOOTH_FROM || 192)) SYr = rowMedian(SYr, rows, cols, hs);
+    const fy = denseField(cv, cx, cy, SYr, rows, cols, W, H);
     if (total) for (let p = 0; p < W * H; p++) { total.fx[p] += fx[p]; total.fy[p] += fy[p]; }
     const mapx = S.add(new cv.Mat(H, W, cv.CV_32F)), mapy = S.add(new cv.Mat(H, W, cv.CV_32F));
     { const mx = mapx.data32F, my = mapy.data32F; for (let y = 0, p = 0; y < H; y++) for (let x = 0; x < W; x++, p++) { mx[p] = x + fx[p]; my[p] = y + fy[p]; } }

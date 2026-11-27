@@ -542,55 +542,133 @@ Licence: SIL Open Font License 1.1 - the full text is in fonts/EB-Garamond-OFL.t
 Taken from Google Fonts (github.com/google/fonts, ofl/ebgaramond) and reduced to the Latin characters (woff2).
 
 ====================================================================
-Source Sans 3 (fonts/sourcesans3.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
-Licence: SIL Open Font License 1.1 - the full text is in fonts/Source-Sans-3-OFL.txt.
-Taken from Google Fonts (github.com/google/fonts, ofl/sourcesans3): the unchanged font, only packed as woff2 (the name 'Source' is reserved, so the font is not reduced).
+Roboto (fonts/roboto-italic.woff2, roboto-regular.woff2), the standard font of Book Compare
+Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Roboto-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/roboto): reduced to the Latin characters with the width fixed at 100 (woff2).
 
 ====================================================================
-Fira Sans (fonts/firasans-regular.woff2, -medium, -semibold, -bold), one of the fonts to choose from in ⋮ → Font … (0.16.0)
+Source Sans 3 (fonts/sourcesans3-italic.woff2, sourcesans3-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Humanist)
+Copyright 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. All Rights Reserved. Source is a trademark of Adobe in the United States and/or other countries.
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Source-Sans-3-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/sourcesans3): the unchanged font, only packed as woff2 (its name is reserved, so the font is not reduced).
+
+====================================================================
+Fira Sans (fonts/firasans-bold.woff2, firasans-bolditalic.woff2, firasans-italic.woff2, firasans-light.woff2, firasans-medium.woff2, firasans-regular.woff2, firasans-semibold.woff2), one of the fonts to choose from in ⋮ → Font … (Humanist)
 Copyright (c) 2012-2015, The Mozilla Foundation and Telefonica S.A.
 Licence: SIL Open Font License 1.1 - the full text is in fonts/Fira-Sans-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/firasans): reduced to the Latin characters (woff2).
 
 ====================================================================
-Alegreya Sans (fonts/alegreyasans-regular.woff2, -medium, -bold), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2013 The Alegreya Sans Project Authors (https://github.com/huertatipografica/Alegreya-Sans).
+Alegreya Sans (fonts/alegreyasans-bold.woff2, alegreyasans-bolditalic.woff2, alegreyasans-italic.woff2, alegreyasans-light.woff2, alegreyasans-medium.woff2, alegreyasans-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Humanist)
+Copyright 2013 The Alegreya Sans Project Authors (https://github.com/huertatipografica/Alegreya-Sans)
 Licence: SIL Open Font License 1.1 - the full text is in fonts/Alegreya-Sans-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/alegreyasans): reduced to the Latin characters (woff2).
 
 ====================================================================
-Figtree (fonts/figtree.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree).
+Figtree (fonts/figtree-italic.woff2, figtree-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Geometric)
+Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree)
 Licence: SIL Open Font License 1.1 - the full text is in fonts/Figtree-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/figtree): reduced to the Latin characters (woff2).
 
 ====================================================================
-DM Sans (fonts/dmsans.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts).
+DM Sans (fonts/dmsans-italic.woff2, dmsans-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Geometric)
+Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
 Licence: SIL Open Font License 1.1 - the full text is in fonts/DM-Sans-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/dmsans): reduced to the Latin characters (woff2).
 
 ====================================================================
-Jost (fonts/jost.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2020 The Jost Project Authors (https://github.com/indestructible-type).
+Jost (fonts/jost-italic.woff2, jost-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Geometric)
+Copyright 2020 The Jost Project Authors (https://github.com/indestructible-type)
 Licence: SIL Open Font License 1.1 - the full text is in fonts/Jost-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/jost): reduced to the Latin characters (woff2).
 
 ====================================================================
-Inter (fonts/inter.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter).
-Licence: SIL Open Font License 1.1 - the full text is in fonts/Inter-OFL.txt.
-Taken from Google Fonts (github.com/google/fonts, ofl/inter): reduced to the Latin characters (woff2).
-
-====================================================================
-Public Sans (fonts/publicsans.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2015 The Public Sans Project Authors (https://github.com/uswds/public-sans).
+Public Sans (fonts/publicsans-italic.woff2, publicsans-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Grotesque)
+Copyright 2015 The Public Sans Project Authors (https://github.com/uswds/public-sans)
 Licence: SIL Open Font License 1.1 - the full text is in fonts/Public-Sans-OFL.txt.
 Taken from Google Fonts (github.com/google/fonts, ofl/publicsans): reduced to the Latin characters (woff2).
 
 ====================================================================
-IBM Plex Sans (fonts/ibmplexsans.woff2), one of the fonts to choose from in ⋮ → Font … (0.16.0)
-Copyright 2017 IBM Corp. with Reserved Font Name "Plex".
+Libre Franklin (fonts/librefranklin-italic.woff2, librefranklin-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Grotesque)
+Copyright 2020 The Libre Franklin Project Authors (https://github.com/googlefonts/Libre-Franklin)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Libre-Franklin-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/librefranklin): reduced to the Latin characters (woff2).
+
+====================================================================
+Schibsted Grotesk (fonts/schibstedgrotesk-italic.woff2, schibstedgrotesk-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Grotesque)
+Copyright 2023 The Schibsted-Grotesk Project Authors (https://github.com/schibsted/schibsted-grotesk)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Schibsted-Grotesk-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/schibstedgrotesk): reduced to the Latin characters (woff2).
+
+====================================================================
+Inter (fonts/inter-italic.woff2, inter-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Neo-grotesque)
+Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Inter-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/inter): reduced to the Latin characters (woff2).
+
+====================================================================
+IBM Plex Sans (fonts/ibmplexsans-italic.woff2, ibmplexsans-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Neo-grotesque)
+Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
 Licence: SIL Open Font License 1.1 - the full text is in fonts/IBM-Plex-Sans-OFL.txt.
-Taken from Google Fonts (github.com/google/fonts, ofl/ibmplexsans): the unchanged font, only packed as woff2 (the name 'Plex' is reserved, so the font is not reduced).
+Taken from Google Fonts (github.com/google/fonts, ofl/ibmplexsans): the unchanged font, only packed as woff2 (its name is reserved, so the font is not reduced).
+
+====================================================================
+Hanken Grotesk (fonts/hankengrotesk-italic.woff2, hankengrotesk-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Neo-grotesque)
+Copyright 2021 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Hanken-Grotesk-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/hankengrotesk): reduced to the Latin characters (woff2).
+
+====================================================================
+Nunito (fonts/nunito-italic.woff2, nunito-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Rounded)
+Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Nunito-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/nunito): reduced to the Latin characters (woff2).
+
+====================================================================
+SN Pro (fonts/snpro-italic.woff2, snpro-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Rounded)
+Copyright 2024 The SN Pro Project Authors (https://github.com/supernotes/sn-pro)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/SN-Pro-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/snpro): reduced to the Latin characters (woff2).
+
+====================================================================
+Asap (fonts/asap-italic.woff2, asap-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Rounded)
+Copyright 2018 The Asap Project Authors (https://github.com/Omnibus-Type/Asap)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Asap-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/asap): reduced to the Latin characters with the width fixed at 100 (woff2).
+
+====================================================================
+Exo 2 (fonts/exo2-italic.woff2, exo2-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Superellipse)
+Copyright 2013 The Exo 2 Project Authors (https://github.com/googlefonts/Exo-2.0)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Exo-2-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/exo2): reduced to the Latin characters (woff2).
+
+====================================================================
+Bai Jamjuree (fonts/baijamjuree-bold.woff2, baijamjuree-bolditalic.woff2, baijamjuree-italic.woff2, baijamjuree-light.woff2, baijamjuree-medium.woff2, baijamjuree-regular.woff2, baijamjuree-semibold.woff2), one of the fonts to choose from in ⋮ → Font … (Superellipse)
+Copyright 2018 Bai Jamjuree (https://github.com/cadsondemak/Bai-Jamjuree)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Bai-Jamjuree-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/baijamjuree): reduced to the Latin characters (woff2).
+
+====================================================================
+Saira (fonts/saira-italic.woff2, saira-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Superellipse)
+Copyright 2020 The Saira Project Authors (https://github.com/Omnibus-Type/Saira)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Saira-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/saira): reduced to the Latin characters with the width fixed at 100 (woff2).
+
+====================================================================
+Amarna (fonts/amarna-italic.woff2, amarna-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Glyphic)
+Copyright 2025 The Amarna Project Authors (https://github.com/ijvanl/Amarna)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Amarna-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/amarna): reduced to the Latin characters (woff2).
+
+====================================================================
+Libertinus Sans (fonts/libertinussans-bold.woff2, libertinussans-italic.woff2, libertinussans-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Glyphic)
+Copyright 2025 The Libertinus Sans Project Authors (https://github.com/googlefonts/libertinus)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Libertinus-Sans-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/libertinussans): reduced to the Latin characters (woff2).
+
+====================================================================
+Philosopher (fonts/philosopher-bold.woff2, philosopher-bolditalic.woff2, philosopher-italic.woff2, philosopher-regular.woff2), one of the fonts to choose from in ⋮ → Font … (Glyphic)
+Copyright 2011 The Philosopher Project Authors (https://github.com/alexeiva/philosopher)
+Licence: SIL Open Font License 1.1 - the full text is in fonts/Philosopher-OFL.txt.
+Taken from Google Fonts (github.com/google/fonts, ofl/philosopher): reduced to the Latin characters (woff2).

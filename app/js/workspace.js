@@ -1234,8 +1234,8 @@
     var s = selected(), tb = $('#ws-toolbar');
     var rg = range(), nrg = 0;
     if (rg) for (var q = rg.lo; q <= rg.hi; q++) if (s.c.cells[q]) nrg++;
-    var where = s ? '<b>' + esc(s.c.name) + '</b> · ' + (rg ? esc(rowLabel(rg.lo)) + ' to ' + esc(rowLabel(rg.hi)) + ' (' + (rg.hi - rg.lo + 1) + ' rows)' : esc(rowLabel(s.row))) : 'Select a cell';
-    tb.innerHTML = '<div class="sel">' + where + '</div>' +
+    // 0.17.0 (owner): no text naming the selected cell (the panel on the right names the row), not even for marked rows
+    tb.innerHTML = '' +
       '<button class="ws-tb" data-act="gap"' + (s ? '' : ' disabled') + ' title="Inserts empty cells ABOVE the selected cell: this cell and everything below it in this copy move down. Book Compare asks how many.">Insert gap above …</button>' +
       '<button class="ws-tb" data-act="closegap"' + (s && !s.key ? '' : ' disabled') + ' title="Select an empty cell: it is removed and everything below it moves up">Close gap</button>' +
       '<button class="ws-tb" data-act="del"' + ((rg ? nrg : s && s.key) ? '' : ' disabled') + ' title="' + (rg ? 'Removes all the marked rows of this column from the workspace; the pages below move up.' : 'Removes this file from the workspace (for covers, flyleaves, duplicates). Hold Shift and click another cell (or press Shift + arrow) to mark several in one go.') + ' The scan files on your disk are not touched. Undo brings them back.">' + (rg ? 'Delete ' + nrg + ' file' + (nrg === 1 ? '' : 's') : 'Delete file') + '</button>' +
@@ -1268,6 +1268,9 @@
       it('addfiles', 'Add files to this copy …') +
       it('mvl', '&#9664; Move copy to the left', s.ci <= 0) + it('mvr', 'Move copy to the right &#9654;', s.ci >= S.copies.length - 1) +
       it('renamecopy', 'Rename copy …') + it('setref', S.ref === s.c.id ? '★ Is the reference copy' : 'Make it the reference copy', S.ref === s.c.id) +
+      // 0.17.0 (owner): copy 1 and copy 2 of the Compare tab are chosen here (a copy that is already the other one changes places with it)
+      it('mk1', S.pair[0] === s.c.id ? 'Is copy 1' : 'Make it copy 1' + (S.pair[1] === s.c.id ? ' (swaps 1 and 2)' : ''), S.pair[0] === s.c.id) +
+      it('mk2', S.pair[1] === s.c.id ? 'Is copy 2' : 'Make it copy 2' + (S.pair[0] === s.c.id ? ' (swaps 1 and 2)' : ''), S.pair[1] === s.c.id) +
       '<hr><div class="ws-mhead">This row · <span>' + esc(rowLabel(s.row)) + '</span></div>' +
       it('startnum', 'Start numbering at this row …') + it('renamerow', 'Rename this row …') +
       (function () {                                                      // 0.15.0 (owner): for all the marked rows at once
@@ -1401,8 +1404,9 @@
       S.copies.forEach(function (c, ci) {
         var key = c.cells[i] || null, sel = (S.sel.ci === ci && S.sel.row === i) ? ' sel' : (rg && rg.ci === ci && i >= rg.lo && i <= rg.hi ? ' rng' : ''), wst = ' style="width:' + cw(c) + 'px;flex-basis:' + cw(c) + 'px"';
         var pm = c.id === S.pair[0] ? ' p1' : c.id === S.pair[1] ? ' p2' : '';            // (0.16.0: a light tint of the copy's colour, no "1"/"2" in every cell)
-        var dot = isStored(stE, c, i, key) ? '<i class="ws-st" title="Aligned onto the reference copy and stored: comparing it with the reference opens at once"></i>' : '';
-        var pic = '<i class="ico"></i>';
+        // 0.17.0 (owner): a small check mark (not a dot) for a page that is aligned onto the reference copy and stored
+        var dot = isStored(stE, c, i, key) ? '<svg class="ws-st" viewBox="0 0 16 16" width="13" height="13" role="img" aria-label="aligned"><title>Aligned onto the reference copy and stored: comparing it with the reference opens at once</title><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.5l3 3 6-7"/></svg>' : '';
+        var pic = '';                                     // (0.17.0, owner: no grey page symbol before the file name; thumbnails on request)
         if (key && S.thumbs) { var tu = thumbUrlNow(c, key); pic = '<span class="tn" data-mk="' + esc(c.id + '|' + key) + '">' + (tu ? '<img alt="" src="' + tu + '">' : '') + '</span>'; }
         if (key) { n++; cells += '<div class="ws-cell filled' + pm + (lostC[ci] ? ' lostc' : '') + sel + '" draggable="true" data-c="' + ci + '" data-r="' + i + '"' + wst + '>' + pic + '<span class="fn" title="' + esc(key) + '">' + esc(baseName(key)) + '</span>' + dot + '</div>'; }
         else cells += '<div class="ws-cell empty' + pm + sel + '" data-c="' + ci + '" data-r="' + i + '"' + wst + '><span class="gap">no page</span></div>';
@@ -1429,8 +1433,8 @@
   function renderPreview() {
     var tok = ++pvTok, row = S.sel.row, h = '';
     $('#ws-pvtitle').textContent = S.copies.length ? rowLabel(row) : 'Row';
-    var sub = !S.copies.length ? 'Previews appear here.' : S.skip[row] ? 'This row will not be compared.' : 'The same page in every copy. Mark two with “1” and “2”, then compare them.';
-    $('#ws-pvsub').innerHTML = '<span class="txt">' + esc(sub) + '</span>' + (S.copies.length > 1 ? '<button class="ws-tb" data-act="swap" title="Swap copy 1 and copy 2">⇄ Swap 1 and 2</button>' : '');
+    var sub = !S.copies.length ? 'Previews appear here.' : S.skip[row] ? 'This row will not be compared.' : 'The same page in every copy. Mark two with “1” and “2” (or right-click a copy → Make it copy 1 / copy 2), then compare them.';
+    $('#ws-pvsub').innerHTML = '<span class="txt">' + esc(sub) + '</span>';      // (0.17.0, owner: no "Swap 1 and 2" button)
     S.copies.forEach(function (c, ci) {
       var key = c.cells[row] || null;
       if (!key) { h += '<div class="ws-th miss"><div class="pg">no page in this copy</div><div class="nm">' + esc(c.name) + '</div></div>'; return; }
@@ -1814,6 +1818,7 @@
       item('open', 'Open project …') + item('new', 'New project') +
       (lost ? item('reconnect', 'Choose scan folder again …') : '') +
       item('stored', 'Stored alignments …', !proj.target || !!S.examples, proj.target ? '' : 'Save the project as a file first: the stored alignments are kept inside it') +
+      (HELPER ? item('report', 'Alignment report …', !proj.target || !!S.examples, 'A file about the stored alignments of this project, with pictures of the pages where most is left over (0.17.0)') : '') +
       item('start', 'Back to the start screen');
     if (!cmp) h += '<hr><div class="ws-mhead">Grid</div>' +
       item('folio', S.folio ? 'Switch to pagination (Page 1, Page 2 …)' : 'Switch to foliation (1r, 1v, 2r …)') +
@@ -1846,24 +1851,30 @@
     if (root) renderMenu();
   }
   function fontDialog() {
+    // 0.17.0 (owner): Google's seven kinds of sans-serif fonts, three of each, every one with a bold and an italic (shown in the sample)
     var groups = [['humanist', 'Humanist', 'shaped like handwriting with a broad pen: open and lively'],
-                  ['geometric', 'Geometric', 'built from circles and straight lines: round and even'],
-                  ['grotesque', 'Grotesque', 'plain and neutral, in the tradition of Helvetica'],
+                  ['geometric', 'Geometric', 'built from circles and straight lines'],
+                  ['grotesque', 'Grotesque', 'like the first sans-serif type of the 19th century: plain, a little irregular'],
+                  ['neogrotesque', 'Neo-grotesque', 'smooth and neutral, like Helvetica (1950s)'],
+                  ['rounded', 'Rounded', 'with rounded ends: soft and friendly'],
+                  ['superellipse', 'Superellipse', 'curves between a circle and a square: technical'],
+                  ['glyphic', 'Glyphic', 'strokes that widen at the ends, like letters cut in stone'],
                   ['earlier', 'Used before in Book Compare', '']];
-    var notes = { roboto: 'the standard font of Book Compare', garamond: 'a font with serifs (tried in 0.15.0)' };
+    var notes = { roboto: 'the standard font', garamond: 'with serifs (tried in 0.15.0)' };
     var cur = currentFont(), h = '<h3>Font</h3><p>All the text of Book Compare is set in the font you choose; the change is shown at once. All these fonts are free for any use.</p><div class="ws-fonts">';
     groups.forEach(function (g) {
       var fs = fontList().filter(function (f) { return f.group === g[0]; }); if (!fs.length) return;
-      h += '<div class="ws-fgroup"><div class="ws-fghead"><b>' + g[1] + '</b>' + (g[2] ? ' · ' + g[2] : '') + '</div>';
+      h += '<div class="ws-fgroup"><div class="ws-fghead"><b>' + g[1] + '</b>' + (g[2] ? ' · ' + g[2] : '') + '</div><div class="ws-fopts">';
       fs.forEach(function (f) {
         h += '<label class="ws-fopt"><input type="radio" name="ws-font" value="' + f.id + '"' + (f.id === cur ? ' checked' : '') + '>' +
-          '<span class="ws-fname" style=\'' + fontStyle(f.id) + '\'>' + esc(f.name) + '</span>' +
-          '<span class="ws-fsamp" style=\'' + fontStyle(f.id) + '\'>' + (notes[f.id] ? esc(notes[f.id]) : 'Copy 1 · Folio 19v · 12 of 340 pages') + '</span></label>';
+          '<span class="ws-ftxt" style=\'' + fontStyle(f.id) + '\'><span class="ws-fname">' + esc(f.name) + '</span>' +
+          '<span class="ws-fsamp">' + (notes[f.id] ? esc(notes[f.id]) : 'Folio 19v · <b>Copy 1</b> · <i>12 of 340</i>') + '</span></span></label>';
       });
-      h += '</div>';
+      h += '</div></div>';
     });
     h += '</div><div class="acts"><button class="ws-tb primary" data-close>Done</button></div>';
     var sc = modal(h);
+    var dlg = sc.querySelector('.ws-dlg'); if (dlg) dlg.classList.add('ws-dlg-fonts');
     sc.querySelector('.ws-fonts').addEventListener('change', function (e) { if (e.target.name === 'ws-font') setFont(e.target.value); });
     var c = sc.querySelector('input[name=ws-font]:checked'); if (c) c.focus();
   }
@@ -1898,6 +1909,7 @@
     else if (m === 'licenses') { var a = document.createElement('a'); a.href = 'licenses.txt'; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
     else if (m === 'about') aboutDialog();
     else if (m === 'font') fontDialog();
+    else if (m === 'report') { if (window.BCAlignReport) BCAlignReport.open(); }
     else if (m === 'updates') { if (updInfo.state === 'newer') { showUpdateCard(true); updateNow(); } else checkUpdatesNow(); }
   }
   // item 28: how much room the stored alignments take, and removing those that are no longer needed (pages that left the grid, an older
@@ -2332,6 +2344,12 @@
       case 'cmpref': closeCellMenu(); if (s) compareWithRef(s.ci, s.row); return;
       case 'renamecopy': { closeCellMenu(); if (!s) return; var hn = root.querySelector('.ws-hname[data-c="' + s.ci + '"]'); if (hn) hn.click(); return; }
       case 'renamerow': { closeCellMenu(); if (!s) return; var lb = root.querySelector('.ws-lbl[data-r="' + s.row + '"] b'); if (lb) startRename(lb, function () { return rowLabel(s.row); }, function (v) { S.labels[s.row] = v; }); return; }
+      case 'mk1': case 'mk2':
+        closeCellMenu(); if (!s) return;
+        var slot = a.dataset.act === 'mk1' ? 0 : 1, oth = 1 - slot;
+        if (S.pair[slot] === s.c.id) return;
+        if (S.pair[oth] === s.c.id) S.pair[oth] = S.pair[slot];                     // it was the other one: the two change places
+        S.pair[slot] = s.c.id; touch(); renderAll(); toast('“' + s.c.name + '” is copy ' + (slot + 1) + ' now.'); return;
       case 'setref': closeCellMenu(); if (s && S.ref !== s.c.id) { commit(); S.ref = s.c.id; changed(); toast('“' + s.c.name + '” is the reference copy now.', true); } return;
       case 'del': closeCellMenu(); return deleteSelected();
       case 'remove':
@@ -2500,7 +2518,7 @@
     var ti = root && $('#ws-title'); if (!ti) return;
     var cs = getComputedStyle(ti), txt = ti.value || ti.placeholder || '';
     fitCv = fitCv || document.createElement('canvas');
-    var x = fitCv.getContext('2d'); x.font = (ti.value ? '' : 'italic ') + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    var x = fitCv.getContext('2d'); x.font = ti.value ? cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily : 'italic 400 15px ' + cs.fontFamily;
     ti.style.width = Math.round(Math.max(120, Math.min(430, x.measureText(txt).width + 22))) + 'px';
   }
   /* ---------------------------------------------------------------- showing and hiding the layer */
@@ -2509,11 +2527,13 @@
     root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Copies and pages'); root.tabIndex = -1;
     root.innerHTML =
       // one top bar for both views (items 13-16): name, project name, save state, the two tabs, help and the one menu
-      '<div class="ws-top"><div class="ws-brand">Book Compare</div>' +
+      // 0.17.0 (owner): no "Book Compare" (the window's title says it): the project's name first, large and bold; the background
+      // alignment's progress follows it; the save state sits on the right, next to the tabs, which are a clear switch with icons
+      '<div class="ws-top">' +
       '<input class="ws-title" id="ws-title" type="text" maxlength="160" spellcheck="false" autocomplete="off" aria-label="Name of the project" title="Name of the project (shown here and in the Compare tab; it is also proposed as the name of the project file)" placeholder="Name of the project, e.g. ' + TITLE_EXAMPLE + '">' +
-      '<button class="ws-save" id="ws-save" data-act="savechip"></button><div class="ws-sp"></div>' +
-      '<div class="bc-bgprog" id="ws-bgprog" hidden></div>' +                         // (0.16.0: how far the background alignment is)
-      '<div class="ws-tabs" role="tablist"><button class="ws-tab" role="tab" aria-selected="true" tabindex="-1">Pages</button><button class="ws-tab" role="tab" aria-selected="false" id="ws-compare" data-act="compare" title="Compare the two pages marked “1” and “2”">Compare</button></div>' +
+      '<div class="bc-bgprog" id="ws-bgprog" hidden></div><div class="ws-sp"></div>' +
+      '<button class="ws-save" id="ws-save" data-act="savechip"></button>' +
+      '<div class="ws-tabs bc-tabs" role="tablist"><button class="ws-tab" role="tab" aria-selected="true" tabindex="-1"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h8v8h-8v-8zm2 2v4h4v-4h-4z"/></svg><span>Pages</span></button><button class="ws-tab" role="tab" aria-selected="false" id="ws-compare" data-act="compare" title="Compare the two pages marked “1” and “2”"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4v2h2V1H9v2zm0 15H5l4-5v5zm10-15h-5v2h5v13l-5-6v9h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg><span>Compare</span></button></div>' +
       '<button class="ws-icon" data-act="help" aria-label="Help: how this screen works" title="How this screen works">?</button>' +
       '<button class="ws-icon ws-dots" id="ws-more" data-act="more" aria-label="Menu" aria-haspopup="true" title="Menu: project, export, help">&#8942;</button>' +
       '<div class="ws-menu" id="ws-menu" role="menu" hidden></div></div>' +

@@ -111,6 +111,12 @@ with sync_playwright() as p:
     assert read_project(pg)['title'] == 'Liber selectarum cantionum · Grimm & Wirsung, Augsburg 1520'
     pg.keyboard.press('Control+z'); pg.wait_for_timeout(200); assert pg.input_value('#ws-title').startswith('Liber'), 'the grid undo leaves the name alone'
     pg.keyboard.press('Control+y'); pg.wait_for_timeout(200)
+    # 0.17.0 (owner): no "Book Compare" in the top bar - the project's name comes first, large and bold; the two tabs stand out, with icons
+    top = pg.evaluate("""(() => { const t = document.querySelector('#ws .ws-top'), n = document.getElementById('ws-title'), cs = getComputedStyle(n);
+        return { text: t.innerText, first: t.firstElementChild === n, w: +cs.fontWeight, px: parseFloat(cs.fontSize),
+                 tabs: [...t.querySelectorAll('.ws-tab')].map(b => [!!b.querySelector('svg'), b.innerText.trim()]), brand: !!t.querySelector('.ws-brand') }; })()""")
+    assert 'Book Compare' not in top['text'] and top['first'] and not top['brand'] and top['w'] >= 600 and top['px'] >= 18, top
+    assert top['tabs'] == [[True, 'Pages'], [True, 'Compare']], top['tabs']
     # N6: the first column (row names) can be made wider and narrower, like the others; a double-click fits the names
     lw = lambda: pg.evaluate("document.querySelector('#ws .ws-corner').getBoundingClientRect().width")
     w0 = lw(); bb = pg.locator('#ws .ws-rz[data-c=lbl]').bounding_box(); x = bb['x'] + bb['width'] / 2; y = bb['y'] + bb['height'] / 2
@@ -146,6 +152,21 @@ with sync_playwright() as p:
     for ci, cid in enumerate(ids):
         n_ = sum(1 for r in range(rc) if pg.evaluate("([c, r]) => !!BookWorkspace.tab.cellKey(c, r)", [cid, r]))
         assert (('%d files in grid' % n_) in metas[ci]) == (n_ < rc), (ci, n_, rc, metas[ci])
+    # 0.17.0 (owner): copy 1 and copy 2 are chosen with the right mouse button on a cell or a column head; a copy that is already the
+    # other one changes places with it; no "Swap 1 and 2" button in the preview any more
+    assert 'Swap' not in pg.inner_text('#ws-pvsub') and pg.locator('#ws-pvsub button').count() == 0
+    i3 = [i for i in range(len(ids)) if i not in (i1, i2)][0]
+    pair = lambda: pg.evaluate("BookWorkspace.tab.state().pair")
+    pg.locator('#ws .ws-hcell[data-c="%d"]' % i3).click(button='right'); pg.wait_for_timeout(120)
+    assert pg.inner_text('#ws-ctx [data-act=mk2]') == 'Make it copy 2' and pg.is_enabled('#ws-ctx [data-act=mk2]'); pg.click('#ws-ctx [data-act=mk2]'); pg.wait_for_timeout(200)
+    assert pair() == [ids[i1], ids[i3]] and 'is copy 2 now' in pg.inner_text('#ws-toast'), pair()
+    assert pg.locator('#ws .ws-hcell[data-c="%d"] .ws-hpm' % i3).inner_text() == '2' and pg.locator('#ws .ws-hcell[data-c="%d"] .ws-hpm' % i2).count() == 0
+    cell(i3, 0).click(button='right'); pg.wait_for_timeout(120)
+    assert pg.inner_text('#ws-ctx [data-act=mk1]') == 'Make it copy 1 (swaps 1 and 2)' and pg.is_disabled('#ws-ctx [data-act=mk2]'); pg.click('#ws-ctx [data-act=mk1]'); pg.wait_for_timeout(200)
+    assert pair() == [ids[i3], ids[i1]], ('swapped', pair())
+    pg.keyboard.press('Control+z'); pg.wait_for_timeout(200); pg.keyboard.press('Control+z'); pg.wait_for_timeout(200)
+    if pair() != [ids[i1], ids[i2]]: pg.evaluate("(p) => { BookWorkspace.tab.setCopy(0, p[0]); BookWorkspace.tab.setCopy(1, p[1]); }", [ids[i1], ids[i2]])
+    assert pair() == [ids[i1], ids[i2]], pair()
     # 0.16.0 (owner): the text of the program cannot be selected, only what one types
     assert pg.evaluate("getComputedStyle(document.querySelector('#ws .ws-lbl b')).userSelect") == 'none' and pg.evaluate("getComputedStyle(document.querySelector('#ws-title')).userSelect") != 'none'
     # deleting a file: gone from the workspace, no "set aside" tray, the scan itself is untouched

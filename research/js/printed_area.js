@@ -224,11 +224,14 @@ function extendBoxByStaves(box, ref, gapFrac = 0.03) {
    the band up to `up` (12 %) of the height above the box and `down` (6 %) below it; only pieces whose middle lies across the width of the box,
    that do not run into the sides of the band (a sliver of the next page, a page edge), and that are text-sized (not dust: 21 px high or 300 px
    of ink); a round or oval stamp (a large hollow ring) is left out with everything inside it. A piece joins while it lies within `gap` (4.5 % of the height) of the box or of a piece already taken, so a far-away mark does not.
+   0.17.0 (Winterburger, D-Mbs: the signature "c ii" sat across the lower edge and was cut in two, the part outside too small to count): a mark
+   that lies across the edge of the box is taken whole (the band starts `ov` = 1.2 % of the height inside the box; only pieces that reach out of
+   it count). Tried on 63 staged scans: 16 boxes changed by 9-37 px, every change took in a cut mark or a last line.
    Returns { box, top, bottom } (top / bottom: how many pixels were added there). */
 function extendBoxByHeadLines(cv, box, dark, o = {}) {
   const up = o.up != null ? o.up : 0.12, down = o.down != null ? o.down : 0.06, gapF = o.gap != null ? o.gap : 0.045;
   const W = dark.cols, H = dark.rows, [bx0, by0, bx1, by1] = box;
-  const tol = Math.round(0.03 * W), gap = Math.round(gapF * H), ex = Math.round(0.02 * W), ey = Math.round(0.02 * H), minH = Math.round(0.007 * H);
+  const ov = Math.round(0.012 * H), tol = Math.round(0.03 * W), gap = Math.round(gapF * H), ex = Math.round(0.02 * W), ey = Math.round(0.02 * H), minH = Math.round(0.007 * H);
   const zx0 = Math.max(ex, bx0 - tol), zx1 = Math.min(W - ex, bx1 + tol), zw = zx1 - zx0;
   if (zw < 100) return { box, top: 0, bottom: 0 };
   const S = scope();
@@ -264,7 +267,7 @@ function extendBoxByHeadLines(cv, box, dark, o = {}) {
     let nx0 = bx0, ny0 = by0, nx1 = bx1, ny1 = by1;
     // above
     {
-      const P = pieces(Math.max(ey, by0 - Math.round(up * H)), by0), used = new Set();
+      const P = pieces(Math.max(ey, by0 - Math.round(up * H)), Math.min(by1, by0 + ov)).filter(p => p.y0 < by0 - 2), used = new Set();   // 0.17.0: a mark across the edge is taken whole
       let cur = by0, moved = true, area = 0;
       while (moved) { moved = false; for (let i = 0; i < P.length; i++) if (!used.has(i) && P[i].y1 >= cur - gap) { used.add(i); area += P[i].a; if (P[i].y0 < cur) { cur = P[i].y0; moved = true; } } }
       if (used.size && area >= 250 && cur < by0) {
@@ -274,7 +277,7 @@ function extendBoxByHeadLines(cv, box, dark, o = {}) {
     }
     // below
     {
-      const P = pieces(by1, Math.min(H - ey, by1 + Math.round(down * H))), used = new Set();
+      const P = pieces(Math.max(by0, by1 - ov), Math.min(H - ey, by1 + Math.round(down * H))).filter(p => p.y1 > by1 + 2), used = new Set();
       let cur = by1, moved = true, area = 0;
       while (moved) { moved = false; for (let i = 0; i < P.length; i++) if (!used.has(i) && P[i].y0 <= cur + gap) { used.add(i); area += P[i].a; if (P[i].y1 > cur) { cur = P[i].y1; moved = true; } } }
       if (used.size && area >= 250 && cur > by1) {

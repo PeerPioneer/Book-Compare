@@ -12,15 +12,16 @@
     <title>Book Compare</title>
     <script>
       // The font of Book Compare (0.16.0, owner): Roboto unless another one was chosen in ⋮ → Font … ("bookcompare_font" in this
-      // browser's storage). The list is used by that window too (js/workspace.js); fsa = font-size-adjust when not 0.52 (as in the CSS below).
+      // browser's storage). The list is used by that window too (js/workspace.js); fsa = font-size-adjust when not 0.52 (as in the CSS below; generated, 0.17.0).
       // Set before anything is drawn.
       window.BC_FONTS = [
-        { id: "source-sans", name: "Source Sans 3", group: "humanist", fsa: 0.50 }, { id: "fira-sans", name: "Fira Sans", group: "humanist" },
-        { id: "alegreya-sans", name: "Alegreya Sans", group: "humanist", fsa: 0.49 },
-        { id: "figtree", name: "Figtree", group: "geometric", fsa: 0.51 }, { id: "dm-sans", name: "DM Sans", group: "geometric" },
-        { id: "jost", name: "Jost", group: "geometric", fsa: 0.49 },
-        { id: "inter", name: "Inter", group: "grotesque" }, { id: "public-sans", name: "Public Sans", group: "grotesque" },
-        { id: "ibm-plex-sans", name: "IBM Plex Sans", group: "grotesque" },
+        { id: "source-sans", name: "Source Sans 3", group: "humanist", fsa: 0.50 }, { id: "fira-sans", name: "Fira Sans", group: "humanist" }, { id: "alegreya-sans", name: "Alegreya Sans", group: "humanist", fsa: 0.49 },
+        { id: "figtree", name: "Figtree", group: "geometric", fsa: 0.51 }, { id: "dm-sans", name: "DM Sans", group: "geometric" }, { id: "jost", name: "Jost", group: "geometric", fsa: 0.49 },
+        { id: "public-sans", name: "Public Sans", group: "grotesque" }, { id: "libre-franklin", name: "Libre Franklin", group: "grotesque" }, { id: "schibsted-grotesk", name: "Schibsted Grotesk", group: "grotesque" },
+        { id: "inter", name: "Inter", group: "neogrotesque" }, { id: "ibm-plex-sans", name: "IBM Plex Sans", group: "neogrotesque" }, { id: "hanken-grotesk", name: "Hanken Grotesk", group: "neogrotesque", fsa: 0.50 },
+        { id: "nunito", name: "Nunito", group: "rounded", fsa: 0.50 }, { id: "sn-pro", name: "SN Pro", group: "rounded", fsa: 0.50 }, { id: "asap", name: "Asap", group: "rounded" },
+        { id: "exo-2", name: "Exo 2", group: "superellipse", fsa: 0.50 }, { id: "bai-jamjuree", name: "Bai Jamjuree", group: "superellipse", fsa: 0.51 }, { id: "saira", name: "Saira", group: "superellipse" },
+        { id: "amarna", name: "Amarna", group: "glyphic", fsa: 0.51 }, { id: "libertinus-sans", name: "Libertinus Sans", group: "glyphic", fsa: 0.49 }, { id: "philosopher", name: "Philosopher", group: "glyphic", fsa: 0.49 },
         { id: "roboto", name: "Roboto", group: "earlier" }, { id: "garamond", name: "EB Garamond", group: "earlier" }
       ];
       try {
@@ -139,56 +140,76 @@
         font-feature-settings: "liga";
       }
 
-      /* https://google-webfonts-helper.herokuapp.com/fonts/roboto?subsets=latin */
-      /* roboto-300 - latin */
-      @font-face {
-        font-family: "Roboto";
-        font-style: normal;
-        font-weight: 300;
-        src: local("Roboto-Light"),
-          url("fonts/roboto-300.woff2") format("woff2"); /* Chrome 26+, Opera 23+, Firefox 39+ */
-      }
-      /* roboto-regular - latin */
-      @font-face {
-        font-family: "Roboto";
-        font-style: normal;
-        font-weight: 400;
-        src: local("Roboto"), local("Roboto-Regular"),
-          url("fonts/roboto-regular.woff2") format("woff2"); /* Chrome 26+, Opera 23+, Firefox 39+ */
-      }
-      /* roboto-500 - latin */
-      @font-face {
-        font-family: "Roboto";
-        font-style: normal;
-        font-weight: 500;
-        src: local("Roboto-Medium"),
-          url("fonts/roboto-500.woff2") format("woff2"); /* Chrome 26+, Opera 23+, Firefox 39+ */
-      }
-      /* The fonts to choose from (0.16.0, owner: ⋮ → Font …). Roboto above is the standard; data-bcfont on <html> (set by the small
-         script at the top of <head>) switches all text to another one. All are free for any use (SIL Open Font License 1.1, the texts
-         are in fonts/), from Google Fonts (github.com/google/fonts): three of each of Google's sans-serif styles, plus EB Garamond (0.15.0).
-         font-size-adjust lets each appear about as large as Roboto (their small letters have different heights; fonts with very small ones are
-         enlarged a little less, as their letters are wider); icons keep their font. */
+      /* Roboto, the standard font: all weights and the italic (0.17.0, owner: every font with a real bold and italic; until 0.16.0 only
+         300, 400 and 500 were here and bold was drawn thicker by the browser). From Google Fonts (ofl/roboto), width fixed at 100,
+         reduced to the Latin characters. */
+      @font-face { font-family: "Roboto"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/roboto-regular.woff2") format("woff2"); }
+      @font-face { font-family: "Roboto"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/roboto-italic.woff2") format("woff2"); }
       /* 0.16.0 (owner): the text of Book Compare cannot be selected (it is a program, not a page); where one types, it can */
       body, body * { -webkit-user-select: none; user-select: none; }
       input, textarea, [contenteditable], [contenteditable] * { -webkit-user-select: text; user-select: text; }
-      @font-face { font-family: "BC Source Sans 3"; font-weight: 200 900; font-display: swap; src: url("fonts/sourcesans3.woff2") format("woff2"); }
-      @font-face { font-family: "BC Fira Sans"; font-weight: 400; font-display: swap; src: url("fonts/firasans-regular.woff2") format("woff2"); }
-      @font-face { font-family: "BC Fira Sans"; font-weight: 500; font-display: swap; src: url("fonts/firasans-medium.woff2") format("woff2"); }
-      @font-face { font-family: "BC Fira Sans"; font-weight: 600; font-display: swap; src: url("fonts/firasans-semibold.woff2") format("woff2"); }
-      @font-face { font-family: "BC Fira Sans"; font-weight: 700 900; font-display: swap; src: url("fonts/firasans-bold.woff2") format("woff2"); }
-      @font-face { font-family: "BC Alegreya Sans"; font-weight: 400; font-display: swap; src: url("fonts/alegreyasans-regular.woff2") format("woff2"); }
-      @font-face { font-family: "BC Alegreya Sans"; font-weight: 500 600; font-display: swap; src: url("fonts/alegreyasans-medium.woff2") format("woff2"); }
-      @font-face { font-family: "BC Alegreya Sans"; font-weight: 700 900; font-display: swap; src: url("fonts/alegreyasans-bold.woff2") format("woff2"); }
-      @font-face { font-family: "BC Figtree"; font-weight: 300 900; font-display: swap; src: url("fonts/figtree.woff2") format("woff2"); }
-      @font-face { font-family: "BC DM Sans"; font-weight: 100 1000; font-display: swap; src: url("fonts/dmsans.woff2") format("woff2"); }
-      @font-face { font-family: "BC Jost"; font-weight: 100 900; font-display: swap; src: url("fonts/jost.woff2") format("woff2"); }
-      @font-face { font-family: "BC Inter"; font-weight: 100 900; font-display: swap; src: url("fonts/inter.woff2") format("woff2"); }
-      @font-face { font-family: "BC Public Sans"; font-weight: 100 900; font-display: swap; src: url("fonts/publicsans.woff2") format("woff2"); }
-      @font-face { font-family: "BC IBM Plex Sans"; font-weight: 100 700; font-display: swap; src: url("fonts/ibmplexsans.woff2") format("woff2"); }
+      @font-face { font-family: "BC Source Sans 3"; font-style: normal; font-weight: 200 900; font-display: swap; src: url("fonts/sourcesans3-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Source Sans 3"; font-style: italic; font-weight: 200 900; font-display: swap; src: url("fonts/sourcesans3-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: normal; font-weight: 300; font-display: swap; src: url("fonts/firasans-light.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/firasans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/firasans-medium.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/firasans-semibold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/firasans-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/firasans-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Fira Sans"; font-style: italic; font-weight: 700; font-display: swap; src: url("fonts/firasans-bolditalic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-style: normal; font-weight: 300; font-display: swap; src: url("fonts/alegreyasans-light.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/alegreyasans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/alegreyasans-medium.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/alegreyasans-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/alegreyasans-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Alegreya Sans"; font-style: italic; font-weight: 700; font-display: swap; src: url("fonts/alegreyasans-bolditalic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Figtree"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("fonts/figtree-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Figtree"; font-style: italic; font-weight: 300 900; font-display: swap; src: url("fonts/figtree-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC DM Sans"; font-style: normal; font-weight: 100 1000; font-display: swap; src: url("fonts/dmsans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC DM Sans"; font-style: italic; font-weight: 100 1000; font-display: swap; src: url("fonts/dmsans-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Jost"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/jost-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Jost"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/jost-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Public Sans"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/publicsans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Public Sans"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/publicsans-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Libre Franklin"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/librefranklin-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Libre Franklin"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/librefranklin-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Schibsted Grotesk"; font-style: normal; font-weight: 400 900; font-display: swap; src: url("fonts/schibstedgrotesk-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Schibsted Grotesk"; font-style: italic; font-weight: 400 900; font-display: swap; src: url("fonts/schibstedgrotesk-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Inter"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/inter-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Inter"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/inter-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC IBM Plex Sans"; font-style: normal; font-weight: 100 700; font-display: swap; src: url("fonts/ibmplexsans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC IBM Plex Sans"; font-style: italic; font-weight: 100 700; font-display: swap; src: url("fonts/ibmplexsans-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Hanken Grotesk"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/hankengrotesk-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Hanken Grotesk"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/hankengrotesk-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Nunito"; font-style: normal; font-weight: 200 1000; font-display: swap; src: url("fonts/nunito-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Nunito"; font-style: italic; font-weight: 200 1000; font-display: swap; src: url("fonts/nunito-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC SN Pro"; font-style: normal; font-weight: 200 900; font-display: swap; src: url("fonts/snpro-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC SN Pro"; font-style: italic; font-weight: 200 900; font-display: swap; src: url("fonts/snpro-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Asap"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/asap-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Asap"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/asap-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Exo 2"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/exo2-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Exo 2"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/exo2-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: normal; font-weight: 300; font-display: swap; src: url("fonts/baijamjuree-light.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/baijamjuree-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/baijamjuree-medium.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/baijamjuree-semibold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/baijamjuree-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/baijamjuree-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Bai Jamjuree"; font-style: italic; font-weight: 700; font-display: swap; src: url("fonts/baijamjuree-bolditalic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Saira"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/saira-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Saira"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/saira-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Amarna"; font-style: normal; font-weight: 100 700; font-display: swap; src: url("fonts/amarna-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Amarna"; font-style: italic; font-weight: 100 700; font-display: swap; src: url("fonts/amarna-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Libertinus Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/libertinussans-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Libertinus Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/libertinussans-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Libertinus Sans"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/libertinussans-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Philosopher"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/philosopher-regular.woff2") format("woff2"); }
+      @font-face { font-family: "BC Philosopher"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/philosopher-bold.woff2") format("woff2"); }
+      @font-face { font-family: "BC Philosopher"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/philosopher-italic.woff2") format("woff2"); }
+      @font-face { font-family: "BC Philosopher"; font-style: italic; font-weight: 700; font-display: swap; src: url("fonts/philosopher-bolditalic.woff2") format("woff2"); }
       @font-face { font-family: "EB Garamond"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("fonts/eb-garamond.woff2") format("woff2"); }
       @font-face { font-family: "EB Garamond"; font-style: italic; font-weight: 400 800; font-display: swap; src: url("fonts/eb-garamond-italic.woff2") format("woff2"); }
-      html[data-bcfont] *:not(.material-icons) { font-family: var(--bc-font) !important; font-size-adjust: var(--bc-fsa) !important; }
+      html[data-bcfont] *:not(.material-icons, .ws-ftxt *) { font-family: var(--bc-font) !important; font-size-adjust: var(--bc-fsa) !important; }   /* (the font window shows each font in itself) */
       html[data-bcfont] { --mdc-typography-font-family: var(--bc-font); --bc-fsa: 0.52; }
       html[data-bcfont="source-sans"] { --bc-font: "BC Source Sans 3", Roboto, Arial, sans-serif; --bc-fsa: 0.50; }
       html[data-bcfont="fira-sans"] { --bc-font: "BC Fira Sans", Roboto, Arial, sans-serif; }
@@ -196,9 +217,21 @@
       html[data-bcfont="figtree"] { --bc-font: "BC Figtree", Roboto, Arial, sans-serif; --bc-fsa: 0.51; }
       html[data-bcfont="dm-sans"] { --bc-font: "BC DM Sans", Roboto, Arial, sans-serif; }
       html[data-bcfont="jost"] { --bc-font: "BC Jost", Roboto, Arial, sans-serif; --bc-fsa: 0.49; }
-      html[data-bcfont="inter"] { --bc-font: "BC Inter", Roboto, Arial, sans-serif; }
       html[data-bcfont="public-sans"] { --bc-font: "BC Public Sans", Roboto, Arial, sans-serif; }
+      html[data-bcfont="libre-franklin"] { --bc-font: "BC Libre Franklin", Roboto, Arial, sans-serif; }
+      html[data-bcfont="schibsted-grotesk"] { --bc-font: "BC Schibsted Grotesk", Roboto, Arial, sans-serif; }
+      html[data-bcfont="inter"] { --bc-font: "BC Inter", Roboto, Arial, sans-serif; }
       html[data-bcfont="ibm-plex-sans"] { --bc-font: "BC IBM Plex Sans", Roboto, Arial, sans-serif; }
+      html[data-bcfont="hanken-grotesk"] { --bc-font: "BC Hanken Grotesk", Roboto, Arial, sans-serif; --bc-fsa: 0.50; }
+      html[data-bcfont="nunito"] { --bc-font: "BC Nunito", Roboto, Arial, sans-serif; --bc-fsa: 0.50; }
+      html[data-bcfont="sn-pro"] { --bc-font: "BC SN Pro", Roboto, Arial, sans-serif; --bc-fsa: 0.50; }
+      html[data-bcfont="asap"] { --bc-font: "BC Asap", Roboto, Arial, sans-serif; }
+      html[data-bcfont="exo-2"] { --bc-font: "BC Exo 2", Roboto, Arial, sans-serif; --bc-fsa: 0.50; }
+      html[data-bcfont="bai-jamjuree"] { --bc-font: "BC Bai Jamjuree", Roboto, Arial, sans-serif; --bc-fsa: 0.51; }
+      html[data-bcfont="saira"] { --bc-font: "BC Saira", Roboto, Arial, sans-serif; }
+      html[data-bcfont="amarna"] { --bc-font: "BC Amarna", Roboto, Arial, sans-serif; --bc-fsa: 0.51; }
+      html[data-bcfont="libertinus-sans"] { --bc-font: "BC Libertinus Sans", Roboto, Arial, sans-serif; --bc-fsa: 0.49; }
+      html[data-bcfont="philosopher"] { --bc-font: "BC Philosopher", Roboto, Arial, sans-serif; --bc-fsa: 0.49; }
       html[data-bcfont="garamond"] { --bc-font: "EB Garamond", Garamond, "Times New Roman", serif; --bc-fsa: 0.47; }
       /* Disable text transforms in tab */
       .mdc-tab {
@@ -1133,6 +1166,7 @@
     <script defer src="js/project-pack.js"></script>
     <script defer src="js/results-store.js"></script>
     <script defer src="js/background-align.js"></script>
+    <script defer src="js/alignment-report.js"></script>
         <script defer src="js/compare-tab.js"></script>
   </head>
   <body class="mdc-typography">

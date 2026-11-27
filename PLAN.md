@@ -1170,14 +1170,14 @@ with the owner: one theme per round; this round was the interface, the next roun
 | D3-1 | No labels over the pictures (Copy 1, Copy 2, Top and bottom, Left and right); the side panels of Superimposed keep theirs | **done 0.16.0** |
 | D3-2 | Toggle: no label; the name of the copy on screen lights up | **done 0.16.0** |
 | D3-3 | Side panels of Superimposed stay (owner: crucial) | **kept** |
-| D3-4 | "One zoom column": each picture has its own column of zoom buttons; with linked panels one column would do | **explained - waiting for the owner** |
+| D3-4 | "One zoom column": each picture has its own column of zoom buttons; with linked panels one column would do | **done 0.17.0, to try (§11.1i)** |
 | D3-5 | Book map stays | **kept** |
 | D3-6 | Help only through "?" (no "How … works" in the menu) | **done 0.16.0** |
 | D3-7 | Save chip: the state only | **done 0.16.0** |
 | D3-8 | No "x of y pages" under the copy names | **done 0.16.0** |
 | D3-9 | No "Skip pages …" tick box; always skipped | **done 0.16.0** |
 | D3-10 | No "More for this cell" button (right mouse button) | **done 0.16.0** |
-| D3-11 | The selected cell is named twice (toolbar "Copy A · 1v" and the title of the right panel): proposal to drop the toolbar text | **explained - waiting for the owner** |
+| D3-11 | The selected cell is named twice (toolbar "Copy A · 1v" and the title of the right panel): proposal to drop the toolbar text | **done 0.17.0 (§11.1i)** |
 | D3-12 | "2 of 3 copies" and "N files in grid" only when something is missing | **done 0.16.0** |
 | D3-13 | No "3 copies · 6 rows" | **done 0.16.0** |
 | D3-14 | Copy 1 / copy 2 headings in the copy's colour, "★ Name 1"; light tint of the column; no "1"/"2" badges in the cells | **done 0.16.0** |
@@ -1186,6 +1186,30 @@ with the owner: one theme per round; this round was the interface, the next roun
 | D3-17 | No "Reference copy …" in the menu; a window when the Compare tab opens without a reference copy (explains it, proposes one, "Don't warn me again in this project") | **done 0.16.0** |
 | D3-18 | "Back to the start screen" stays | **kept** |
 | I1 | Introduction for new users instead of the examples | **after the alignment round: mock-up first** |
+
+### 11.1i The owner's notes of 27 November 2026 (on 0.16.0)
+
+Built 27 Nov 2026 as **version 0.17.0** (details in CHANGELOG.txt), except the items marked *waiting*. New rule from the owner: when Claude
+would do something differently from what he asked, Claude says so first and waits for his yes or no.
+
+| ID | Item | Status |
+|----|------|--------|
+| N36 | Melopoiae p. 4, A-Wn1 / A-Z: the staff lines of A-Z turn wavy. Cause: staff lines and notes stand differently to each other in the two copies; the tiles follow the lines in some places, the notes in others. "Stiffer" does not help; two options tried (research switches, off): smoothing along the rows (BC_HSMOOTH 9 from the 96 px level: lines straighter, all 93 checks that passed still pass, +0.2 points unmatched on matching passages) and "notes first" (BC_NOLINES: lines straight and doubled, notes aligned, but more ink counts as unmatched) | **waiting: the owner chooses** |
+| N37 | Background alignment: copies whose pages were changed in the grid were greyed out ("all aligned") when resuming. A replay with changed pages found the check working | **waiting: when exactly did it happen?** |
+| N38 | Top bar: project name first, large and bold; no "Book Compare"; background progress after the name; save state on the right next to the tabs; tabs with icons that stand out | **done 0.17.0** |
+| F3 | Fonts: Google's seven kinds of sans-serif, three each, every one with bold and italic (glyphic: only Amarna qualifies fully) | **done 0.17.0** |
+| N39 | Left lip and right bar alike; no "Fold away" button in the right panel | **waiting: part of the left-panel mock-ups** |
+| N40 | A click on the page name at the bottom left opens the search of the page list | **waiting: part of the left-panel mock-ups** |
+| N41 | Right mouse button on a cell or column heading: make it copy 1 / copy 2 (swapping); no "Swap 1 and 2" in the preview | **done 0.17.0** |
+| N42 | At least six redesigns of the left panel (copy boxes, the long copy list, the size of "Pages" and the search) | **mock-ups made (Design canvas); waiting for the owner's choice** |
+| N43 | Grey page symbols before the file names removed; check mark instead of the green dot in the grid | **done 0.17.0** (the markers of the Compare tab's page list: **waiting for the owner's yes**) |
+| N44 | One zoom column while the panels are linked | **done 0.17.0, to try** |
+| N45 | No toolbar text for the selected cell or rows | **done 0.17.0** |
+| N30 | Tint (A-Wn1 / D-W p. 13): the paper level is measured on each scan | **done 0.17.0** |
+| N35 | Stored pages: the next one bent ahead, the page just left kept | **done 0.17.0**; more possible: a half-size picture first, the scans decoded ahead |
+| R1 | Alignment report (desktop: ⋮ → Project → "Alignment report …") | **done 0.17.0; the owner runs it on his PC** |
+| N29 | Melopoiae p. 6 (A-Wn1 / D-W): 13 % unmatched, same cause as N36; p. 16: the "middle line removed" not reproduced | **waiting: N36 decision; a screenshot of p. 16** |
+| W1 | Winterburger Antiphonarius (A-Wn, D-Mbs) on the new PC: headlines, folio numbers and signatures inside the printed area; a mark across the edge is now taken whole | **done 0.17.0** |
 
 ### 11.2 After version 1
 

@@ -262,7 +262,10 @@ def scenario(p, kind):
     assert pg.evaluate("getComputedStyle(document.querySelector('#ct_link')).backgroundColor") in ('rgba(0, 0, 0, 0)', 'transparent'), '0.16.0: no coloured background, the symbol says it'
     pg.click('#ct_link'); pg.wait_for_timeout(300)
     assert pg.get_attribute('#ct_link', 'aria-pressed') == 'false' and not pg.evaluate("BCLink.linked()") and pg.evaluate("getComputedStyle(document.querySelector('#ct_link .ct-linkx')).opacity") == '1', 'unlinked: the symbol is crossed out'
+    zc = lambda: pg.evaluate("['pane_main', 'pane_o1', 'pane_o2'].map(id => { const v = document.querySelector('#' + id + ' .pane__vbar'); return !!v && getComputedStyle(v).display !== 'none'; })")      # (the side panels may be folded away: their buttons are judged by display)
+    assert zc() == [True, True, True], ('unlinked: every picture has its own zoom buttons', zc())
     pg.click('#ct_link'); pg.wait_for_timeout(250); assert pg.evaluate("BCLink.linked()")
+    assert zc() == [True, False, False], ('0.17.0 (owner, to try): linked, one column of zoom buttons', zc())
     # the View section folds too, and is remembered
     pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'false' and pg.locator('#ct_vbody').bounding_box()['height'] < 2
     pg.click('#ct_vhead'); pg.wait_for_timeout(350); assert pg.get_attribute('#ct_vhead', 'aria-expanded') == 'true'
@@ -299,10 +302,21 @@ def scenario(p, kind):
     pg.click('#ct_more'); pg.wait_for_timeout(200); assert 'now: Roboto' in pg.inner_text('#ws-fmenu [data-m=font]')
     pg.click('#ws-fmenu [data-m=font]'); pg.wait_for_selector('#ws-float .ws-fonts')
     opts = pg.evaluate("[...document.querySelectorAll('#ws-float input[name=ws-font]')].map(i => i.value)")
-    assert opts == ['source-sans', 'fira-sans', 'alegreya-sans', 'figtree', 'dm-sans', 'jost', 'inter', 'public-sans', 'ibm-plex-sans', 'roboto', 'garamond'], opts
-    assert pg.is_checked('#ws-float input[value=roboto]') and [t.strip().split(' · ')[0].upper() for t in pg.locator('#ws-float .ws-fghead').all_inner_texts()] == ['HUMANIST', 'GEOMETRIC', 'GROTESQUE', 'USED BEFORE IN BOOK COMPARE']
+    # 0.17.0 (owner): Google's seven kinds of sans-serif, three fonts each, every one with a bold and an italic
+    assert opts == ['source-sans', 'fira-sans', 'alegreya-sans', 'figtree', 'dm-sans', 'jost', 'public-sans', 'libre-franklin', 'schibsted-grotesk',
+                    'inter', 'ibm-plex-sans', 'hanken-grotesk', 'nunito', 'sn-pro', 'asap', 'exo-2', 'bai-jamjuree', 'saira',
+                    'amarna', 'libertinus-sans', 'philosopher', 'roboto', 'garamond'], opts
+    assert pg.is_checked('#ws-float input[value=roboto]') and [t.strip().split(' · ')[0].upper() for t in pg.locator('#ws-float .ws-fghead').all_inner_texts()] == ['HUMANIST', 'GEOMETRIC', 'GROTESQUE', 'NEO-GROTESQUE', 'ROUNDED', 'SUPERELLIPSE', 'GLYPHIC', 'USED BEFORE IN BOOK COMPARE']
     fams = pg.evaluate("[...document.querySelectorAll('#ws-float .ws-fname')].map(e => getComputedStyle(e).fontFamily)")
-    assert 'BC Jost' in fams[5] and 'BC Inter' in fams[6] and 'EB Garamond' in fams[10] and fams[9].startswith('Roboto'), fams
+    assert 'BC Jost' in fams[5] and 'BC Inter' in fams[9] and 'BC Philosopher' in fams[20] and 'EB Garamond' in fams[22] and fams[21].startswith('Roboto'), fams
+    # every font has a bold and an italic of its own (not drawn thicker or slanted by the browser)
+    faces = pg.evaluate("""(async () => { const out = {}; for (const f of BC_FONTS) { if (f.id === 'garamond') continue;
+        const fam = f.id === 'roboto' ? 'Roboto' : 'BC ' + f.name;
+        await document.fonts.load('700 16px "' + fam + '"'); await document.fonts.load('italic 400 16px "' + fam + '"');
+        const fs = [...document.fonts].filter(x => x.family.replace(/"/g, '') === fam && x.status === 'loaded');
+        out[f.id] = [fs.some(x => x.style === 'italic'), fs.some(x => x.style !== 'italic' && (x.weight === '700' || /^\\d+ \\d+$/.test(x.weight) && +x.weight.split(' ')[1] >= 700))]; }
+      return out; })()""")
+    assert all(v == [True, True] for v in faces.values()), [k for k, v in faces.items() if v != [True, True]]
     pg.click('#ws-float input[value=inter]'); pg.wait_for_timeout(400)
     assert pg.evaluate("document.documentElement.getAttribute('data-bcfont')") == 'inter' and 'BC Inter' in ff('#ct_where b') and 'BC Inter' in ff('#ct_list li') and pg.evaluate("localStorage.getItem('bookcompare_font')") == 'inter'
     assert 'BC Jost' in pg.evaluate("getComputedStyle(document.querySelectorAll('#ws-float .ws-fname')[5]).fontFamily"), 'the names keep their own fonts'

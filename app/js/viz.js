@@ -98,7 +98,7 @@ const inkLayer = (_ctx, color, lighten = 0) => {
     const pm = document.createElement("canvas");
     pm.width = gw; pm.height = gh;
     const pctx = pm.getContext("2d");
-    const pd = pctx.createImageData(gw, gh);
+    const pd = pctx.createImageData(gw, gh), vcell = new Float32Array(gw * gh);
     for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
         let best = -1;
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -107,6 +107,7 @@ const inkLayer = (_ctx, color, lighten = 0) => {
             best = Math.max(best, cell[y * gw + x]);
         }
         const v = best < 0 ? g : Math.min(1, Math.max(0.8 * g, best));
+        vcell[gy * gw + gx] = v;
         const inv = Math.round((1 - v) * 255), o = (gy * gw + gx) * 4;
         pd.data[o] = pd.data[o + 1] = pd.data[o + 2] = inv; pd.data[o + 3] = 255;
     }
@@ -127,9 +128,25 @@ const inkLayer = (_ctx, color, lighten = 0) => {
     _ctx.drawImage(pm, 0, 0, W, H);
     _ctx.restore();
 
+    // 0.17.0 (owner: "the tint is still fairly strong whatever I do"): how light the paper of THIS scan is, after the paper map is divided
+    // out, decides what still counts as paper. A clean scan keeps the old 0.95; a grainy photo with uneven paper or show-through from the
+    // other side (D-W of the Melopoiae) gets a lower value, so its paper comes out white too. Median and spread of the light pixels.
+    const hp = new Uint32Array(256); let np = 0;
+    for (let y = 0; y < mh; y++) for (let x = 0, o = y * mw; x < mw; x++, o++) {
+        if (!on[o]) continue;
+        const r = Math.min(1, lum[o] / (255 * vcell[Math.floor(y / cs) * gw + Math.floor(x / cs)]));
+        if (r > 0.6) { hp[Math.round(r * 255)]++; np++; }
+    }
+    let pAuto = 0.95;
+    if (np > 100) {
+        let acc = 0, md = 255; for (let v = 0; v < 256; v++) { acc += hp[v]; if (acc >= np / 2) { md = v; break; } }
+        const hd = new Uint32Array(256); for (let v = 0; v < 256; v++) hd[Math.abs(v - md)] += hp[v];
+        let mad = 0; acc = 0; for (let v = 0; v < 256; v++) { acc += hd[v]; if (acc >= np / 2) { mad = v; break; } }
+        pAuto = Math.min(0.95, Math.max(0.6, (md - 3 * 1.4826 * mad) / 255));
+    }
     // stretch so that paper -> white and the darker ink -> full ink strength
     const L = Math.min(Math.max(+lighten || 0, 0), 1);
-    const p = 0.95 - 0.15 * L;                             // light grey (paper texture) counts as paper; "whiter" goes further
+    const p = pAuto - 0.15 * L;                            // light grey (paper texture) counts as paper; "whiter" goes further
     const lo = 0.45 * p;
     const m = 1 / (p - lo);
     const q = -lo * m;

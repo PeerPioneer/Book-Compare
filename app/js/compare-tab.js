@@ -54,10 +54,11 @@
     ui = {};
     ui.top = el('div', 'ct-top ws-vars');
     ui.top.innerHTML =
-      '<div class="ct-brand">Book Compare</div><div class="ct-proj" id="ct_proj"></div><button class="ws-save" id="ct_save"></button><div class="ct-sp"></div>' +
-      '<div class="bc-bgprog" id="ct_bgprog" hidden></div>' +                         // (0.16.0: how far the background alignment is, js/background-align.js)
-      '<div class="ct-tabs" role="tablist"><button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages">Pages</button>' +
-      '<button class="ct-tab" role="tab" aria-selected="true" id="ct_tab_compare" tabindex="-1">Compare</button></div>' +
+      // 0.17.0 (owner): as in the Pages tab - the project's name first (large, bold), then how far the background alignment is
+      // (js/background-align.js); the save state on the right next to the tabs; the tabs a clear switch
+      '<div class="ct-proj" id="ct_proj"></div><div class="bc-bgprog" id="ct_bgprog" hidden></div><div class="ct-sp"></div><button class="ws-save" id="ct_save"></button>' +
+      '<div class="ct-tabs bc-tabs" role="tablist"><button class="ct-tab" role="tab" aria-selected="false" id="ct_tab_pages"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h8v8h-8v-8zm2 2v4h4v-4h-4z"/></svg><span>Pages</span></button>' +
+      '<button class="ct-tab" role="tab" aria-selected="true" id="ct_tab_compare" tabindex="-1"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4v2h2V1H9v2zm0 15H5l4-5v5zm10-15h-5v2h5v13l-5-6v9h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg><span>Compare</span></button></div>' +
       '<button class="ct-iconbtn ct-helpbtn" id="ct_helpbtn" title="How the Compare tab works, and its keys" aria-label="Help: how the Compare tab works, and its keys">?</button>' +
       '<button class="ct-iconbtn ct-dots" id="ct_more" title="Menu: project, export, help" aria-label="Menu" aria-haspopup="true">&#8942;</button>' +
       '<button class="ct-iconbtn" id="ct_focusbtn" title="Focus mode: hide everything except the pictures (Esc leaves it)" aria-label="Focus mode: hide everything except the pictures">' +
@@ -380,7 +381,7 @@
   // the project's name (set in the Pages view) and the save state, as in the top bar there
   function renderTitle() {
     var i = window.BookWorkspace ? BookWorkspace.projectInfo() : {}, p = document.getElementById('ct_proj');
-    if (p) { p.textContent = i.title || i.name || ''; p.title = i.title ? 'Name of the project (change it in the Pages view)' : ''; }
+    if (p) { p.textContent = i.title || i.name || 'Unnamed project'; p.classList.toggle('none', !(i.title || i.name)); p.title = 'Name of the project (change it in the Pages tab)'; }
     renderSaveChip();
   }
   function renderSaveChip() {
@@ -656,7 +657,7 @@
   function markStale() { st.stale = true; ui.rc.classList.add('ct-stale'); if (window.CompareBox) CompareBox.refresh(); if (ui.busy.classList.contains('bad')) setBusy(null); if (ui.mv) ui.mv.hidden = true; var h = document.getElementById('ct_hint'); if (h) h.hidden = true; var w = document.getElementById('ct_warn'); if (w) w.hidden = true; }   // a new wish makes an old message obsolete
   function clearStale() { st.stale = false; ui.rc.classList.remove('ct-stale', 'ct-blank'); }
   // another project (0.12.0, owner): the pictures of the old one are not shown, not even dimmed, until the first page of the new one is ready
-  function forget() { st.shown = null; st.lastTiles = null; if (ui) { ui.rc.classList.add('ct-blank'); foldMenus(); } }       // a project is opened or started
+  function forget() { st.shown = null; st.lastTiles = null; if (typeof bent !== 'undefined') bent.clear(); st.fineKey = null; st.fineRs = null; if (ui) { ui.rc.classList.add('ct-blank'); foldMenus(); } }       // a project is opened or started
 
 
   /* ---------------------------------------------------------------- the views (left panel, 0.14.0) */
@@ -865,6 +866,21 @@
   }
   function preKey(d) { return d.ids ? [d.ids[0], d.keys[0], d.files[0].size, d.files[0].lastModified, d.ids[1], d.keys[1], d.files[1].size, d.files[1].lastModified, JSON.stringify(d.tiles || null), JSON.stringify(d.quad || null), window.BCResults ? BCResults.ENGINE : ''].join('|') : null; }
   var pre = { e: null, ready: false, jobs: 0, cache: new Map(), busy: null };          // the helper that prepares the next page, and what it prepared
+  // 0.17.0 (owner: "a stored alignment should appear nearly at once"): a stored page is not only looked up ahead but already bent in colour
+  // (the slow part: opening the scan of copy 2 and bending it), so that turning to it only has to draw it. One page ahead, one behind.
+  // The page just left is kept the same way (it is already bent), so that going back to it is at once too.
+  var bent = new Map(), BENT_MAX = 3, bentHits = 0;
+  function bentTake(d) { var k = preKey(d), v = k && bent.get(k); if (v) { bent.delete(k); bentHits++; } return v || null; }
+  function scansOf(d) { return d.ids ? [d.ids[0], d.keys[0], d.ids[1], d.keys[1]].join('|') : null; }
+  function keepLeft(d) {                                                                    // the page on screen, before another one is shown
+    var k = preKey(d);                                                                      // (not when the same two scans get another setting: that one replaces it)
+    if (st.fineImg && st.fineKey && st.fineRs && st.fineKey !== k && st.fineScans !== scansOf(d) && !bent.has(st.fineKey)) {
+      var rs = Object.assign({}, st.fineRs, { stored: true });
+      bent.set(st.fineKey, { pixels: st.fineImg.data, w: st.fineImg.width, h: st.fineImg.height, rs: rs });
+      while (bent.size > BENT_MAX) bent.delete(bent.keys().next().value);
+    }
+    st.fineKey = null; st.fineRs = null;
+  }
   var mem = new Map(), MEM_MAX = 8;                                                     // pairs aligned while there is no project file (0.14.0)
   function remember(d, bin) { var k = preKey(d); if (!k || !bin) return; mem.delete(k); mem.set(k, bin); while (mem.size > MEM_MAX) mem.delete(mem.keys().next().value); }
   function preTake(d) { var k = preKey(d), v = k && pre.cache.get(k); if (v) pre.cache.delete(k); return v || null; }
@@ -884,11 +900,18 @@
       try {
         var d = await W().loadRow(i); if (!d || my !== st.token) return;
         d.tiles = W().tileSetting(i, d.ids[1]); d.quad = W().boxSetting(i, d.ids[0]);
-        var k = preKey(d); if (pre.cache.has(k) || mem.has(k)) return;
-        var p = await storeKey(d); if (p && await BCResults.has(p)) return;                       // stored already: nothing to prepare
+        var k = preKey(d); if (pre.cache.has(k) || bent.has(k)) return;
+        var p = await storeKey(d), have = mem.has(k) || (p && await BCResults.has(p));
         if (pre.e && pre.jobs >= MAX_JOBS) { try { pre.e.terminate(); } catch (x) { /* ignore */ } pre.e = null; }
         if (!pre.e) { pre.e = AlignEngine.create(); pre.ready = false; pre.jobs = 0; }
         if (!pre.ready) { await pre.e.init(); pre.ready = true; }
+        if (have) {                                                                             // stored already: bend it in colour now (0.17.0)
+          var bin = mem.has(k) ? mem.get(k) : await BCResults.read(p); if (!bin || my !== st.token) return;
+          var rs = await pre.e.warpStored(d.files[1], bin); pre.jobs++;
+          if (my !== st.token) return;
+          bent.set(k, { pixels: rs.pixels, w: rs.w, h: rs.h, rs: rs }); while (bent.size > BENT_MAX) bent.delete(bent.keys().next().value);
+          return;
+        }
         var r = await pre.e.alignStore(d.files[0], d.ids[0] + '#' + d.keys[0] + '#' + d.files[0].size + '#' + d.files[0].lastModified + '#' + JSON.stringify(d.quad || null), d.files[1], d.tiles, d.quad);
         pre.jobs++;
         if (p) BCResults.save(p, r.bin, { u: r.unmatched_tiles, max: r.max, sparse: !!r.sparse }).catch(function () { });
@@ -906,6 +929,16 @@
     try {
       if (!g.ready) { setBusy('Starting the alignment helper … (the first time, the browser loads about 13 MB)'); await (g.loading || g.e.init()); g.ready = true; }
       if (my !== st.token) return null;
+      keepLeft(d);
+      var ready = bentTake(d);                                                                  // 0.17.0: bent ahead of time (prepareNext)
+      if (ready && my === st.token) {
+        await loading;
+        if (my !== st.token) return null;
+        st.fineImg = new ImageData(new Uint8ClampedArray(ready.pixels), ready.w, ready.h); st.fineNames = d.names;
+        E.compare.show_aligned(d.names, st.fineImg);
+        ready.rs.pixels = null;
+        return ready.rs;
+      }
       var bin = null; try { bin = await stored(d); } catch (x) { bin = null; }
       if (bin && my === st.token) {
         setBusy('Showing the stored alignment …');
@@ -959,7 +992,8 @@
     setPaperNow();
     window.BC_COPY_NAMES = [copyName(0), copyName(1)];                                       // the colour note of the Difference view names the copies (js/panes.js)
     try {
-      if (tiles) { d.tiles = W().tileSetting(s.row, s.pair[1]); d.quad = W().boxSetting(s.row, s.pair[0]); info = await serial(function () { return tileJob(d, my); }); done = !!info; }
+      if (tiles) { d.tiles = W().tileSetting(s.row, s.pair[1]); d.quad = W().boxSetting(s.row, s.pair[0]); info = await serial(function () { return tileJob(d, my); }); done = !!info;
+        if (info && my === st.token) { st.fineKey = preKey(d); st.fineScans = scansOf(d); st.fineRs = info; } }
       else done = await E.compare.align_images(d.urls, d.names, st.transform, function () { return my === st.token; });
     }
     catch (e) {
@@ -1022,7 +1056,7 @@
     isOpen: function () { return st.on; },
     inFocus: function () { return st.on && st.focus; },
     lastTiles: function () { return st.lastTiles || null; },                                 // what the tile alignment of the picture on screen reported (tests)
-    prepared: function () { return { busy: pre.busy, cached: pre.cache.size }; },            // the next page being prepared (tests)
+    prepared: function () { return { busy: pre.busy, cached: pre.cache.size, bent: bent.size, bentHits: bentHits }; },            // the next page being prepared (tests)
     toast: function (t) { if (ui) toast(t); },
     preload: function () { try { preload(); } catch (e) { /* not important */ } },
     titleChanged: function () { if (ui) renderTitle(); },

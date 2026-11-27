@@ -394,9 +394,12 @@
         link_icon.textContent = state.linked ? 'link' : 'link_off';
         link_label.textContent = state.linked ? 'Linked' : 'Unlinked';
     };
+    // 0.17.0 (owner, to try): while the panels are linked, only one picture keeps its column of zoom buttons (they act on all
+    // pictures anyway); see compare-tab.css. Unlinked, every picture has its own again.
+    const mark_linked = () => { const w = el('workspace'); if (w) w.classList.toggle('ws-linked', state.linked); };
     const toggle_link = () => {
         state.linked = !state.linked;
-        show_link_state();
+        show_link_state(); mark_linked();
         if (state.linked) {
             const v = state.last.get_view();
             panes.forEach((p) => {
@@ -406,7 +409,7 @@
         document.dispatchEvent(new CustomEvent('linkchange'));
     };
     link_btn.addEventListener('click', toggle_link);
-    show_link_state();
+    show_link_state(); mark_linked();
     // 0.14.0: the Compare tab has its own button for this in the left panel ("Zoom and move all panels together", js/compare-tab.js)
     window.BCLink = { linked: () => state.linked, toggle: toggle_link };
 

@@ -22,11 +22,11 @@
 
 /* the top bar (the same as in the Compare tab, js/compare-tab.css .ct-top) */
 .ws-top { position: relative; flex: 0 0 46px; height: 46px; display: flex; align-items: center; gap: 12px; padding: 0 12px; margin-bottom: 10px; background: var(--ws-surface); border-bottom: 1px solid var(--ws-line); }
-.ws-brand { font-weight: 500; font-size: 16px; white-space: nowrap; }
-.ws-title { flex: 0 1 auto; width: 430px; min-width: 120px; height: 30px; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; font: inherit; font-size: 13.5px; color: var(--ws-fg); text-overflow: ellipsis; }
+/* 0.17.0 (owner): the project's name is the first thing in the top bar, large and bold (no "Book Compare" before it) */
+.ws-title { flex: 0 1 auto; width: 430px; min-width: 120px; height: 34px; padding: 4px 8px; margin-left: -4px; border: 1px solid transparent; border-radius: 4px; background: transparent; font: inherit; font-size: 18px; font-weight: 600; color: var(--ws-fg); text-overflow: ellipsis; }
 .ws-title:hover { border-color: var(--ws-line); }
 .ws-title:focus { border-color: var(--ws-teal); background: var(--ws-surface); outline: none; }
-.ws-title::placeholder { color: #6b7c7c; font-style: italic; }
+.ws-title::placeholder { color: #6b7c7c; font-style: italic; font-weight: 400; font-size: 15px; }
 .ws-sp { flex: 1; }
 .ws-tabs { display: flex; height: 100%; }
 .ws-tab { border: 0; background: none; font: inherit; font-weight: 500; font-size: 13.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ws-muted); padding: 0 16px; cursor: pointer; border-bottom: 3px solid transparent; }
@@ -51,8 +51,6 @@
 .ws-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; padding: 0 16px 10px; }
 .ws-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .ws-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--ws-surface); border: 1px solid var(--ws-line); border-radius: 6px; padding: 8px 10px; }
-.ws-toolbar .sel { font-size: 13px; color: var(--ws-muted); margin-right: auto; min-width: 160px; }
-.ws-toolbar .sel b { color: var(--ws-fg); font-weight: 500; }
 .ws-tb { background: var(--ws-surface); border: 1px solid var(--ws-line); border-radius: 4px; padding: 6px 8px; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .ws-tb:hover:not(:disabled) { border-color: var(--ws-teal); color: var(--ws-teal); }
 .ws-tb:disabled { opacity: .4; cursor: default; }
@@ -121,7 +119,6 @@
 .ws-cell.ins-top::before, .ws-cell.ins-bot::before { content: ""; position: absolute; left: 0; right: 0; height: 4px; background: var(--ws-teal); z-index: 6; pointer-events: none; }
 .ws-cell.ins-top::before { top: -2px; }
 .ws-cell.ins-bot::before { bottom: -2px; }
-.ws-cell .ico { flex: 0 0 14px; height: 18px; border-radius: 2px; border: 1px solid var(--ws-line); background: var(--ws-line); }
 .ws-cell .fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-family: var(--ws-mono); }
 .ws-cell .gap { font-size: 12px; font-style: italic; }
 .ws-cell.p1 { background: color-mix(in srgb, var(--ws-c1) 7%, var(--ws-surface)); }
@@ -258,7 +255,7 @@
 .ws-menu.ws-ctx button { padding: 7px 16px; }
 .ws-corner .ws-rz { right: -5px; }
 /* a page aligned onto the reference copy and stored (item 21) */
-.ws-cell .ws-st { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ws-teal); margin-left: 4px; box-shadow: 0 0 0 1.5px var(--ws-surface); }
+.ws-cell .ws-st { flex: none; margin-left: 4px; color: #3a9a8f; opacity: .85; }
 
 /* 0.11.0: pictures in the grid (toolbar "Pictures in the grid", kept in the project) */
 .ws-tb.ws-tog { display: inline-flex; align-items: center; gap: 5px; }
@@ -303,17 +300,29 @@
 .bc-bgacts button:hover { border-color: var(--ws-teal); }
 .bc-bgacts button.primary { background: var(--ws-teal); color: #fff; border-color: var(--ws-teal); }
 
-/* 0.16.0 (owner): the font window (⋮ → Font …): every font shown in itself */
-.ws-fonts { display: flex; flex-direction: column; gap: 10px; max-height: min(60vh, 520px); overflow-y: auto; padding-right: 4px; }
-.ws-fghead { font-size: 12.5px; color: var(--ws-muted); margin-bottom: 3px; }
+/* 0.16.0 (owner): the font window (⋮ → Font …): every font shown in itself; 0.17.0: seven kinds, three fonts side by side */
+.ws-dlg.ws-dlg-fonts { width: min(760px, 94vw); max-width: none; }
+.ws-fonts { display: flex; flex-direction: column; gap: 12px; max-height: min(64vh, 640px); overflow-y: auto; padding-right: 4px; }
+.ws-fghead { font-size: 12.5px; color: var(--ws-muted); margin-bottom: 4px; }
 .ws-fghead b { color: var(--ws-fg); font-weight: 500; }
-.ws-dlg label.ws-fopt { flex-direction: row; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 6px; cursor: pointer; color: var(--ws-fg); }
-.ws-dlg label.ws-fopt:hover, .ws-dlg label.ws-fopt:has(input:checked) { background: var(--ws-band); }
-.ws-fopt input { align-self: center; margin: 0; }
-.ws-fname { flex: 0 0 130px; font-size: 15px; }
-.ws-fsamp { font-size: 13px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-fopts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ws-dlg label.ws-fopt { flex-direction: row; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--ws-line-soft); border-radius: 6px; cursor: pointer; color: var(--ws-fg); min-width: 0; }
+.ws-dlg label.ws-fopt:hover { border-color: var(--ws-line); background: var(--ws-band); }
+.ws-dlg label.ws-fopt:has(input:checked) { border-color: var(--ws-teal); background: var(--ws-band); }
+.ws-fopt input { margin: 0; flex: 0 0 auto; }
+.ws-ftxt { display: flex; flex-direction: column; min-width: 0; }
+.ws-fname { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-fsamp { font-size: 12.5px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-fsamp b { font-weight: 700; color: var(--ws-fg); }
 .ws-refwhy { margin: 0 0 8px; padding-left: 20px; }
 .ws-refwhy li { margin-bottom: 4px; }
 .ws-dlg label.ws-nowarn { margin-top: 8px; }
 /* file names stay in a typewriter font whatever font is chosen for the rest (0.16.0) */
 html[data-bcfont] .ws-cell .fn, html[data-bcfont] .ws-th .fnm, html[data-bcfont] .ws-dlg .mono { font-family: var(--ws-mono) !important; font-size-adjust: none !important; }
+
+/* 0.17.0 (owner): the tabs Pages / Compare stand out - a switch with icons, the open tab filled (both tabs' top bars) */
+.bc-tabs { display: flex; align-items: center; height: auto; gap: 2px; padding: 3px; border-radius: 10px; background: #e3eeee; }
+.bc-tabs .ws-tab, .bc-tabs .ct-tab { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 15px; border: 0; border-radius: 7px; background: transparent; color: #2f5a5a; font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .01em; text-transform: none; cursor: pointer; }
+.bc-tabs .ws-tab:hover, .bc-tabs .ct-tab:hover { background: rgba(255, 255, 255, .75); color: #00605c; }
+.bc-tabs .ws-tab[aria-selected="true"], .bc-tabs .ct-tab[aria-selected="true"] { background: #008080; color: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); cursor: default; }
+.bc-tabs svg { flex: 0 0 auto; }

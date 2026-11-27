@@ -94,7 +94,7 @@ def run(pg, col, read_proj=None):
     cell(2, 0).click(); assert delbtn() == 'Delete file'
     cell(2, 2).click(modifiers=['Shift']); pg.wait_for_timeout(120)
     assert pg.locator('#ws .ws-cell.rng[data-c="2"]').count() == 2 and pg.locator('#ws .ws-cell.sel[data-c="2"]').count() == 1
-    assert delbtn() == 'Delete 3 files' and '3 rows' in pg.inner_text('#ws-toolbar .sel'), (delbtn(), pg.inner_text('#ws-toolbar .sel'))
+    assert delbtn() == 'Delete 3 files' and pg.locator('#ws-toolbar .sel').count() == 0, delbtn()    # (0.17.0: no text naming the selection)
     pg.keyboard.press('Delete'); pg.wait_for_timeout(200)                                  # the whole range goes at once, the pages below move up
     assert col(pg, 2)[:3] == c2[3:6] and allcols()[0] == start_cols[0] and allcols()[1] == start_cols[1], col(pg, 2)
     assert pg.locator('#ws .ws-cell.rng').count() == 0 and delbtn() == 'Delete file'
